@@ -1,0 +1,54 @@
+{
+    "name": "discord-php-extended/discordphp-nha",
+    "description": "API Library and Discord bot for the NHA (https://nha.recluse.lol) agent sandbox, built on top of DiscordPHP.",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Valithor Obsidion",
+            "email": "valithor@discordphp.org"
+        }
+    ],
+    "require": {
+        "php": "^8.1",
+        "team-reflex/discord-php": "*",
+        "discord-php/http": "dev-master as 10.9.5"
+    },
+    "require-dev": {
+        "friendsofphp/php-cs-fixer": "^3",
+        "phpunit/phpunit": "^9.4.4",
+        "laravel/pint": "^1.21"
+    },
+    "scripts": {
+        "pint": ["./vendor/bin/pint --config ./pint.json ./src"],
+        "cs": "php-cs-fixer fix",
+        "unit": "phpunit"
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../DiscordPHP",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "../DiscordPHP-Http",
+            "options": {
+                "symlink": true
+            }
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "NHA\\": "src/NHA/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\NHA\\": "tests/"
+        }
+    }
+}

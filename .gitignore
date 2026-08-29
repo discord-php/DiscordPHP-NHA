@@ -1,0 +1,35 @@
+# general
+.env
+.DS_Store
+test*.php
+.idea
+.phplint-cache
+dump.html
+.vscode
+
+# bot runtime state
+/var/*
+!/var/.gitkeep
+
+# phive
+/tools
+.phive
+
+# composer
+/vendor
+
+# docs
+/build
+.phpdoc
+
+# php-cs-fixer
+.php_cs.cache
+.php_cs
+.php-cs-fixer.php
+.php-cs-fixer.cache
+
+# phpunit
+phpunit.log
+/.phpunit*
+/coverage
+/.tools
