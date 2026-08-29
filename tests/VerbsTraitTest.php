@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Tests\NHA;
 
+use DiscordTestCase;
 use NHA\VerbsTrait;
-use PHPUnit\Framework\TestCase;
 use React\Promise\PromiseInterface;
 
 use function React\Promise\resolve;
 
-class VerbsTraitTest extends TestCase
+class VerbsTraitTest extends DiscordTestCase
 {
     private function subject(): object
     {

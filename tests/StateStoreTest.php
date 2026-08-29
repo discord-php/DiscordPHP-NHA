@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\NHA;
 
+use DiscordTestCase;
 use NHA\StateStore;
-use PHPUnit\Framework\TestCase;
 
-class StateStoreTest extends TestCase
+class StateStoreTest extends DiscordTestCase
 {
     private string $path;
 

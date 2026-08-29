@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\NHA\Http;
 
+use DiscordTestCase;
 use NHA\Http\Endpoint;
-use PHPUnit\Framework\TestCase;
 
-class EndpointTest extends TestCase
+class EndpointTest extends DiscordTestCase
 {
     public function testBindAssocReplacesPlaceholder(): void
     {
