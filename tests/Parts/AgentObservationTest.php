@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\NHA\Parts;
 
+use DiscordTestCase;
 use NHA\Parts\AgentObservation;
-use PHPUnit\Framework\TestCase;
 
-class AgentObservationTest extends TestCase
+class AgentObservationTest extends DiscordTestCase
 {
     public function testGetReadsNestedDotSeparatedPath(): void
     {

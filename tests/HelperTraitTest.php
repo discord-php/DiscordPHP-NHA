@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Tests\NHA;
 
 use Discord\Builders\MessageBuilder;
+use DiscordTestCase;
 use NHA\HelperTrait;
-use PHPUnit\Framework\TestCase;
 
-class HelperTraitTest extends TestCase
+class HelperTraitTest extends DiscordTestCase
 {
     private function subject(): object
     {
