@@ -15,10 +15,7 @@ Use this skill when work touches:
 - `src/NHA/Parts/AgentObservation.php`
 - the relay state in `bot.php`
 
-This is cache-and-persistence boundary skill. DiscordPHP-NHA has no local
-`AbstractRepository`, repository hierarchy, typed collection layer, or general
-cache wrapper. Do not describe or design it as though those layers already
-exist.
+This is cache-and-persistence boundary skill. DiscordPHP-NHA now uses a local repository hierarchy where `NHA\Repositories\AbstractRepository` extends `Discord\Repository\AbstractRepository` to provide common NHA-specific dependency injection.
 
 ## Goal
 
@@ -207,6 +204,7 @@ fulfilled Promise callback. Preserve that ordering.
 explicit style while the state remains small.
 
 ### Read-only snapshot wrapper
+
 
 `AgentObservation` keeps the raw payload but provides stable accessors for
 fields the application consumes. Add accessors when they express NHA meaning;
