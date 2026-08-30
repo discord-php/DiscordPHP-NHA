@@ -275,20 +275,9 @@ trait VerbsTrait
     }
 
     /**
-     * Returns the outcome of a previously queued intent.
-     *
-     * @param int $intent_id The ID of the intent to check.
-     * @return PromiseInterface Resolving to the intent response payload.
-     */
-    public function getIntentStatus(int $intent_id): PromiseInterface
-    {
-        return $this->fetch((string) Endpoint::bind(Endpoint::INTENT_STATUS)->bindAssoc(['intent_id' => $intent_id]));
-    }
-
-    /**
      * Fetches a read-only endpoint and resolves with the decoded JSON body.
      *
-     * @param string|Endpoint $endpoint
+     * @param string|object $endpoint
      *
      * @return PromiseInterface
      */
@@ -296,4 +285,6 @@ trait VerbsTrait
     {
         return $this->nha_http->get($endpoint);
     }
+
+
 }
