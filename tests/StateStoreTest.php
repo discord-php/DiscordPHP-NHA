@@ -13,7 +13,7 @@ class StateStoreTest extends DiscordTestCase
 
     protected function setUp(): void
     {
-        $this->path = sys_get_temp_dir().'/nha-state-'.uniqid().'/state.json';
+        $this->path = sys_get_temp_dir() . '/nha-state-' . uniqid() . '/state.json';
     }
 
     protected function tearDown(): void

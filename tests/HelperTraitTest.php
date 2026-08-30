@@ -28,27 +28,27 @@ class HelperTraitTest extends DiscordTestCase
     {
         $result = $this->subject()::bar(10, 10, 10);
 
-        $this->assertSame(str_repeat('█', 10).' (10/10)', $result);
+        $this->assertSame(str_repeat('█', 10) . ' (10/10)', $result);
     }
 
     public function testBarRendersEmptyBarWhenCurrentIsZero(): void
     {
         $result = $this->subject()::bar(0, 10, 10);
 
-        $this->assertSame(str_repeat('░', 10).' (0/10)', $result);
+        $this->assertSame(str_repeat('░', 10) . ' (0/10)', $result);
     }
 
     public function testBarClampsCurrentAboveMax(): void
     {
         $result = $this->subject()::bar(15, 10, 4);
 
-        $this->assertSame(str_repeat('█', 4).' (15/10)', $result);
+        $this->assertSame(str_repeat('█', 4) . ' (15/10)', $result);
     }
 
     public function testBarTreatsNonPositiveMaxAsOne(): void
     {
         $result = $this->subject()::bar(0, 0, 4);
 
-        $this->assertSame(str_repeat('░', 4).' (0/1)', $result);
+        $this->assertSame(str_repeat('░', 4) . ' (0/1)', $result);
     }
 }

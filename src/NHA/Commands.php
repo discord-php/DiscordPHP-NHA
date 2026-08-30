@@ -31,9 +31,7 @@ use function React\Promise\reject;
  */
 class Commands
 {
-    public function __construct(protected readonly NHA $nha, protected readonly StateStore $state)
-    {
-    }
+    public function __construct(protected readonly NHA $nha, protected readonly StateStore $state) {}
 
     /**
      * Resolves an explicit agent id, falling back to the default agent.
@@ -42,7 +40,7 @@ class Commands
      */
     public function resolveAgentId(?int $agent_id): int
     {
-        if ($agent_id = $agent_id ?? $this->state->getDefaultAgent()) {
+        if ($agent_id ??= $this->state->getDefaultAgent()) {
             return $agent_id;
         }
 
@@ -62,7 +60,7 @@ class Commands
     {
         $json = json_encode($data, JSON_PRETTY_PRINT);
         if (strlen($json) > 3800) {
-            $json = substr($json, 0, 3800)."\n… (truncated)";
+            $json = substr($json, 0, 3800) . "\n… (truncated)";
         }
 
         return NHA::createBuilder()->addComponent(self::textContainer("### {$title}\n```json\n{$json}\n```"));
@@ -73,7 +71,7 @@ class Commands
     public function register(?string $name, ?int $metal, ?int $credits): PromiseInterface
     {
         $name ??= 'my-bot';
-        $materials = array_filter(['metal' => $metal, 'credits' => $credits], fn ($v) => null !== $v);
+        $materials = array_filter(['metal' => $metal, 'credits' => $credits], fn($v) => null !== $v);
 
         return $this->nha->registerAgent($name, $materials)->then(function (int $agent_id) {
             $this->state->setDefaultAgent($agent_id);
@@ -87,7 +85,7 @@ class Commands
     public function observe(?int $agent_id): PromiseInterface
     {
         return $this->nha->observe($this->resolveAgentId($agent_id))->then(
-            fn (AgentObservation $obs) => NHA::createBuilder()->addComponent($obs->toContainer($this->nha))
+            fn(AgentObservation $obs) => NHA::createBuilder()->addComponent($obs->toContainer($this->nha))
         );
     }
 
@@ -106,7 +104,7 @@ class Commands
         $agent_id = $this->resolveAgentId($agent_id);
 
         return $this->nha->intent($agent_id, $verb, $args)->then(
-            fn () => NHA::createBuilder()->addComponent(self::textContainer("✅ Queued **{$verb}** for agent #{$agent_id}."))
+            fn() => NHA::createBuilder()->addComponent(self::textContainer("✅ Queued **{$verb}** for agent #{$agent_id}."))
         );
     }
 
@@ -115,7 +113,7 @@ class Commands
         $agent_id = $this->resolveAgentId($agent_id);
 
         return $this->nha->move($agent_id, $dx, $dy)->then(
-            fn () => NHA::createBuilder()->addComponent(self::textContainer("✅ Queued **move** ({$dx}, {$dy}) for agent #{$agent_id}."))
+            fn() => NHA::createBuilder()->addComponent(self::textContainer("✅ Queued **move** ({$dx}, {$dy}) for agent #{$agent_id}."))
         );
     }
 
@@ -140,7 +138,7 @@ class Commands
         $n ??= 1;
 
         return $this->nha->intent($agent_id, $verb, ['n' => $n])->then(
-            fn () => NHA::createBuilder()->addComponent(self::textContainer("✅ Queued **{$verb}** x{$n} for agent #{$agent_id}."))
+            fn() => NHA::createBuilder()->addComponent(self::textContainer("✅ Queued **{$verb}** x{$n} for agent #{$agent_id}."))
         );
     }
 
@@ -149,7 +147,7 @@ class Commands
         $agent_id = $this->resolveAgentId($agent_id);
 
         return $this->nha->say($agent_id, $text)->then(
-            fn () => NHA::createBuilder()->addComponent(self::textContainer("💬 Agent #{$agent_id} said: {$text}"))
+            fn() => NHA::createBuilder()->addComponent(self::textContainer("💬 Agent #{$agent_id} said: {$text}"))
         );
     }
 
@@ -158,7 +156,7 @@ class Commands
         $agent_id = $this->resolveAgentId($agent_id);
 
         return $this->nha->tell($agent_id, $to, $text)->then(
-            fn () => NHA::createBuilder()->addComponent(self::textContainer("💬 Agent #{$agent_id} told #{$to}: {$text}"))
+            fn() => NHA::createBuilder()->addComponent(self::textContainer("💬 Agent #{$agent_id} told #{$to}: {$text}"))
         );
     }
 
@@ -166,36 +164,36 @@ class Commands
 
     public function world(): PromiseInterface
     {
-        return $this->nha->getWorld()->then(fn ($data) => self::jsonMessage('World', $data));
+        return $this->nha->getWorldRepo()->getWorld()->then(fn($data) => self::jsonMessage('World', $data));
     }
 
     public function map(): PromiseInterface
     {
-        return $this->nha->getMap()->then(fn ($data) => self::jsonMessage('Map', $data));
+        return $this->nha->getWorldRepo()->getMap()->then(fn($data) => self::jsonMessage('Map', $data));
     }
 
     public function market(): PromiseInterface
     {
-        return $this->nha->getMarket()->then(fn ($data) => self::jsonMessage('Market', $data));
+        return $this->nha->getEconomyRepo()->getMarket()->then(fn($data) => self::jsonMessage('Market', $data));
     }
 
     public function roster(): PromiseInterface
     {
-        return $this->nha->getRoster()->then(fn ($data) => self::jsonMessage('Roster', $data));
+        return $this->nha->getSocialRepo()->getRoster()->then(fn($data) => self::jsonMessage('Roster', $data));
     }
 
     public function rules(): PromiseInterface
     {
-        return $this->nha->getRules()->then(fn ($data) => self::jsonMessage('Rules', $data));
+        return $this->nha->getSocialRepo()->getRules()->then(fn($data) => self::jsonMessage('Rules', $data));
     }
 
     public function contracts(): PromiseInterface
     {
-        return $this->nha->getContracts()->then(fn ($data) => self::jsonMessage('Contracts', $data));
+        return $this->nha->getEconomyRepo()->getContracts()->then(fn($data) => self::jsonMessage('Contracts', $data));
     }
 
     public function agentInfo(int $agent_id): PromiseInterface
     {
-        return $this->nha->getAgentInfo($agent_id)->then(fn ($data) => self::jsonMessage("Agent #{$agent_id}", $data));
+        return $this->nha->getAgentRepo()->getAgentInfo($agent_id)->then(fn($data) => self::jsonMessage("Agent #{$agent_id}", $data));
     }
 }

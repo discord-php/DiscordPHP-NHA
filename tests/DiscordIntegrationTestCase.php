@@ -33,7 +33,7 @@ class DiscordIntegrationTestCase extends DiscordTestCase
                 $resolve($discord->getChannel(getenv('TEST_CHANNEL')));
             });
         } catch (\Throwable $e) {
-            static::markTestSkipped('Could not connect to Discord: '.$e->getMessage());
+            static::markTestSkipped('Could not connect to Discord: ' . $e->getMessage());
 
             return;
         }

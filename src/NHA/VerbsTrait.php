@@ -94,7 +94,7 @@ trait VerbsTrait
         return $this->intent($agent_id, 'finalize', ['name' => $name]);
     }
 
-    public function construct(int $agent_id, string $shape, $size, $height, $color): PromiseInterface
+    public function construct(int $agent_id, string $shape, mixed $size, mixed $height, mixed $color): PromiseInterface
     {
         return $this->intent($agent_id, 'construct', ['shape' => $shape, 'size' => $size, 'height' => $height, 'color' => $color]);
     }
@@ -143,7 +143,7 @@ trait VerbsTrait
         return $this->intent($agent_id, 'order', ['side' => $side, 'resource' => $resource, 'qty' => $qty, 'price' => $price]);
     }
 
-    public function cancelOrder(int $agent_id, $order_id): PromiseInterface
+    public function cancelOrder(int $agent_id, mixed $order_id): PromiseInterface
     {
         return $this->intent($agent_id, 'cancel', ['order_id' => $order_id]);
     }
@@ -153,40 +153,40 @@ trait VerbsTrait
         return $this->intent($agent_id, 'trade', ['to' => $to, 'give' => $give, 'want' => $want]);
     }
 
-    public function acceptTrade(int $agent_id, $trade_id): PromiseInterface
+    public function acceptTrade(int $agent_id, mixed $trade_id): PromiseInterface
     {
         return $this->intent($agent_id, 'accept', ['trade_id' => $trade_id]);
     }
 
     // --- Contracts & bounties --------------------------------------------
 
-    public function contract(int $agent_id, $reward, array $want, ?int $to = null, ?int $deadline_ticks = null): PromiseInterface
+    public function contract(int $agent_id, mixed $reward, array $want, ?int $to = null, ?int $deadline_ticks = null): PromiseInterface
     {
         return $this->intent($agent_id, 'contract', array_filter([
             'reward' => $reward,
             'want' => $want,
             'to' => $to,
             'deadline_ticks' => $deadline_ticks,
-        ], fn ($v) => null !== $v));
+        ], fn($v) => null !== $v));
     }
 
-    public function fulfill(int $agent_id, $contract_id): PromiseInterface
+    public function fulfill(int $agent_id, mixed $contract_id): PromiseInterface
     {
         return $this->intent($agent_id, 'fulfill', ['contract_id' => $contract_id]);
     }
 
-    public function revoke(int $agent_id, $contract_id): PromiseInterface
+    public function revoke(int $agent_id, mixed $contract_id): PromiseInterface
     {
         return $this->intent($agent_id, 'revoke', ['contract_id' => $contract_id]);
     }
 
-    public function bounty(int $agent_id, int $target, $reward, ?int $deadline_ticks = null): PromiseInterface
+    public function bounty(int $agent_id, int $target, mixed $reward, ?int $deadline_ticks = null): PromiseInterface
     {
         return $this->intent($agent_id, 'bounty', array_filter([
             'target' => $target,
             'reward' => $reward,
             'deadline_ticks' => $deadline_ticks,
-        ], fn ($v) => null !== $v));
+        ], fn($v) => null !== $v));
     }
 
     // --- Heal --------------------------------------------------------------
@@ -208,7 +208,7 @@ trait VerbsTrait
         return $this->intent($agent_id, 'arm', []);
     }
 
-    public function detonate(int $agent_id, $bomb): PromiseInterface
+    public function detonate(int $agent_id, mixed $bomb): PromiseInterface
     {
         return $this->intent($agent_id, 'detonate', ['bomb' => $bomb]);
     }
@@ -218,7 +218,7 @@ trait VerbsTrait
         return $this->intent($agent_id, 'steal', ['from' => $from, 'resource' => $resource, 'n' => $n]);
     }
 
-    public function collect(int $agent_id, $loot): PromiseInterface
+    public function collect(int $agent_id, mixed $loot): PromiseInterface
     {
         return $this->intent($agent_id, 'collect', ['loot' => $loot]);
     }
@@ -288,11 +288,11 @@ trait VerbsTrait
     /**
      * Fetches a read-only endpoint and resolves with the decoded JSON body.
      *
-     * @param string $endpoint
+     * @param string|Endpoint $endpoint
      *
      * @return PromiseInterface
      */
-    public function fetch(string $endpoint): PromiseInterface
+    public function fetch(string|object $endpoint): PromiseInterface
     {
         return $this->nha_http->get($endpoint);
     }

@@ -18,7 +18,12 @@ use Discord\MessageCommandClient;
 use NHA\Http\Endpoint;
 use NHA\Http\Http;
 use NHA\Parts\AgentObservation;
-use NHA\NHARepository;
+use NHA\Repositories\AgentRepository;
+use NHA\Repositories\DiscoveryRepository;
+use NHA\Repositories\EconomyRepository;
+use NHA\Repositories\IntentRepository;
+use NHA\Repositories\SocialRepository;
+use NHA\Repositories\WorldRepository;
 use React\Promise\PromiseInterface;
 
 use function React\Promise\resolve;
@@ -38,9 +43,44 @@ class NHA extends MessageCommandClient
     /**
      * The repository for querying NHA world state.
      *
-     * @var NHARepository
+     * @var WorldRepository
      */
-    protected $repo;
+    protected WorldRepository $world_repo;
+
+    /**
+     * The repository for querying NHA economy related data.
+     *
+     * @var EconomyRepository
+     */
+    protected EconomyRepository $economy_repo;
+
+    /**
+     * The repository for querying NHA social and communication data.
+     *
+     * @var SocialRepository
+     */
+    protected SocialRepository $social_repo;
+
+    /**
+     * The repository for querying NHA agent and history related data.
+     *
+     * @var AgentRepository
+     */
+    protected AgentRepository $agent_repo;
+
+    /**
+     * The repository for querying NHA discovery and intent related data.
+     *
+     * @var DiscoveryRepository
+     */
+    protected DiscoveryRepository $discovery_repo;
+
+    /**
+     * The repository for querying NHA intent related data.
+     *
+     * @var IntentRepository
+     */
+    protected IntentRepository $intent_repo;
 
     /**
      * Local cache of the last observation received per agent id.
@@ -60,7 +100,12 @@ class NHA extends MessageCommandClient
             new React($this->loop, $options['socket_options'] ?? [])
         );
 
-        $this->repo = new NHARepository($this);
+        $this->world_repo = new WorldRepository($this);
+        $this->economy_repo = new EconomyRepository($this);
+        $this->social_repo = new SocialRepository($this);
+        $this->agent_repo = new AgentRepository($this);
+        $this->discovery_repo = new DiscoveryRepository($this);
+        $this->intent_repo = new IntentRepository($this);
     }
 
     /**
@@ -74,13 +119,63 @@ class NHA extends MessageCommandClient
     }
 
     /**
-     * Gets the repository for querying NHA world state.
+     * Gets the world repository.
      *
-     * @return NHARepository
+     * @return WorldRepository
      */
-    public function getRepo(): NHARepository
+    public function getWorldRepo(): WorldRepository
     {
-        return $this->repo;
+        return $this->world_repo;
+    }
+
+    /**
+     * Gets the economy repository.
+     *
+     * @return EconomyRepository
+     */
+    public function getEconomyRepo(): EconomyRepository
+    {
+        return $this->economy_repo;
+    }
+
+    /**
+     * Gets the social repository.
+     *
+     * @return SocialRepository
+     */
+    public function getSocialRepo(): SocialRepository
+    {
+        return $this->social_repo;
+    }
+
+    /**
+     * Gets the agent repository.
+     *
+     * @return AgentRepository
+     */
+    public function getAgentRepo(): AgentRepository
+    {
+        return $this->agent_repo;
+    }
+
+    /**
+     * Gets the discovery repository.
+     *
+     * @return DiscoveryRepository
+     */
+    public function getDiscoveryRepo(): DiscoveryRepository
+    {
+        return $this->discovery_repo;
+    }
+
+    /**
+     * Gets the intent repository.
+     *
+     * @return IntentRepository
+     */
+    public function getIntentRepo(): IntentRepository
+    {
+        return $this->intent_repo;
     }
 
     /**
@@ -108,7 +203,7 @@ class NHA extends MessageCommandClient
         return $this->nha_http->post(Endpoint::AGENTS, [
             'name' => $name,
             'materials' => $materials,
-        ])->then(fn ($response) => $response->agent_id);
+        ])->then(fn($response) => $response->agent_id);
     }
 
     /**

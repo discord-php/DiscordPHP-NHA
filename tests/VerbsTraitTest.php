@@ -79,10 +79,10 @@ class VerbsTraitTest extends DiscordTestCase
 
     public function testGetIntentStatusForwardsId(): void
     {
-        // Since we can't easily mock NHA::getIntentStatus in this anonymous class 
-        // without a full NHA mock, we'll just check if the method exists and 
+        // Since we can't easily mock NHA::getIntentStatus in this anonymous class
+        // without a full NHA mock, we'll just check if the method exists and
         // doesn't crash if we call it on a mockable object.
-        // However, VerbsTrait::getIntentStatus calls $this->fetch(), 
+        // However, VerbsTrait::getIntentStatus calls $this->fetch(),
         // so let's extend the subject to provide fetch.
         $subject = new class {
             use VerbsTrait;
@@ -93,7 +93,7 @@ class VerbsTraitTest extends DiscordTestCase
         };
 
         $promise = $subject->getIntentStatus(123);
-        
+
         $this->assertInstanceOf(PromiseInterface::class, $promise);
     }
 }

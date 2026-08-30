@@ -194,6 +194,6 @@ class Http extends DiscordHttp implements HttpInterface
      */
     public function getUserAgent(): string
     {
-        return 'DiscordPHP-NHA (https://github.com/discord-php/DiscordPHP-NHA, '.self::VERSION.')';
+        return 'DiscordPHP-NHA (https://github.com/discord-php/DiscordPHP-NHA, ' . self::VERSION . ')';
     }
 }

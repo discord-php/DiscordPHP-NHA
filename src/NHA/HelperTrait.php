@@ -50,6 +50,6 @@ trait HelperTrait
         $max = max($max, 1);
         $filled = (int) round($length * max(0, min(1, $current / $max)));
 
-        return str_repeat('█', $filled).str_repeat('░', $length - $filled)." ({$current}/{$max})";
+        return str_repeat('█', $filled) . str_repeat('░', $length - $filled) . " ({$current}/{$max})";
     }
 }

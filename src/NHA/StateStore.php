@@ -44,7 +44,7 @@ class StateStore
     {
         $dir = dirname($this->path);
         if (! is_dir($dir)) {
-            mkdir($dir, 0777, true);
+            mkdir($dir, 0o777, true);
         }
 
         file_put_contents($this->path, json_encode($this->data, JSON_PRETTY_PRINT));

@@ -11,9 +11,9 @@ declare(strict_types=1);
  * with this source code in the LICENSE.md file.
  */
 
-require __DIR__.'/../vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
 
-$envPath = __DIR__.'/../.env';
+$envPath = __DIR__ . '/../.env';
 if (is_file($envPath)) {
     foreach (file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
         $line = trim($line);
@@ -37,7 +37,7 @@ if (is_file($envPath)) {
     }
 }
 
-require __DIR__.'/functions.php';
-require __DIR__.'/DiscordSingleton.php';
-require __DIR__.'/DiscordTestCase.php';
-require __DIR__.'/DiscordIntegrationTestCase.php';
+require __DIR__ . '/functions.php';
+require __DIR__ . '/DiscordSingleton.php';
+require __DIR__ . '/DiscordTestCase.php';
+require __DIR__ . '/DiscordIntegrationTestCase.php';

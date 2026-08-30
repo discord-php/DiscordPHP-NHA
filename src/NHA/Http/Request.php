@@ -27,6 +27,6 @@ class Request extends DiscordRequest
      */
     public function getUrl(): string
     {
-        return Http::BASE_URL.'/'.$this->url;
+        return Http::BASE_URL . '/' . $this->url;
     }
 }

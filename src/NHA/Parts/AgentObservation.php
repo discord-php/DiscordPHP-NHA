@@ -132,21 +132,21 @@ class AgentObservation implements \JsonSerializable
 
         $lines = [
             "### Agent #{$this->agentId}",
-            'HP: '.self::bar((float) ($this->getHp() ?? 0), $this->getMaxHp()),
-            "Position: {$positionText}".($this->getVision() ? " · Vision: {$this->getVision()}" : ''),
+            'HP: ' . self::bar((float) ($this->getHp() ?? 0), $this->getMaxHp()),
+            "Position: {$positionText}" . ($this->getVision() ? " · Vision: {$this->getVision()}" : ''),
         ];
 
         if ($inventory = $this->getInventory()) {
-            $summary = implode(', ', array_map(fn ($k, $v) => "{$k}: {$v}", array_keys($inventory), $inventory));
+            $summary = implode(', ', array_map(fn($k, $v) => "{$k}: {$v}", array_keys($inventory), $inventory));
             $lines[] = "Inventory: {$summary}";
         }
 
         if ($threats = $this->getThreats()) {
-            $lines[] = '⚠️ Threats: '.count($threats).' recent alert(s)';
+            $lines[] = '⚠️ Threats: ' . count($threats) . ' recent alert(s)';
         }
 
         if ($bounties = $this->getBounties()) {
-            $lines[] = '💀 Bounties: '.count($bounties).' open';
+            $lines[] = '💀 Bounties: ' . count($bounties) . ' open';
         }
 
         if ($messages = array_slice($this->getMessages(), -3)) {
@@ -159,19 +159,19 @@ class AgentObservation implements \JsonSerializable
         }
 
         // After any quick-action, re-observe and refresh the message in place.
-        $refresh = fn ($interaction) => $nha->observe($this->agentId)->then(
-            fn (self $obs) => $interaction->updateMessage(NHA::createBuilder()->addComponent($obs->toContainer($nha)))
+        $refresh = fn($interaction) => $nha->observe($this->agentId)->then(
+            fn(self $obs) => $interaction->updateMessage(NHA::createBuilder()->addComponent($obs->toContainer($nha)))
         );
 
         $container = Container::new()->addComponents([
             TextDisplay::new(implode("\n", $lines)),
             Separator::new(),
             ActionRow::new()->addComponents([
-                Button::secondary()->setLabel('⬆️')->setListener(fn ($i) => $nha->move($this->agentId, 0, -1)->then(fn () => $refresh($i)), $nha),
-                Button::secondary()->setLabel('⬇️')->setListener(fn ($i) => $nha->move($this->agentId, 0, 1)->then(fn () => $refresh($i)), $nha),
-                Button::secondary()->setLabel('⬅️')->setListener(fn ($i) => $nha->move($this->agentId, -1, 0)->then(fn () => $refresh($i)), $nha),
-                Button::secondary()->setLabel('➡️')->setListener(fn ($i) => $nha->move($this->agentId, 1, 0)->then(fn () => $refresh($i)), $nha),
-                Button::primary()->setLabel('🔄 Refresh')->setListener(fn ($i) => $refresh($i), $nha),
+                Button::secondary()->setLabel('⬆️')->setListener(fn($i) => $nha->move($this->agentId, 0, -1)->then(fn() => $refresh($i)), $nha),
+                Button::secondary()->setLabel('⬇️')->setListener(fn($i) => $nha->move($this->agentId, 0, 1)->then(fn() => $refresh($i)), $nha),
+                Button::secondary()->setLabel('⬅️')->setListener(fn($i) => $nha->move($this->agentId, -1, 0)->then(fn() => $refresh($i)), $nha),
+                Button::secondary()->setLabel('➡️')->setListener(fn($i) => $nha->move($this->agentId, 1, 0)->then(fn() => $refresh($i)), $nha),
+                Button::primary()->setLabel('🔄 Refresh')->setListener(fn($i) => $refresh($i), $nha),
             ]),
         ]);
 

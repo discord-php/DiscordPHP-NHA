@@ -32,8 +32,8 @@ use React\Promise\PromiseInterface;
 
 use function React\Promise\set_rejection_handler;
 
-$autoload_path = file_exists($autoload_path = __DIR__.'/vendor/autoload.php') ? $autoload_path
-    : (file_exists($autoload_path = dirname(__DIR__).'/vendor/autoload.php') ? $autoload_path : null);
+$autoload_path = file_exists($autoload_path = __DIR__ . '/vendor/autoload.php') ? $autoload_path
+    : (file_exists($autoload_path = dirname(__DIR__) . '/vendor/autoload.php') ? $autoload_path : null);
 $autoload_path ? require ($autoload_path) : throw new \Exception('Composer autoloader not found. Run `composer update` and try again.');
 
 function loadEnv(string $filePath): void
@@ -43,7 +43,7 @@ function loadEnv(string $filePath): void
     }
 
     $lines = file($filePath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    $filteredLines = array_filter(array_map('trim', $lines), fn ($line) => $line && ! str_starts_with($line, '#'));
+    $filteredLines = array_filter(array_map('trim', $lines), fn($line) => $line && ! str_starts_with($line, '#'));
 
     array_walk($filteredLines, function ($line) {
         [$name, $value] = array_map('trim', explode('=', $line, 2));
@@ -53,8 +53,8 @@ function loadEnv(string $filePath): void
     });
 }
 
-$env_path = file_exists($env_path = getcwd().'/.env') ? $env_path
-    : (file_exists($env_path = dirname(getcwd()).'/.env') ? $env_path : null);
+$env_path = file_exists($env_path = getcwd() . '/.env') ? $env_path
+    : (file_exists($env_path = dirname(getcwd()) . '/.env') ? $env_path : null);
 $env_path ? loadEnv($env_path) : throw new \Exception('The .env file does not exist. Please create one in the root directory.');
 
 $error_channel_id = getenv('ERROR_CHANNEL_ID') ?: null;
@@ -87,22 +87,22 @@ $reportFatalError = function (\Throwable $e) use ($nha, $error_channel_id, $logg
 set_rejection_handler($reportFatalError);
 set_exception_handler($reportFatalError);
 
-$state = new StateStore(__DIR__.'/var/state.json');
+$state = new StateStore(__DIR__ . '/var/state.json');
 $commands = new Commands($nha, $state);
 
 /**
  * Builds a container carrying a single line of text, used for quick
  * confirmations/errors shared by every entry point.
  */
-$text = fn (string $content): Container => Container::new()->addComponents([TextDisplay::new($content)]);
+$text = fn(string $content): Container => Container::new()->addComponents([TextDisplay::new($content)]);
 
 /**
  * Runs a Commands:: promise and reports the outcome back to a chat Message.
  */
 $replyToMessage = function (Message $message, PromiseInterface $promise) use ($nha, $text): void {
     $promise->then(
-        fn ($builder) => $message->channel->sendMessage($builder),
-        fn (\Throwable $e) => $message->channel->sendMessage($nha::createBuilder()->addComponent($text("❌ {$e->getMessage()}")))
+        fn($builder) => $message->channel->sendMessage($builder),
+        fn(\Throwable $e) => $message->channel->sendMessage($nha::createBuilder()->addComponent($text("❌ {$e->getMessage()}")))
     );
 };
 
@@ -111,9 +111,9 @@ $replyToMessage = function (Message $message, PromiseInterface $promise) use ($n
  * deferring the response first since world requests are network calls.
  */
 $replyToInteraction = function (Interaction $interaction, PromiseInterface $promise) use ($nha, $text): PromiseInterface {
-    return $interaction->acknowledgeWithResponse()->then(fn () => $promise)->then(
-        fn ($builder) => $interaction->updateOriginalResponse($builder),
-        fn (\Throwable $e) => $interaction->updateOriginalResponse($nha::createBuilder()->addComponent($text("❌ {$e->getMessage()}")))
+    return $interaction->acknowledgeWithResponse()->then(fn() => $promise)->then(
+        fn($builder) => $interaction->updateOriginalResponse($builder),
+        fn(\Throwable $e) => $interaction->updateOriginalResponse($nha::createBuilder()->addComponent($text("❌ {$e->getMessage()}")))
     );
 };
 
@@ -171,7 +171,7 @@ $nha_cmd->registerSubCommand('move', function (Message $message, array $args) us
 foreach (['mine', 'chop', 'gather'] as $verb) {
     $nha_cmd->registerSubCommand($verb, function (Message $message, array $args) use ($commands, $replyToMessage, $verb): void {
         $replyToMessage($message, $commands->{$verb}(null, isset($args[0]) ? (int) $args[0] : null));
-    }, ['description' => ucfirst($verb).' nearby resources.', 'usage' => '[n]']);
+    }, ['description' => ucfirst($verb) . ' nearby resources.', 'usage' => '[n]']);
 }
 
 $nha_cmd->registerSubCommand('say', function (Message $message, array $args) use ($commands, $replyToMessage): void {
@@ -224,7 +224,7 @@ $registerSlashCommands = function (NHA $nha) use ($commands, $replyToInteraction
             return $subOption;
         };
 
-        $agentIdOpt = fn () => $opt(Option::INTEGER, 'agent_id', 'Agent id (defaults to your registered agent).');
+        $agentIdOpt = fn() => $opt(Option::INTEGER, 'agent_id', 'Agent id (defaults to your registered agent).');
 
         $subCommands = [
             $sub('register', 'Register a new agent (becomes the default).', [
