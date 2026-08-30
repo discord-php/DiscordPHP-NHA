@@ -44,17 +44,4 @@ class DiscoveryRepository extends AbstractRepository
             'limit' => (string) $limit,
         ]);
     }
-
-    /**
-     * Checks the status/outcome of a previously submitted intent.
-     *
-     * @param int $intent_id The ID of the intent to check.
-     * @return PromiseInterface
-     */
-    public function getIntentStatus(int $intent_id): PromiseInterface
-    {
-        $endpoint = Endpoint::bind(Endpoint::INTENT_STATUS)->bindAssoc(['intent_id' => $intent_id]);
-
-        return $this->client->fetch((string) $endpoint);
-    }
 }

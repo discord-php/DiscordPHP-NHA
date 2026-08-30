@@ -61,4 +61,50 @@ class WorldRepository extends AbstractRepository
     {
         return $this->client->fetch(Endpoint::STRUCTURES);
     }
+
+    /**
+     * Fetches colony information.
+     *
+     * @param string $body
+     * @return PromiseInterface
+     */
+    public function getColony(string $body): PromiseInterface
+    {
+        $endpoint = Endpoint::bind(Endpoint::COLONY)->bindAssoc(['body' => $body]);
+
+        return $this->client->fetch((string) $endpoint);
+    }
+
+    /**
+     * Fetches terraform information.
+     *
+     * @param string $body
+     * @return PromiseInterface
+     */
+    public function getTerraform(string $body): PromiseInterface
+    {
+        $endpoint = Endpoint::bind(Endpoint::TERRAFORM)->bindAssoc(['body' => $body]);
+
+        return $this->client->fetch((string) $endpoint);
+    }
+
+    /**
+     * Fetches expansion information.
+     *
+     * @return PromiseInterface
+     */
+    public function getExpansion(): PromiseInterface
+    {
+        return $this->client->fetch(Endpoint::EXPANSION);
+    }
+
+    /**
+     * Fetches the rules.
+     *
+     * @return PromiseInterface
+     */
+    public function getRules(): PromiseInterface
+    {
+        return $this->client->fetch(Endpoint::RULES);
+    }
 }

@@ -36,42 +36,22 @@ class AgentRepository extends AbstractRepository
     }
 
     /**
-     * Fetches inventors.
+     * Fetches the agent list.
      *
      * @return PromiseInterface
      */
-    public function getInventors(): PromiseInterface
+    public function getAgents(): PromiseInterface
     {
-        return $this->client->fetch(Endpoint::INVENTORS);
+        return $this->client->fetch(Endpoint::AGENTS_LIST);
     }
 
     /**
-     * Fetches records.
+     * Fetches the roster.
      *
      * @return PromiseInterface
      */
-    public function getRecords(): PromiseInterface
+    public function getRoster(): PromiseInterface
     {
-        return $this->client->fetch(Endpoint::RECORDS);
-    }
-
-    /**
-     * Fetches milestones.
-     *
-     * @return PromiseInterface
-     */
-    public function getMilestones(): PromiseInterface
-    {
-        return $this->client->fetch(Endpoint::MILESTONES);
-    }
-
-    /**
-     * Fetches the timeline.
-     *
-     * @return PromiseInterface
-     */
-    public function getTimeline(): PromiseInterface
-    {
-        return $this->client->fetch(Endpoint::TIMELINE);
+        return $this->client->fetch(Endpoint::ROSTER);
     }
 }

@@ -63,12 +63,12 @@ class SocialRepository extends AbstractRepository
     }
 
     /**
-     * Fetches the rules.
+     * Fetches relations.
      *
      * @return PromiseInterface
      */
-    public function getRules(): PromiseInterface
+    public function getRelations(): PromiseInterface
     {
-        return $this->client->fetch(Endpoint::RULES);
+        return $this->client->fetch(Endpoint::RELATIONS);
     }
 }

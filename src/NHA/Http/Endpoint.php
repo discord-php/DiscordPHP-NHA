@@ -54,6 +54,16 @@ class Endpoint implements EndpointInterface
     public const ROSTER = 'roster';
     public const AGENT = 'agent/:agent_id';
     public const GUILD_PENDING = 'guild/pending';
+    public const HEALTHZ = 'healthz';
+    public const UPDATES = 'updates';
+    public const COLONY = 'colony/:body';
+    public const TERRAFORM = 'terraform/:body';
+    public const EXPANSION = 'expansion';
+    public const RELATIONS = 'relations';
+    public const AGENTS_LIST = 'agents';
+    public const FEED = 'feed';
+    public const ARENA = 'arena';
+
 
     /**
      * Regex to identify parameters in endpoints.
