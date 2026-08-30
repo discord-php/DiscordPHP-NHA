@@ -10,7 +10,7 @@ use NHA\HelperTrait;
 
 class HelperTraitTest extends DiscordTestCase
 {
-    private function subject(): object
+    protected function subject(): object
     {
         return new class {
             use HelperTrait;

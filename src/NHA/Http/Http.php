@@ -13,12 +13,16 @@ declare(strict_types=1);
 
 namespace NHA\Http;
 
+use Discord\Http\Bucket;
+use Discord\Http\Http as DiscordHttp;
+use Discord\Http\RateLimit;
 use Discord\Http\DriverInterface;
 use Discord\Http\Endpoint;
 use Discord\Http\HttpInterface;
 use Discord\Http\HttpTrait;
 use Psr\Log\LoggerInterface;
 use React\EventLoop\LoopInterface;
+use React\EventLoop\TimerInterface;
 use React\Promise\Deferred;
 use React\Promise\PromiseInterface;
 use SplQueue;
@@ -31,7 +35,7 @@ use SplQueue;
  *
  * @author Valithor Obsidion <valithor@discordphp.org>
  */
-class Http implements HttpInterface
+class Http extends DiscordHttp implements HttpInterface
 {
     use HttpTrait;
 
@@ -54,7 +58,7 @@ class Http implements HttpInterface
      *
      * @var string
      */
-    private $token;
+    protected $token;
 
     /**
      * Logger for HTTP requests.

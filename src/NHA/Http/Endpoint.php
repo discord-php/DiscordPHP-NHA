@@ -31,6 +31,10 @@ class Endpoint implements EndpointInterface
     public const OBSERVE = 'observe/:agent_id';
     // POST - submit an intent (action) for an agent
     public const INTENT = 'intent';
+    // GET - check the outcome of an intent
+    public const INTENT_STATUS = 'intent/:intent_id';
+    // GET - find nearest deposits to a point
+    public const DEPOSITS = 'deposits';
 
     // Read-only world/state endpoints
     public const WORLD = 'world';

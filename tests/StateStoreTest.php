@@ -9,7 +9,7 @@ use NHA\StateStore;
 
 class StateStoreTest extends DiscordTestCase
 {
-    private string $path;
+    protected string $path;
 
     protected function setUp(): void
     {

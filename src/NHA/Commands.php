@@ -31,7 +31,7 @@ use function React\Promise\reject;
  */
 class Commands
 {
-    public function __construct(private readonly NHA $nha, private readonly StateStore $state)
+    public function __construct(protected readonly NHA $nha, protected readonly StateStore $state)
     {
     }
 
@@ -49,7 +49,7 @@ class Commands
         throw new \RuntimeException('No agent registered yet. Use `register` first, or pass an explicit agent id.');
     }
 
-    private static function textContainer(string $text): Container
+    protected static function textContainer(string $text): Container
     {
         return Container::new()->addComponents([TextDisplay::new($text)]);
     }
@@ -58,7 +58,7 @@ class Commands
      * Formats arbitrary read-only endpoint data into a message, truncated
      * to stay within the 4000 character Text Display limit.
      */
-    private static function jsonMessage(string $title, $data): MessageBuilder
+    protected static function jsonMessage(string $title, mixed $data): MessageBuilder
     {
         $json = json_encode($data, JSON_PRETTY_PRINT);
         if (strlen($json) > 3800) {
@@ -134,7 +134,7 @@ class Commands
         return $this->gatherVerb('gather', $agent_id, $n);
     }
 
-    private function gatherVerb(string $verb, ?int $agent_id, ?int $n): PromiseInterface
+    protected function gatherVerb(string $verb, ?int $agent_id, ?int $n): PromiseInterface
     {
         $agent_id = $this->resolveAgentId($agent_id);
         $n ??= 1;

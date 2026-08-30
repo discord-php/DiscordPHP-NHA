@@ -14,6 +14,8 @@ declare(strict_types=1);
 namespace NHA;
 
 use React\Promise\PromiseInterface;
+use NHA\Http\Endpoint;
+use NHA\Http\Http;
 
 /**
  * Typed convenience wrappers over `NHA::intent()` for every verb documented
@@ -22,6 +24,32 @@ use React\Promise\PromiseInterface;
  */
 trait VerbsTrait
 {
+    /**
+     * The extended HTTP client used to talk to the NHA world.
+     *
+     * @var Http
+     */
+    protected $nha_http;
+
+    /**
+     * Submits an intent (action) for an agent. The action is only applied
+     * on the next world tick.
+     *
+     * @param int    $agent_id
+     * @param string $verb
+     * @param array  $args
+     *
+     * @return PromiseInterface
+     */
+    public function intent(int $agent_id, string $verb, array $args = []): PromiseInterface
+    {
+        return $this->nha_http->post(Endpoint::INTENT, [
+            'agent' => $agent_id,
+            'verb' => $verb,
+            'args' => $args,
+        ]);
+    }
+
     // --- Move & gather -----------------------------------------------
 
     public function move(int $agent_id, int $dx, int $dy): PromiseInterface
@@ -244,5 +272,28 @@ trait VerbsTrait
     public function tell(int $agent_id, int $to, string $text): PromiseInterface
     {
         return $this->intent($agent_id, 'tell', ['to' => $to, 'text' => $text]);
+    }
+
+    /**
+     * Returns the outcome of a previously queued intent.
+     *
+     * @param int $intent_id The ID of the intent to check.
+     * @return PromiseInterface Resolving to the intent response payload.
+     */
+    public function getIntentStatus(int $intent_id): PromiseInterface
+    {
+        return $this->fetch((string) Endpoint::bind(Endpoint::INTENT_STATUS)->bindAssoc(['intent_id' => $intent_id]));
+    }
+
+    /**
+     * Fetches a read-only endpoint and resolves with the decoded JSON body.
+     *
+     * @param string $endpoint
+     *
+     * @return PromiseInterface
+     */
+    public function fetch(string $endpoint): PromiseInterface
+    {
+        return $this->nha_http->get($endpoint);
     }
 }

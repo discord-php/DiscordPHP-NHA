@@ -22,9 +22,9 @@ namespace NHA;
  */
 class StateStore
 {
-    private array $data;
+    protected array $data;
 
-    public function __construct(private readonly string $path)
+    public function __construct(protected readonly string $path)
     {
         $this->data = is_file($path) ? (array) json_decode(file_get_contents($path), true) : [];
     }
@@ -40,7 +40,7 @@ class StateStore
         $this->save();
     }
 
-    private function save(): void
+    protected function save(): void
     {
         $dir = dirname($this->path);
         if (! is_dir($dir)) {

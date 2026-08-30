@@ -17,8 +17,8 @@ use Psr\Log\NullLogger;
 
 class DiscordSingleton
 {
-    private static ?Discord $discord = null;
-    private static ?Discord $liveDiscord = null;
+    protected static ?Discord $discord = null;
+    protected static ?Discord $liveDiscord = null;
 
     public static function get(): Discord
     {
@@ -43,7 +43,7 @@ class DiscordSingleton
         return self::$liveDiscord;
     }
 
-    private static function connect(string $token): Discord
+    protected static function connect(string $token): Discord
     {
         $discord = new Discord([
             'token' => $token,
