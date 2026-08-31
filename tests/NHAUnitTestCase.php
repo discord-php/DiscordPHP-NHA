@@ -2,8 +2,6 @@
 
 declare(strict_types=1);
 
-namespace Tests\NHA;
-
 use PHPUnit\Framework\TestCase;
 
 /**

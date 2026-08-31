@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-use Discord\Builders\MessageBuilder;
 use NHA\HelperTrait;
+use Discord\Builders\MessageBuilder;
 
-class HelperTraitTest extends NHATestCase
+class HelperTraitTest extends NHAUnitTestCase
 {
     protected function subject(): object
     {

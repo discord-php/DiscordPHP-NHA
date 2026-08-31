@@ -7,7 +7,7 @@ use React\Promise\PromiseInterface;
 
 use function React\Promise\resolve;
 
-class VerbsTraitTest extends NHATestCase
+class VerbsTraitTest extends NHAUnitTestCase
 {
     protected function subject(): object
     {

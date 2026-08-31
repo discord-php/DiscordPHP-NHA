@@ -1,9 +1,10 @@
 <?php
 
 declare(strict_types=1);
+
 use NHA\StateStore;
 
-class StateStoreTest extends NHATestCase
+class StateStoreTest extends NHAUnitTestCase
 {
     protected string $path;
 

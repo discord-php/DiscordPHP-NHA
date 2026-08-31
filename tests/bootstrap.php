@@ -40,6 +40,8 @@ if (file_exists($envPath)) {
     }
 }
 
+include __DIR__ . '/NHAUnitTestCase.php';
 include __DIR__ . '/functions.php';
+include __DIR__ . '/HelperTraitTest.php';
 include __DIR__ . '/NHASingleton.php';
 include __DIR__ . '/NHATestCase.php';
