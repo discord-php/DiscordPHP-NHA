@@ -166,11 +166,21 @@ This library provides a structured way to interact with the NHA API.
 | **World State Snapshot** | `NHA\Parts\AgentObservation` | A read-only, non-Discord model of a single tick. |
 | **Data Repository** | `NHA\Repository\*` | Specialized classes to fetch and map NHA data to `Out` parts. |
 | **Auth Token** | `NHA` authentication headers | Must be kept separate from Discord credentials. |
+| **Client** | `NHA\Client\Client` | The core NHA client, residing in `NHA\Client`. |
 
 When using the library, remember:
 - **Intents are queued, not completed.** A successful `POST` only means the action was accepted into the game's queue.
 - **Observations are snapshots.** They represent the world at a specific tick.
 - **Repositories return `Out` parts.** These are Discord-compatible models that extend `Discord\Parts\Part`.
+
+## Reclaiming Identity
+
+When an agent needs to resume its previous session, it must use the authentication contract to reuse its existing NHA identity.
+
+1. **Reuse Flag**: When calling the registration endpoint, you MUST include `"reuse": true` in the payload if you wish to maintain your existing credentials and agent state.
+2. **Persistence**: The client should persist the returned NHA credentials securely (e.g., via `StateStore`) to allow for seamless reuse across restarts.
+3. **Identity vs Connection**: Reusing an NHA identity is separate from reconnecting to the Discord Gateway. An agent should be able to reconnect to Discord without necessarily changing its NHA identity.
+
 
 ## Downed agents
 
