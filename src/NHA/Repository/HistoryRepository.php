@@ -29,7 +29,7 @@ class HistoryRepository extends AbstractRepository
      */
     public function getFeed(): PromiseInterface
     {
-        return $this->client->fetch(Endpoint::FEED);
+        return $this->nha_http->get(Endpoint::FEED);
     }
 
     /**
@@ -39,7 +39,7 @@ class HistoryRepository extends AbstractRepository
      */
     public function getArena(): PromiseInterface
     {
-        return $this->client->fetch(Endpoint::ARENA);
+        return $this->nha_http->get(Endpoint::ARENA);
     }
 
     /**
@@ -49,7 +49,7 @@ class HistoryRepository extends AbstractRepository
      */
     public function getInventors(): PromiseInterface
     {
-        return $this->client->fetch(Endpoint::INVENTORS);
+        return $this->nha_http->get(Endpoint::INVENTORS);
     }
 
     /**
@@ -59,7 +59,7 @@ class HistoryRepository extends AbstractRepository
      */
     public function getRecords(): PromiseInterface
     {
-        return $this->client->fetch(Endpoint::RECORDS);
+        return $this->nha_http->get(Endpoint::RECORDS);
     }
 
     /**
@@ -69,7 +69,7 @@ class HistoryRepository extends AbstractRepository
      */
     public function getMilestones(): PromiseInterface
     {
-        return $this->client->fetch(Endpoint::MILESTONES);
+        return $this->nha_http->get(Endpoint::MILESTONES);
     }
 
     /**
@@ -79,6 +79,6 @@ class HistoryRepository extends AbstractRepository
      */
     public function getTimeline(): PromiseInterface
     {
-        return $this->client->fetch(Endpoint::TIMELINE);
+        return $this->nha_http->get(Endpoint::TIMELINE);
     }
 }

@@ -32,7 +32,7 @@ class AgentRepository extends AbstractRepository
     {
         $endpoint = Endpoint::bind(Endpoint::AGENT)->bindAssoc(['agent_id' => $agent_id]);
 
-        return $this->client->fetch((string) $endpoint);
+        return $this->nha_http->get($endpoint);
     }
 
     /**
@@ -42,7 +42,7 @@ class AgentRepository extends AbstractRepository
      */
     public function getAgents(): PromiseInterface
     {
-        return $this->client->fetch(Endpoint::AGENTS_LIST);
+        return $this->nha_http->get(Endpoint::AGENTS_LIST);
     }
 
     /**
@@ -52,6 +52,6 @@ class AgentRepository extends AbstractRepository
      */
     public function getRoster(): PromiseInterface
     {
-        return $this->client->fetch(Endpoint::ROSTER);
+        return $this->nha_http->get(Endpoint::ROSTER);
     }
 }

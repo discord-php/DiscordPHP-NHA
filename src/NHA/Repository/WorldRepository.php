@@ -31,7 +31,7 @@ class WorldRepository extends AbstractRepository
      */
     public function getWorld(): PromiseInterface
     {
-        return $this->client->fetch(Endpoint::WORLD)->then(
+        return $this->nha_http->get(Endpoint::WORLD)->then(
             fn(array $data) => $this->factory->part(World::class, (array) $data, true)
         );
     }
@@ -43,7 +43,7 @@ class WorldRepository extends AbstractRepository
      */
     public function getMap(): PromiseInterface
     {
-        return $this->client->fetch(Endpoint::MAP)->then(
+        return $this->nha_http->get(Endpoint::MAP)->then(
             fn(array $data) => $this->factory->part(Map::class, (array) $data, true)
         );
     }
@@ -55,7 +55,7 @@ class WorldRepository extends AbstractRepository
      */
     public function getScene(): PromiseInterface
     {
-        return $this->client->fetch(Endpoint::SCENE);
+        return $this->nha_http->get(Endpoint::SCENE);
     }
 
     /**
@@ -65,7 +65,7 @@ class WorldRepository extends AbstractRepository
      */
     public function getStructures(): PromiseInterface
     {
-        return $this->client->fetch(Endpoint::STRUCTURES);
+        return $this->nha_http->get(Endpoint::STRUCTURES);
     }
 
     /**
@@ -78,7 +78,7 @@ class WorldRepository extends AbstractRepository
     {
         $endpoint = Endpoint::bind(Endpoint::COLONY)->bindAssoc(['body' => $body]);
 
-        return $this->client->fetch((string) $endpoint);
+        return $this->nha_http->get((string) $endpoint);
     }
 
     /**
@@ -91,7 +91,7 @@ class WorldRepository extends AbstractRepository
     {
         $endpoint = Endpoint::bind(Endpoint::TERRAFORM)->bindAssoc(['body' => $body]);
 
-        return $this->client->fetch((string) $endpoint);
+        return $this->nha_http->get((string) $endpoint);
     }
 
     /**
@@ -101,7 +101,7 @@ class WorldRepository extends AbstractRepository
      */
     public function getExpansion(): PromiseInterface
     {
-        return $this->client->fetch(Endpoint::EXPANSION);
+        return $this->nha_http->get(Endpoint::EXPANSION);
     }
 
     /**
@@ -111,6 +111,6 @@ class WorldRepository extends AbstractRepository
      */
     public function getRules(): PromiseInterface
     {
-        return $this->client->fetch(Endpoint::RULES);
+        return $this->nha_http->get(Endpoint::RULES);
     }
 }

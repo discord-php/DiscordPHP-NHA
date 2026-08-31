@@ -20,6 +20,7 @@ use Discord\Builders\Components\Separator;
 use Discord\Builders\Components\TextDisplay;
 use NHA\HelperTrait;
 use NHA\NHA;
+use JsonSerializable;
 
 /**
  * A lightweight, read-only wrapper around a single `GET /observe/:id`
@@ -28,7 +29,7 @@ use NHA\NHA;
  *
  * @since 0.1.0
  */
-class AgentObservation implements \JsonSerializable
+class AgentObservation implements JsonSerializable
 {
     use HelperTrait;
 

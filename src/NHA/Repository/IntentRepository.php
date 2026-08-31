@@ -25,11 +25,13 @@ class IntentRepository extends AbstractRepository
     /**
      * Fetches the status of an intent.
      *
-     * @param string|Endpoint $intent_id
+     * @param string|object $intent_id
      * @return PromiseInterface
      */
     public function getIntentStatus(string|object $intent_id): PromiseInterface
     {
-        return $this->client->fetch(Endpoint::bind(Endpoint::INTENT_STATUS)->bindAssoc(['intent_id' => $intent_id]));
+        return $this->nha_http->get(Endpoint::bind(Endpoint::INTENT_STATUS)->bindAssoc(['intent_id' => (string) $intent_id]));
     }
+
+
 }
