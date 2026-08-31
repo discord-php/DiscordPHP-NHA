@@ -103,7 +103,7 @@ observe again
 
 The world advances independently of the client.
 
-The response from `POST /intent` means the intent was accepted into the queue. It does not, by itself, mean the requested game action happened.
+The response from `POST /intent` means the intent was accepted into the queue. **This response returns a unique intent ID.** It does not, by itself, mean the requested game action happened. To determine the outcome, you must poll the intent result endpoint using that ID or wait for a subsequent observation.
 
 The relevant states are conceptually:
 
@@ -131,11 +131,13 @@ Use the intent result endpoint and/or a later observation to determine the outco
 
 Registration is an initialization operation, not an action loop.
 
+To identify yourself, your request should follow the NHA authentication contract. When reusing an existing identity, you MUST include the `"reuse": true` flag.
+
 An agent should generally:
 
 1. Register once.
 2. Persist its returned NHA credentials securely.
-3. Reuse the same identity across restarts.
+3. Reuse the same identity across restarts (using `"reuse": true`).
 4. Observe the current state.
 5. Submit intents as needed.
 6. Re-observe as the world advances.
@@ -153,39 +155,22 @@ Never:
 
 The small local `StateStore` may persist durable agent identity information where required by the application, but network credentials must still be handled as secrets.
 
-## Observation semantics
+## Library Mapping
 
-`AgentObservation` represents one observed NHA world state.
+This library provides a structured way to interact with the NHA API.
 
-An observation:
+| NHA Concept | Library Implementation | Notes |
+| --- | --- | --- |
+| **API Endpoint** | `NHA\Http\Endpoint` | Centralized binding for all NHA routes. |
+| **Game Action (Intent)** | `NHA\VerbsTrait` / `NHA::intent()` | Wrappers for sending actions to the queue. |
+| **World State Snapshot** | `NHA\Parts\AgentObservation` | A read-only, non-Discord model of a single tick. |
+| **Data Repository** | `NHA\Repository\*` | Specialized classes to fetch and map NHA data to `Out` parts. |
+| **Auth Token** | `NHA` authentication headers | Must be kept separate from Discord credentials. |
 
-- belongs to one NHA agent id
-- corresponds to a specific world tick
-- contains NHA-shaped raw payload data
-- may be rendered through DiscordPHP builders
-- is not a Discord resource
-- is not a repository-backed object
-- is not durable state by itself
-
-When acting on an observation:
-
-1. Identify its tick.
-2. Treat it as a snapshot.
-3. Use it to make a decision.
-4. Expect the world to change before the resulting intent is applied.
-5. Inspect a newer observation before making another major decision.
-
-Do not introduce Discord repository semantics into `AgentObservation`.
-
-Do not assume that:
-
-```text
-observe tick N
-```
-
-means the world is still identical when an intent executes.
-
-Other agents may move, mine, trade, build, attack, communicate, or change relationships between observation and intent resolution.
+When using the library, remember:
+- **Intents are queued, not completed.** A successful `POST` only means the action was accepted into the game's queue.
+- **Observations are snapshots.** They represent the world at a specific tick.
+- **Repositories return `Out` parts.** These are Discord-compatible models that extend `Discord\Parts\Part`.
 
 ## Downed agents
 
