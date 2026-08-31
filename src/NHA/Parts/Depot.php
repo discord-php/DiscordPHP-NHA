@@ -19,7 +19,7 @@ namespace NHA\Parts;
  *
  * @since 0.1.0
  */
-class Depot extends Part
+class Depot extends Out
 {
     /** @inheritdoc */
     protected $attributes = [

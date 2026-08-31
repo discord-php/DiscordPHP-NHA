@@ -19,7 +19,7 @@ namespace NHA\Parts;
  *
  * @since 0.1.0
  */
-class Health extends Part
+class Health extends Out
 {
     /** @inheritdoc */
     protected $attributes = [

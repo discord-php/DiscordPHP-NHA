@@ -21,7 +21,7 @@ use JsonSerializable;
  *
  * @since 0.1.0
  */
-class Updates extends Part
+class Updates extends Out
 {
     /** @inheritdoc */
     protected $attributes = [

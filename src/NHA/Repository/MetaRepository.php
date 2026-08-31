@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace NHA\Repository;
 
 use NHA\Http\Endpoint;
-use NHA\NHA;
 use NHA\Parts\Health;
 use NHA\Parts\Updates;
 use React\Promise\PromiseInterface;
@@ -41,7 +40,7 @@ class MetaRepository extends AbstractRepository
     /**
      * Fetches recent updates.
      *
-     * @return PromiseInterface<UpdatesOut>
+     * @return PromiseInterface<Updates>
      */
     public function getUpdates(): PromiseInterface
     {

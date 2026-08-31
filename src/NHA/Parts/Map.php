@@ -19,7 +19,7 @@ namespace NHA\Parts;
  *
  * @since 0.1.0
  */
-class Map extends Part
+class Map extends Out
 {
     /** @inheritdoc */
     protected $attributes = [

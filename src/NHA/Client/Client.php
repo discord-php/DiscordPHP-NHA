@@ -11,42 +11,37 @@ declare(strict_types=1);
  * with this source code in the LICENSE.md file.
  */
 
-namespace NHA;
+namespace NHA\Client;
 
 use Discord\Parts\User\Client as DiscordClient;
-use Discord\Repository\EmojiRepository;
-use Discord\Repository\GuildRepository;
-use Discord\Repository\PrivateChannelRepository;
-use Discord\Repository\SoundRepository;
-use Discord\Repository\StickerPackRepository;
-use Discord\Repository\UserRepository;
 use NHA\Repository\AgentRepository;
 use NHA\Repository\DiscoveryRepository;
 use NHA\Repository\EconomyRepository;
-use NHA\Repository\HistoryRepository;
 use NHA\Repository\IntentRepository;
-use NHA\Repository\MetaRepository;
 use NHA\Repository\SocialRepository;
 use NHA\Repository\WorldRepository;
 
+/**
+ * The NHA Client class.
+ *
+ * @property AgentRepository $agents
+ * @property DiscoveryRepository $discovery
+ * @property EconomyRepository $economy
+ * @property IntentRepository $intents
+ * @property SocialRepository $social
+ * @property WorldRepository $world
+ */
 class Client extends DiscordClient
 {
     /**
      * @inheritDoc
      */
     protected $repositories = [
-        'emojis' => EmojiRepository::class,
-        'guilds' => GuildRepository::class,
-        'private_channels' => PrivateChannelRepository::class,
-        'sounds' => SoundRepository::class,
-        'sticker_packs' => StickerPackRepository::class,
-        'users' => UserRepository::class,
         'agents' => AgentRepository::class,
         'discovery' => DiscoveryRepository::class,
         'economy' => EconomyRepository::class,
-        'history' => HistoryRepository::class,
         'intents' => IntentRepository::class,
-        'meta' => MetaRepository::class,
+        'social' => SocialRepository::class,
         'world' => WorldRepository::class,
     ];
 }

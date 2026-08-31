@@ -19,7 +19,7 @@ namespace NHA\Parts;
  *
  * @since 0.1.0
  */
-class Contracts extends Part
+class Contracts extends Out
 {
     /** @inheritdoc */
     protected $attributes = [

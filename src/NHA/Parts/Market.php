@@ -19,7 +19,7 @@ namespace NHA\Parts;
  *
  * @since 0.1.0
  */
-class Market extends Part
+class Market extends Out
 {
     /** @inheritdoc */
     protected $attributes = [

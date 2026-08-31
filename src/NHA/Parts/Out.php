@@ -20,4 +20,4 @@ use Discord\Parts\Part as DiscordPart;
  *
  * @since 0.1.0
  */
-abstract class Part extends DiscordPart {}
+abstract class Out extends DiscordPart {}

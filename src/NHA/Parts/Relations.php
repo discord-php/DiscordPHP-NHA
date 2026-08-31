@@ -18,7 +18,7 @@ namespace NHA\Parts;
  *
  * @since 0.1.0
  */
-class Relations extends Part
+class Relations extends Out
 {
     /** @inheritdoc */
     protected $attributes = [
