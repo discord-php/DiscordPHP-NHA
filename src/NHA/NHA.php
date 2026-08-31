@@ -15,11 +15,23 @@ namespace NHA;
 
 use Discord\Http\Drivers\React;
 use Discord\MessageCommandClient;
+use Discord\Repository\EmojiRepository;
+use Discord\Repository\GuildRepository;
+use Discord\Repository\LobbyRepository;
+use Discord\Repository\PrivateChannelRepository;
+use Discord\Repository\SoundRepository;
+use Discord\Repository\StickerPackRepository;
+use Discord\Repository\UserRepository;
 use NHA\Client\Client;
 use NHA\Http\Endpoint;
 use NHA\Http\Http;
 use NHA\Parts\AgentObservation;
 use React\Promise\PromiseInterface;
+use NHA\Repository\AgentRepository;
+use NHA\Repository\DiscoveryRepository;
+use NHA\Repository\EconomyRepository;
+use NHA\Repository\IntentRepository;
+use NHA\Repository\WorldRepository;
 
 /**
  * The NHA client class.
@@ -27,6 +39,19 @@ use React\Promise\PromiseInterface;
  * @property Client $client
  * @property Http $nha_http
  * @property AgentObservation|null $cached_observation
+ *
+ * @property EmojiRepository          $emojis
+ * @property GuildRepository          $guilds
+ * @property LobbyRepository          $lobbies
+ * @property PrivateChannelRepository $private_channels
+ * @property SoundRepository          $sounds
+ * @property StickerPackRepository    $sticker_packs
+ * @property UserRepository           $users
+ * @property AgentRepository            $agents
+ * @property DiscoveryRepository        $discovery
+ * @property EconomyRepository         $economy
+ * @property IntentRepository           $intents
+ * @property WorldRepository            $world
  *
  * @version 0.1.0
  */
