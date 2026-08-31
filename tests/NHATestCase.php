@@ -26,8 +26,8 @@ class NHATestCase extends TestCase
             $channel = $discord->getChannel(getenv('TEST_CHANNEL'));
             $resolve($channel);
         });
-        assert(self::$channel instanceof Channel, 'Channel not found. Please check your environment variables and ensure TEST_CHANNEL is set.');
         self::$channel = $channel;
+        assert(self::$channel instanceof Channel, 'Channel not found. Please check your environment variables and ensure TEST_CHANNEL is set.');
     }
 
     protected function channel()

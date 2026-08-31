@@ -17,6 +17,11 @@ use NHA\Http\Endpoint;
 use NHA\NHA;
 use NHA\Parts\World;
 use NHA\Parts\Map;
+use NHA\Parts\Scene;
+use NHA\Parts\Structure;
+use NHA\Parts\Colony;
+use NHA\Parts\Terraform;
+use NHA\Parts\Expansion;
 use React\Promise\PromiseInterface;
 
 /**
@@ -24,6 +29,9 @@ use React\Promise\PromiseInterface;
  */
 class WorldRepository extends AbstractRepository
 {
+    /** @inheritdoc */
+    protected $class = World::class;
+
     /**
      * Fetches the current world state.
      *
@@ -32,7 +40,7 @@ class WorldRepository extends AbstractRepository
     public function getWorld(): PromiseInterface
     {
         return $this->nha_http->get(Endpoint::WORLD)->then(
-            fn(array $data) => $this->factory->part(World::class, (array) $data, true),
+            fn($data) => $this->factory->part(World::class, (array) $data, true),
         );
     }
 

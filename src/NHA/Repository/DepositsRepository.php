@@ -14,15 +14,21 @@ declare(strict_types=1);
 namespace NHA\Repository;
 
 use NHA\Http\Endpoint;
-use NHA\NHA;
+use NHA\Parts\Deposits;
 use React\Promise\PromiseInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
 /**
- * Repository for querying NHA discovery and intent related data.
+ * The nearest live (amount>0) deposits to (x,y), optionally of one resource — so an agent can find materials its local observe.nearby_deposits (a small local window) doesn't show, then move{x,y} straight to one.
+ * Each row: {id, resource, amount, x, y, dist}.
+ *
+ * Read-only, cached per tick.
  */
-class DiscoveryRepository extends AbstractRepository
+class DepositsRepository extends AbstractRepository
 {
+    /** @inheritdoc */
+    protected $class = Deposits::class;
+
     /**
      * Fetches nearby deposits.
      *
@@ -33,7 +39,7 @@ class DiscoveryRepository extends AbstractRepository
      * @param string|null $options['resource'] Resource type.
      * @param int|null    $options['limit']    Max entries to return.
      *
-     * @return PromiseInterface
+     * @return PromiseInterface<Deposits[]>
      */
     public function getDeposits(array $options = []): PromiseInterface
     {
@@ -65,6 +71,12 @@ class DiscoveryRepository extends AbstractRepository
             $query['resource'] = $options['resource'];
         }
 
-        return $this->nha_http->get((string) $endpoint, $query);
+        return $this->nha_http->get((string) $endpoint, $query)->then(function ($response) {
+            $deposits = [];
+            foreach ($response->deposits as $deposit) {
+                $deposits[] = $this->factory->part($this->class, (array) $deposit);
+            }
+            return $deposits;
+        });
     }
 }

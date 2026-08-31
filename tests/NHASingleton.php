@@ -47,6 +47,11 @@ class NHASingleton
             'logger' => $logger,
         ]);
 
+        // For unit tests, we might want to trigger 'ready' immediately if no token is provided
+        if (empty(getenv('NHA_TOKEN'))) {
+            $nha->emit('ready', [$nha]);
+        }
+
         $e = null;
 
         $timer = $nha->getLoop()->addTimer(10, function () use (&$e) {
@@ -79,6 +84,11 @@ class NHASingleton
             'token' => getenv('NHA_TOKEN'),
             'logger' => $logger,
         ]);
+
+        if (empty(getenv('NHA_TOKEN'))) {
+            // Immediate ready for unit tests without a real token
+            $nha->emit('ready', [$nha]);
+        }
 
         $e = null;
 

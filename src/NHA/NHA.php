@@ -22,13 +22,12 @@ use Discord\Repository\PrivateChannelRepository;
 use Discord\Repository\SoundRepository;
 use Discord\Repository\StickerPackRepository;
 use Discord\Repository\UserRepository;
-use NHA\Client\Client;
 use NHA\Http\Endpoint;
 use NHA\Http\Http;
 use NHA\Parts\AgentObservation;
 use React\Promise\PromiseInterface;
 use NHA\Repository\AgentRepository;
-use NHA\Repository\DiscoveryRepository;
+use NHA\Repository\DepositsRepository;
 use NHA\Repository\EconomyRepository;
 use NHA\Repository\IntentRepository;
 use NHA\Repository\WorldRepository;
@@ -48,7 +47,7 @@ use NHA\Repository\WorldRepository;
  * @property StickerPackRepository    $sticker_packs
  * @property UserRepository           $users
  * @property AgentRepository          $agents
- * @property DiscoveryRepository      $discovery
+ * @property DepositsRepository       $deposits
  * @property EconomyRepository        $economy
  * @property IntentRepository         $intents
  * @property WorldRepository          $world

@@ -21,13 +21,28 @@ use Discord\Repository\SoundRepository;
 use Discord\Repository\StickerPackRepository;
 use Discord\Repository\UserRepository;
 use NHA\Repository\AgentRepository;
-use NHA\Repository\DiscoveryRepository;
+use NHA\Repository\DepositsRepository;
 use NHA\Repository\EconomyRepository;
 use NHA\Repository\HistoryRepository;
 use NHA\Repository\IntentRepository;
 use NHA\Repository\MetaRepository;
 use NHA\Repository\WorldRepository;
 
+/**
+ * The NHA Client class.
+ *
+ * @property EmojiRepository          $emojis
+ * @property GuildRepository          $guilds
+ * @property PrivateChannelRepository $private_channels
+ * @property SoundRepository          $sounds
+ * @property StickerPackRepository    $sticker_packs
+ * @property UserRepository           $users
+ * @property AgentRepository          $agents
+ * @property DepositsRepository       $deposits
+ * @property EconomyRepository        $economy
+ * @property IntentRepository         $intents
+ * @property WorldRepository          $world
+ */
 class Client extends DiscordClient
 {
     /**
@@ -41,7 +56,7 @@ class Client extends DiscordClient
         'sticker_packs' => StickerPackRepository::class,
         'users' => UserRepository::class,
         'agents' => AgentRepository::class,
-        'discovery' => DiscoveryRepository::class,
+        'deposits' => DepositsRepository::class,
         'economy' => EconomyRepository::class,
         'history' => HistoryRepository::class,
         'intents' => IntentRepository::class,
