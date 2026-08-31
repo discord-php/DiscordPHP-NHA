@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\NHA\Http;
 
-use DiscordTestCase;
+use NHATestCase;
 use NHA\Http\Endpoint;
 
-class EndpointTest extends DiscordTestCase
+class EndpointTest extends NHATestCase
 {
     public function testBindAssocReplacesPlaceholder(): void
     {

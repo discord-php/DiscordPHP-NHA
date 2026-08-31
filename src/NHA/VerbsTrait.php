@@ -281,7 +281,7 @@ trait VerbsTrait
      *
      * @return PromiseInterface
      */
-    public function fetch(string|object $endpoint): PromiseInterface
+    public function get(string|object $endpoint): PromiseInterface
     {
         return $this->nha_http->get($endpoint);
     }

@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\NHA\Parts;
 
-use DiscordTestCase;
+use NHATestCase;
 use NHA\Parts\AgentObservation;
 
-class AgentObservationTest extends DiscordTestCase
+class AgentObservationTest extends NHATestCase
 {
     public function testGetReadsNestedDotSeparatedPath(): void
     {

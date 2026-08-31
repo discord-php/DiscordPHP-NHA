@@ -205,7 +205,7 @@ trait AbstractRepositoryTrait
             $headers['X-Audit-Log-Reason'] = $reason;
         }
 
-        return $this->mtg_http->{$method}($endpoint, $attributes, $headers)->then(function ($response) use ($method, $part) {
+        return $this->nha_http->{$method}($endpoint, $attributes, $headers)->then(function ($response) use ($method, $part) {
             switch ($method) {
                 case 'patch': // Update old part
                     $part->fill((array) $response);
@@ -256,7 +256,7 @@ trait AbstractRepositoryTrait
             $headers['X-Audit-Log-Reason'] = $reason;
         }
 
-        return $this->mtg_http->delete($endpoint, null, $headers)->then(function ($response) use (&$part) {
+        return $this->nha_http->delete($endpoint, null, $headers)->then(function ($response) use (&$part) {
             if ($response) {
                 $part->fill((array) $response);
             }
@@ -293,7 +293,7 @@ trait AbstractRepositoryTrait
             $endpoint->addQuery($query, $param);
         }
 
-        return $this->mtg_http->get($endpoint)->then(function ($response) use (&$part) {
+        return $this->nha_http->get($endpoint)->then(function ($response) use (&$part) {
             $part->fill((array) $response);
 
             return $this->cache->set($part->{$this->discrim}, $part)->then(fn($success) => $part);
@@ -343,7 +343,7 @@ trait AbstractRepositoryTrait
         $endpoint = new Endpoint($this->endpoints['get']);
         $endpoint->bindAssoc(array_merge($part->getRepositoryAttributes(), $this->vars));
 
-        return $this->mtg_http->get($endpoint)->then(function ($response) use ($part, $id) {
+        return $this->nha_http->get($endpoint)->then(function ($response) use ($part, $id) {
             $part->created = true;
             $part->fill(array_merge($this->vars, (array) $response));
 

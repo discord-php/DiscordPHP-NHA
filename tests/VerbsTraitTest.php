@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Tests\NHA;
 
-use DiscordTestCase;
+use NHATestCase;
 use NHA\VerbsTrait;
 use React\Promise\PromiseInterface;
 
 use function React\Promise\resolve;
 
-class VerbsTraitTest extends DiscordTestCase
+class VerbsTraitTest extends NHATestCase
 {
     protected function subject(): object
     {

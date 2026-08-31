@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\NHA;
 
-use DiscordTestCase;
+use NHATestCase;
 use NHA\StateStore;
 
-class StateStoreTest extends DiscordTestCase
+class StateStoreTest extends NHATestCase
 {
     protected string $path;
 

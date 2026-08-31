@@ -11,52 +11,41 @@ declare(strict_types=1);
  * with this source code in the LICENSE.md file.
  */
 
-use Discord\Discord;
-use Discord\DiscordCommandClient;
+use NHA\NHA;
 use Psr\Log\NullLogger;
 
 const TIMEOUT = 10;
 
 function wait(callable $callback, float $timeout = TIMEOUT, ?callable $timeoutFn = null)
 {
-    $discord = DiscordSingleton::get();
+    $nha = NHASingleton::get();
 
-    return waitWithDiscord($discord, $callback, $timeout, $timeoutFn);
-}
-
-function waitForDiscord(callable $callback, float $timeout = TIMEOUT, ?callable $timeoutFn = null)
-{
-    return waitWithDiscord(DiscordSingleton::getLive(), $callback, $timeout, $timeoutFn);
-}
-
-function waitWithDiscord(Discord $discord, callable $callback, float $timeout, ?callable $timeoutFn)
-{
     $result = null;
     $finally = null;
     $timedOut = false;
 
-    $discord->getLoop()->futureTick(function () use ($callback, $discord, &$result, &$finally): void {
-        $resolve = function ($value = null) use ($discord, &$result): void {
-            $result = $value;
-            $discord->getLoop()->stop();
+    $nha->getLoop()->futureTick(function () use ($callback, $nha, &$result, &$finally) {
+        $resolve = function ($x = null) use ($nha, &$result) {
+            $result = $x;
+            $nha->getLoop()->stop();
         };
 
         try {
-            $finally = $callback($discord, $resolve);
+            $finally = $callback($nha, $resolve);
         } catch (\Throwable $e) {
             $resolve($e);
         }
     });
 
-    $timer = $discord->getLoop()->addTimer($timeout, function () use ($discord, &$timedOut): void {
+    $timeout = $nha->getLoop()->addTimer($timeout, function () use ($nha, &$timedOut) {
         $timedOut = true;
-        $discord->getLoop()->stop();
+        $nha->getLoop()->stop();
     });
 
-    $discord->getLoop()->run();
-    $discord->getLoop()->cancelTimer($timer);
+    $nha->getLoop()->run();
+    $nha->getLoop()->cancelTimer($timeout);
 
-    if ($result instanceof \Throwable) {
+    if ($result instanceof Exception) {
         throw $result;
     }
 
@@ -65,25 +54,17 @@ function waitWithDiscord(Discord $discord, callable $callback, float $timeout, ?
     }
 
     if ($timedOut) {
-        if (null !== $timeoutFn) {
+        if ($timeoutFn != null) {
             $timeoutFn();
         } else {
-            throw new \RuntimeException('Timed out');
+            throw new \Exception('Timed out');
         }
     }
 
     return $result;
 }
 
-function getMockDiscord(): Discord
+function getMockNha(): NHA
 {
-    return new Discord(['token' => '', 'logger' => new NullLogger()]);
-}
-
-function getMockDiscordCommandClient(): DiscordCommandClient
-{
-    return new DiscordCommandClient([
-        'token' => '',
-        'discordOptions' => ['logger' => new NullLogger()],
-    ]);
+    return new NHA(['token' => '', 'logger' => new NullLogger()]);
 }

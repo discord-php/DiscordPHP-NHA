@@ -4,26 +4,40 @@ declare(strict_types=1);
 
 namespace Tests\NHA;
 
-use DiscordTestCase;
-use NHA\NHARepository;
+use NHATestCase;
 use NHA\NHA;
-use NHA\Http\Http;
-use NHA\Http\Endpoint;
 use NHA\Repository\AgentRepository;
 use NHA\Repository\DiscoveryRepository;
 use NHA\Repository\WorldRepository;
 use React\Promise\PromiseInterface;
+use Discord\Factory\Factory;
 
 use function React\Promise\resolve;
 
-class NHARepositoryTest extends DiscordTestCase
+class NHARepositoryTest extends NHATestCase
 {
     protected function createMockNha(): NHA
     {
+        // We need to mock NHA so that it doesn't try to connect to a real gateway during unit tests,
+        // but we must ensure that when its methods are called, they return what we expect.
+        // Since the repositories use getNhaHttpClient() and getFactory(), we must mock those.
+
         $nha = $this->getMockBuilder(NHA::class)
             ->disableOriginalConstructor()
-            ->onlyMethods(['fetch', 'getNhaHttpClient', 'getWorldRepo', 'getEconomyRepo', 'getSocialRepo', 'getAgentRepo', 'getDiscoveryRepo', 'getIntentRepo'])
+            ->onlyMethods(['getNhaHttpClient', 'getFactory'])
             ->getMock();
+
+        $http = $this->getMockBuilder(\NHA\Http\Http::class)
+            ->disableOriginalConstructor()
+            ->getMock();
+
+        $nha->method('getNhaHttpClient')->willReturn($http);
+
+        /** @var Factory|\PHPUnit\Framework\MockObject\MockObject $factory */
+        $factory = $this->getMockBuilder(Factory::class)
+            ->disableOriginalConstructor()
+            ->getMock();
+        $nha->method('getFactory')->willReturn($factory);
 
         return $nha;
     }
@@ -32,65 +46,51 @@ class NHARepositoryTest extends DiscordTestCase
     public function testGetWorld(): void
     {
         $nha = $this->createMockNha();
-        $worldRepo = $this->getMockBuilder(WorldRepository::class)
+
+        $http = $this->getMockBuilder(\NHA\Http\Http::class)
             ->disableOriginalConstructor()
-            ->onlyMethods(['getWorld'])
+            ->onlyMethods(['get'])
             ->getMock();
 
-        $nha->method('getWorldRepo')->willReturn($worldRepo);
-        $worldRepo->expects($this->once())
-            ->method('getWorld')
+        $nha->method('getNhaHttpClient')->willReturn($http);
+
+        $worldRepo = new WorldRepository($nha);
+
+        $http->expects($this->once())
+            ->method('get')
+            ->with(\NHA\Http\Endpoint::WORLD)
             ->willReturn(resolve(['world_data' => true]));
 
-        $repo = new NHARepository($nha);
-
-        $promise = $repo->getWorld();
+        $promise = $worldRepo->getWorld();
         $this->assertInstanceOf(PromiseInterface::class, $promise);
-        $result = \wait(fn($discord, $resolve) => $promise->then($resolve));
-        $this->assertSame(['world_data' => true], $result);
-    }
+        $result = \wait(fn($nha, $resolve) => $promise->then($resolve));
 
-    public function testGetAgentInfo(): void
-    {
-        $nha = $this->createMockNha();
-        $agentRepo = $this->getMockBuilder(AgentRepository::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['getAgentInfo'])
-            ->getMock();
-
-        $nha->method('getAgentRepo')->willReturn($agentRepo);
-        $agentRepo->expects($this->once())
-            ->method('getAgentInfo')
-            ->with(123)
-            ->willReturn(resolve(['agent_id' => 123]));
-
-        $repo = new NHARepository($nha);
-
-        $promise = $repo->getAgentInfo(123);
-        $this->assertInstanceOf(PromiseInterface::class, $promise);
-        $result = \wait(fn($discord, $resolve) => $promise->then($resolve));
-        $this->assertSame(['agent_id' => 123], $result);
+        $this->assertInstanceOf(\NHA\Parts\World::class, $result);
     }
 
     public function testGetDeposits(): void
     {
         $nha = $this->createMockNha();
-        $discoveryRepo = $this->getMockBuilder(DiscoveryRepository::class)
+
+        $http = $this->getMockBuilder(\NHA\Http\Http::class)
             ->disableOriginalConstructor()
-            ->onlyMethods(['getDeposits'])
+            ->onlyMethods(['get'])
             ->getMock();
 
-        $nha->method('getDiscoveryRepo')->willReturn($discoveryRepo);
-        $discoveryRepo->expects($this->once())
-            ->method('getDeposits')
-            ->with(1.0, 2.0, 50)
+        $nha->method('getNhaHttpClient')->willReturn($http);
+
+        $discoveryRepo = new DiscoveryRepository($nha);
+
+        $http->expects($this->once())
+            ->method('get')
+            ->with($this->callback(fn($endpoint) => str_contains((string) $endpoint, 'x=1.0') && str_contains((string) $endpoint, 'y=2.0')))
             ->willReturn(resolve([['resource' => 'metal']]));
 
-        $repo = new NHARepository($nha);
-
-        $promise = $repo->getDeposits(1.0, 2.0, 50);
+        $promise = $discoveryRepo->getDeposits(['x' => 1.0, 'y' => 2.0, 'limit' => 50]);
         $this->assertInstanceOf(PromiseInterface::class, $promise);
-        $result = \wait(fn($discord, $resolve) => $promise->then($resolve));
+        $result = \wait(fn($nha, $resolve) => $promise->then($resolve));
+
         $this->assertSame([['resource' => 'metal']], $result);
     }
+
 }

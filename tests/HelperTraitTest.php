@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Tests\NHA;
 
 use Discord\Builders\MessageBuilder;
-use DiscordTestCase;
+use NHATestCase;
 use NHA\HelperTrait;
 
-class HelperTraitTest extends DiscordTestCase
+class HelperTraitTest extends NHATestCase
 {
     protected function subject(): object
     {
