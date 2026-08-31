@@ -13,56 +13,37 @@ declare(strict_types=1);
 
 namespace NHA\Repository;
 
-use Discord\Http\Drivers\React;
+use Discord\Discord;
 use Discord\Repository\AbstractRepository as DiscordAbstractRepository;
 use NHA\Http\Http;
-use NHA\Http\Endpoint;
 use NHA\NHA;
-use NHA\Client;
-use React\Promise\PromiseInterface;
 
 /**
- * Base class for all NHA-specific repositories.
+ * Repositories provide a way to store and update parts on the NHA server.
+ *
+ * @author Valithor Obsidion <valithor@discordphp.org>
  */
 abstract class AbstractRepository extends DiscordAbstractRepository
 {
-    /**
-     * @var NHA
-     */
-    protected NHA $client;
+    use AbstractRepositoryTrait;
 
     /**
-     * The extended NHA client.
+     * The extended HTTP client.
      *
-     * @var Http The extended NHA client.
+     * @var Http Client.
      */
-    protected Http $nha_http;
+    protected $nha_http;
 
     /**
-     * The class used to wrap the response data.
+     * AbstractRepository constructor.
+     *
+     * @param NHA|Discord $discord
+     * @param array       $vars    An array of variables used for the endpoint.
      */
-    protected $class;
-
-    public function __construct(array $options = [])
+    public function __construct(protected $discord, array $vars = [])
     {
-        parent::__construct($options);
-
-        $this->nha_http = new Http(
-            'Bot '.$this->token,
-            $this->loop,
-            $this->options['logger'] ?? null,
-            new React($this->loop, $options['socket_options'] ?? [])
-        );
-        $this->client = $this->factory->part(Client::class, (array) $this->client);
-    }
-
-    /**
-     * @return PromiseInterface
-     */
-    protected function fetchAll(string|Endpoint $endpoint): PromiseInterface
-    {
-        return $this->client->fetch($endpoint)->then(
-            fn(array $data) => new $this->class($data)
-        );
+        parent::__construct($discord, $vars);
+        $this->nha_http = $discord->getNhaHttpClient();
     }
 }
+
