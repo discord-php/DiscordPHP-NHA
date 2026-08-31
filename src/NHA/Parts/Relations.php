@@ -20,11 +20,8 @@ namespace NHA\Parts;
  */
 class Relations extends Part
 {
-    /**
-     * @return array<int, array<string, mixed>>
-     */
-    public function getRelations(): array
-    {
-        return $this->get('relations', []);
-    }
+    /** @inheritdoc */
+    protected $attributes = [
+        'relations',
+    ];
 }

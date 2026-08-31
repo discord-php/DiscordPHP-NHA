@@ -21,19 +21,9 @@ namespace NHA\Parts;
  */
 class Market extends Part
 {
-    /**
-     * @return array<int, array<string, mixed>>
-     */
-    public function getOrders(): array
-    {
-        return (array) $this->get('orders', []);
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public function getMetadata(): array
-    {
-        return (array) $this->get('metadata', []);
-    }
+    /** @inheritdoc */
+    protected $attributes = [
+        'orders',
+        'last_prices',
+    ];
 }

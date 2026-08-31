@@ -21,54 +21,14 @@ use JsonSerializable;
  *
  * @since 0.1.0
  */
-class World extends Part implements JsonSerializable
+class World extends Part
 {
-    /**
-     * Reads a (possibly nested, dot-separated) key from the raw payload.
-     *
-     * @param string $path
-     * @param mixed  $default
-     *
-     * @return mixed
-     */
-    public function get(string $path, mixed $default = null): mixed
-    {
-        $value = $this->raw;
-        foreach (explode('.', $path) as $segment) {
-            $value = is_array($value) ? ($value[$segment] ?? null) : ($value->{$segment} ?? null);
-            if (null === $value) {
-                return $default;
-            }
-        }
-
-        return $value;
-    }
-
-    public function getTick(): int
-    {
-        return (int) $this->get('tick', 0);
-    }
-
-    public function getMap(): array
-    {
-        return (array) $this->get('map', []);
-    }
-
-    public function getStructures(): array
-    {
-        return (array) $this->get('structures', []);
-    }
-
-    public function getActiveEvents(): array
-    {
-        return (array) $this->get('active_events', []);
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function jsonSerialize(): array
-    {
-        return $this->raw;
-    }
+    /** @inheritdoc */
+    protected $attributes = [
+        'tick',
+        'tick_seconds',
+        'entities',
+        'last_state_hash',
+        'visitors',
+    ];
 }

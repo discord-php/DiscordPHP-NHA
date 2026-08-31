@@ -21,18 +21,11 @@ namespace NHA\Parts;
  */
 class Health extends Part
 {
-    public function isOk(): bool
-    {
-        return (bool) $this->get('ok', true);
-    }
-
-    public function getTick(): int
-    {
-        return (int) $this->get('tick', 0);
-    }
-
-    public function isRunning(): bool
-    {
-        return (bool) $this->get('running', false);
-    }
+    /** @inheritdoc */
+    protected $attributes = [
+        'ok',
+        'tick',
+        'running',
+        'drift',
+    ];
 }

@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /*
- * This file is a part of the DiscordPHP-MTG project.
+ * This file is a part of the DiscordPHP-NHA project.
  *
  * Copyright (c) 2025-present Valithor Obsidion <valithor@discordphp.org>
  *
@@ -14,6 +14,8 @@ declare(strict_types=1);
 namespace NHA\Repository;
 
 use Discord\Discord;
+use Discord\Factory\Factory;
+use Discord\Helpers\CacheWrapper;
 use Discord\Helpers\CollectionTrait;
 use Discord\Helpers\ExCollectionInterface;
 use Discord\Http\Http;
@@ -144,7 +146,7 @@ trait AbstractRepositoryTrait
             return resolve($this);
         }
 
-        return $this->cache->setMultiple($items)->then(fn ($success) => $this);
+        return $this->cache->setMultiple($items)->then(fn($success) => $this);
     }
 
     /**
@@ -209,11 +211,11 @@ trait AbstractRepositoryTrait
                     $part->fill((array) $response);
                     $part->created = true;
 
-                    return $this->cache->set($part->{$this->discrim}, $part)->then(fn ($success) => $part);
+                    return $this->cache->set($part->{$this->discrim}, $part)->then(fn($success) => $part);
                 default: // Create new part
                     $newPart = $this->factory->part($this->class, (array) $response, true);
 
-                    return $this->cache->set($newPart->{$this->discrim}, $newPart)->then(fn ($success) => $newPart);
+                    return $this->cache->set($newPart->{$this->discrim}, $newPart)->then(fn($success) => $newPart);
             }
         });
     }
@@ -260,7 +262,7 @@ trait AbstractRepositoryTrait
             }
             $part->created = false;
 
-            return $this->cache->delete($part->{$this->discrim})->then(fn ($success) => $part);
+            return $this->cache->delete($part->{$this->discrim})->then(fn($success) => $part);
         });
     }
 
@@ -294,7 +296,7 @@ trait AbstractRepositoryTrait
         return $this->mtg_http->get($endpoint)->then(function ($response) use (&$part) {
             $part->fill((array) $response);
 
-            return $this->cache->set($part->{$this->discrim}, $part)->then(fn ($success) => $part);
+            return $this->cache->set($part->{$this->discrim}, $part)->then(fn($success) => $part);
         });
     }
 
@@ -345,7 +347,7 @@ trait AbstractRepositoryTrait
             $part->created = true;
             $part->fill(array_merge($this->vars, (array) $response));
 
-            return $this->cache->set($id, $part)->then(fn ($success) => $part);
+            return $this->cache->set($id, $part)->then(fn($success) => $part);
         });
     }
 
@@ -454,7 +456,7 @@ trait AbstractRepositoryTrait
      */
     public function cachePull($key, $default = null): PromiseInterface
     {
-        return $this->cacheGet($key)->then(fn ($item) => ($item === null) ? $default : $this->cache->delete($key)->then(fn ($success) => $item));
+        return $this->cacheGet($key)->then(fn($item) => ($item === null) ? $default : $this->cache->delete($key)->then(fn($success) => $item));
     }
 
     /**

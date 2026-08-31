@@ -21,51 +21,10 @@ use JsonSerializable;
  *
  * @since 0.1.0
  */
-class Updates extends Part implements JsonSerializable
+class Updates extends Part
 {
-
-    /**
-     * Reads a (possibly nested, dot-separated) key from the raw payload.
-     *
-     * @param string $path
-     * @param mixed  $default
-     *
-     * @return mixed
-     */
-    public function get(string $path, mixed $default = null): mixed
-    {
-        $value = $this->raw;
-        foreach (explode('.', $path) as $segment) {
-            $value = is_array($value) ? ($value[$segment] ?? null) : ($value->{$segment} ?? null);
-            if (null === $value) {
-                return $default;
-            }
-        }
-
-        return $value;
-    }
-
-    /**
-     * @return array<int, array<string, mixed>>
-     */
-    public function getUpdates(): array
-    {
-        return (array) $this->get('updates', []);
-    }
-
-    /**
-     * @return int
-     */
-    public function getTick(): int
-    {
-        return (int) $this->get('tick', 0);
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function jsonSerialize(): array
-    {
-        return $this->raw;
-    }
+    /** @inheritdoc */
+    protected $attributes = [
+        'updates',
+    ];
 }

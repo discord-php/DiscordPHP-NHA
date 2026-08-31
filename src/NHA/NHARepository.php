@@ -13,11 +13,14 @@ declare(strict_types=1);
 
 namespace NHA;
 
+use NHA\Http\Endpoint;
+use NHA\Repository\AbstractRepository;
+use React\Promise\PromiseInterface;
+
 /**
- * @deprecated This class has been decomposed into specialized repositories in src/NHA/Repositories/
- * Use the specific repository getters on the NHA client instead.
+ * Repository for querying NHA world state.
  */
-class NHARepository
+class NHARepository extends AbstractRepository
 {
     /**
      * @var NHA
@@ -35,183 +38,187 @@ class NHARepository
     /**
      * Fetches the current world state.
      *
-     * @return \React\Promise\PromiseInterface
+     * @return PromiseInterface
      */
-    public function getWorld(): \React\Promise\PromiseInterface
+    public function getWorld(): PromiseInterface
     {
-        return $this->client->getWorldRepo()->getWorld();
+        return $this->client->fetch(Endpoint::WORLD);
     }
 
     /**
      * Fetches the map.
      *
-     * @return \React\Promise\PromiseInterface
+     * @return PromiseInterface
      */
-    public function getMap(): \React\Promise\PromiseInterface
+    public function getMap(): PromiseInterface
     {
-        return $this->client->getWorldRepo()->getMap();
+        return $this->client->fetch(Endpoint::MAP);
     }
 
     /**
      * Fetches the current scene.
      *
-     * @return \React\Promise\PromiseInterface
+     * @return PromiseInterface
      */
-    public function getScene(): \React\Promise\PromiseInterface
+    public function getScene(): PromiseInterface
     {
-        return $this->client->getWorldRepo()->getScene();
+        return $this->client->fetch(Endpoint::SCENE);
     }
 
     /**
      * Fetches the structures in the scene.
      *
-     * @return \React\Promise\PromiseInterface
+     * @return PromiseInterface
      */
-    public function getStructures(): \React\Promise\PromiseInterface
+    public function getStructures(): PromiseInterface
     {
-        return $this->client->getWorldRepo()->getStructures();
+        return $this->client->fetch(Endpoint::STRUCTURES);
     }
 
     /**
      * Fetches the market.
      *
-     * @return \React\Promise\PromiseInterface
+     * @return PromiseInterface
      */
-    public function getMarket(): \React\Promise\PromiseInterface
+    public function getMarket(): PromiseInterface
     {
-        return $this->client->getEconomyRepo()->getMarket();
+        return $this->client->fetch(Endpoint::MARKET);
     }
 
     /**
      * Fetches the depot.
      *
-     * @return \React\Promise\PromiseInterface
+     * @return PromiseInterface
      */
-    public function getDepot(): \React\Promise\PromiseInterface
+    public function getDepot(): PromiseInterface
     {
-        return $this->client->getEconomyRepo()->getDepot();
+        return $this->client->fetch(Endpoint::DEPOT);
     }
 
     /**
      * Fetches the contracts.
      *
-     * @return \React\Promise\PromiseInterface
+     * @return PromiseInterface
      */
-    public function getContracts(): \React\Promise\PromiseInterface
+    public function getContracts(): PromiseInterface
     {
-        return $this->client->getEconomyRepo()->getContracts();
+        return $this->client->fetch(Endpoint::CONTRACTS);
     }
 
     /**
      * Fetches the chat.
      *
-     * @return \React\Promise\PromiseInterface
+     * @return PromiseInterface
      */
-    public function getChat(): \React\Promise\PromiseInterface
+    public function getChat(): PromiseInterface
     {
-        return $this->client->getSocialRepo()->getChat();
+        return $this->client->fetch(Endpoint::CHAT);
     }
 
     /**
      * Fetches the log.
      *
-     * @return \React\Promise\PromiseInterface
+     * @return PromiseInterface
      */
-    public function getLog(): \React\Promise\PromiseInterface
+    public function getLog(): PromiseInterface
     {
-        return $this->client->getSocialRepo()->getLog();
+        return $this->client->fetch(Endpoint::LOG);
     }
 
     /**
      * Fetches the rules.
      *
-     * @return \React\Promise\PromiseInterface
+     * @return PromiseInterface
      */
-    public function getRules(): \React\Promise\PromiseInterface
+    public function getRules(): PromiseInterface
     {
-        return $this->client->getSocialRepo()->getRules();
+        return $this->client->fetch(Endpoint::RULES);
     }
 
     /**
      * Fetches the inventors.
      *
-     * @return \React\Promise\PromiseInterface
+     * @return PromiseInterface
      */
-    public function getInventors(): \React\Promise\PromiseInterface
+    public function getInventors(): PromiseInterface
     {
-        return $this->client->getAgentRepo()->getInventors();
+        return $this->client->fetch(Endpoint::INVENTORS);
     }
 
     /**
      * Fetches the records.
      *
-     * @return \React\Promise\PromiseInterface
+     * @return PromiseInterface
      */
-    public function getRecords(): \React\Promise\PromiseInterface
+    public function getRecords(): PromiseInterface
     {
-        return $this->client->getAgentRepo()->getRecords();
+        return $this->client->fetch(Endpoint::RECORDS);
     }
 
     /**
      * Fetches the milestones.
      *
-     * @return \React\Promise\PromiseInterface
+     * @return PromiseInterface
      */
-    public function getMilestones(): \React\Promise\PromiseInterface
+    public function getMilestones(): PromiseInterface
     {
-        return $this->client->getAgentRepo()->getMilestones();
+        return $this->client->fetch(Endpoint::MILESTONES);
     }
 
     /**
      * Fetches the timeline.
      *
-     * @return \React\Promise\PromiseInterface
+     * @return PromiseInterface
      */
-    public function getTimeline(): \React\Promise\PromiseInterface
+    public function getTimeline(): PromiseInterface
     {
-        return $this->client->getAgentRepo()->getTimeline();
+        return $this->client->fetch(Endpoint::TIMELINE);
     }
 
     /**
      * Fetches the roster.
      *
-     * @return \React\Promise\PromiseInterface
+     * @return PromiseInterface
      */
-    public function getRoster(): \React\Promise\PromiseInterface
+    public function getRoster(): PromiseInterface
     {
-        return $this->client->getSocialRepo()->getRoster();
+        return $this->client->fetch(Endpoint::ROSTER);
     }
 
     /**
      * Fetches the guild pending information.
      *
-     * @return \React\Promise\PromiseInterface
+     * @return PromiseInterface
      */
-    public function getGuildPending(): \React\Promise\PromiseInterface
+    public function getGuildPending(): PromiseInterface
     {
-        return $this->client->getSocialRepo()->getGuildPending();
+        return $this->client->fetch(Endpoint::GUILD_PENDING);
     }
 
     /**
      * Fetches public info about any agent by id.
      *
      * @param int $agent_id
-     * @return \React\Promise\PromiseInterface
+     * @return PromiseInterface
      */
-    public function getAgentInfo(int $agent_id): \React\Promise\PromiseInterface
+    public function getAgentInfo(int $agent_id): PromiseInterface
     {
-        return $this->client->getAgentRepo()->getAgentInfo($agent_id);
+        $endpoint = Endpoint::bind(Endpoint::AGENT)->bindAssoc(['agent_id' => $agent_id]);
+
+        return $this->client->fetch((string) $endpoint);
     }
 
     /**
      * Checks the status/outcome of a previously submitted intent.
      *
      * @param int $intent_id The ID of the intent to check.
-     * @return \React\Promise\PromiseInterface
+     * @return PromiseInterface
      */
-    public function getIntentStatus(int $intent_id): \React\Promise\PromiseInterface
+    public function getIntentStatus(int $intent_id): PromiseInterface
     {
-        return $this->client->getIntentRepo()->getIntentStatus($intent_id);
+        $endpoint = Endpoint::bind(Endpoint::INTENT_STATUS)->bindAssoc(['intent_id' => $intent_id]);
+
+        return $this->client->fetch((string) $endpoint);
     }
 
     /**
@@ -222,10 +229,23 @@ class NHARepository
      * @param int $radius
      * @param string|null $resource
      * @param int $limit
-     * @return \React\Promise\PromiseInterface
+     * @return PromiseInterface
      */
-    public function getDeposits(float $x, float $y, int $radius = 100, ?string $resource = null, int $limit = 10): \React\Promise\PromiseInterface
+    public function getDeposits(float $x, float $y, int $radius = 100, ?string $resource = null, int $limit = 10): PromiseInterface
     {
-        return $this->client->getDiscoveryRepo()->getDeposits($x, $y, $radius, $resource, $limit);
+        $endpoint = Endpoint::bind(Endpoint::DEPOSITS);
+
+        return $this->client->getNhaHttpClient()->get((string) $endpoint, [
+            'x' => (string) $x,
+            'y' => (string) $y,
+            'radius' => (string) $radius,
+            'resource' => $resource,
+            'limit' => (string) $limit,
+        ]);
     }
+
+
+
+
+
 }

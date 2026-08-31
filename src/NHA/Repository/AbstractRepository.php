@@ -46,4 +46,3 @@ abstract class AbstractRepository extends DiscordAbstractRepository
         $this->nha_http = $discord->getNhaHttpClient();
     }
 }
-

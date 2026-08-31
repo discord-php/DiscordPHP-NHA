@@ -21,27 +21,10 @@ namespace NHA\Parts;
  */
 class Contracts extends Part
 {
-    /**
-     * @return array<int, array<string, mixed>>
-     */
-    public function getContracts(): array
-    {
-        return (array) $this->get('contracts', []);
-    }
-
-    /**
-     * @return array<int, array<string, mixed>>
-     */
-    public function getCreated(): array
-    {
-        return (array) $this->get('created', []);
-    }
-
-    /**
-     * @return array<int, array<string, mixed>>
-     */
-    public function getPending(): array
-    {
-        return (array) $this->get('pending', []);
-    }
+    /** @inheritdoc */
+    protected $attributes = [
+        'open',
+        'fulfilled',
+        'bounties',
+    ];
 }

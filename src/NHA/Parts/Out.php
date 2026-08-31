@@ -13,18 +13,11 @@ declare(strict_types=1);
 
 namespace NHA\Parts;
 
+use Discord\Parts\Part as DiscordPart;
+
 /**
- * A Part for NHA social chat data.
+ * Base class for NHA Parts.
  *
  * @since 0.1.0
  */
-class Social extends Part
-{
-    /**
-     * @return array<int, array<string, mixed>>
-     */
-    public function getMessages(): array
-    {
-        return $this->get('messages', []);
-    }
-}
+abstract class Part extends DiscordPart {}

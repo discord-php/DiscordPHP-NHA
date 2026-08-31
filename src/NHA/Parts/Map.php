@@ -19,21 +19,15 @@ namespace NHA\Parts;
  *
  * @since 0.1.0
  */
-class MapOut extends Part
+class Map extends Part
 {
-    /**
-     * @return array<int, array<string, mixed>>
-     */
-    public function getTiles(): array
-    {
-        return (array) $this->get('tiles', []);
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public function getDimensions(): array
-    {
-        return (array) $this->get('dimensions', []);
-    }
+    /** @inheritdoc */
+    protected $attributes = [
+        'seed',
+        'w',
+        'h',
+        'ascii',
+        'agents',
+        'loading',
+    ];
 }

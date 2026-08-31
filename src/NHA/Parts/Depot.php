@@ -21,19 +21,8 @@ namespace NHA\Parts;
  */
 class Depot extends Part
 {
-    /**
-     * @return array<int, array<string, mixed>>
-     */
-    public function getItems(): array
-    {
-        return (array) $this->get('items', []);
-    }
-
-    /**
-     * @return float
-     */
-    public function getTotalValue(): float
-    {
-        return (float) $this->get('total_value', 0.0);
-    }
+    /** @inheritdoc */
+    protected $attributes = [
+        'prices',
+    ];
 }
