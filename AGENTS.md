@@ -736,7 +736,7 @@ When you need an example worth imitating, start here:
 - Shared command semantics: `src/NHA/Commands.php`
 - Local persistence: `src/NHA/StateStore.php`
 - Runtime adapters and startup: `bot.php`
-- Unit test base: `tests/DiscordTestCase.php`
+- Unit test base: `tests/NHATestCase.php`
 - Live test base: `tests/DiscordIntegrationTestCase.php`
 - Async test bridge: `tests/functions.php`
 - NHA domain guidance: `.agents/skills/nha-agent/SKILL.md`
@@ -752,7 +752,7 @@ For DiscordPHP builder, interaction, repository, gateway, type-map, or voice int
 ### Tests
 
 - PHPUnit is version 9.
-- Every unit-test class extends `DiscordTestCase`.
+- Every unit-test class extends `NHATestCase`.
 - Tests needing live Discord infrastructure extend `DiscordIntegrationTestCase`.
 - Use `$this->getMockBuilder()` for isolated dependencies and `getMockDiscord()` for unit-safe Discord-backed objects.
 - Use and return `wait()` for asynchronous work against the unit-safe singleton.
