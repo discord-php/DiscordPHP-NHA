@@ -40,7 +40,6 @@ use NHA\Repository\WorldRepository;
  * @property DiscoveryRepository $discovery
  * @property EconomyRepository $economy
  * @property IntentRepository $intents
- * @property SocialRepository $social
  * @property WorldRepository $world
  */
 class Client extends DiscordClient
@@ -59,7 +58,6 @@ class Client extends DiscordClient
         'discovery' => DiscoveryRepository::class,
         'economy' => EconomyRepository::class,
         'intents' => IntentRepository::class,
-        'social' => SocialRepository::class,
         'world' => WorldRepository::class,
     ];
 }
