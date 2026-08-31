@@ -36,8 +36,8 @@ use NHA\Repository\WorldRepository;
 /**
  * The NHA client class.
  *
- * @property Client $client
- * @property Http $nha_http
+ * @property Client                $client
+ * @property Http                  $nha_http
  * @property AgentObservation|null $cached_observation
  *
  * @property EmojiRepository          $emojis
@@ -47,11 +47,11 @@ use NHA\Repository\WorldRepository;
  * @property SoundRepository          $sounds
  * @property StickerPackRepository    $sticker_packs
  * @property UserRepository           $users
- * @property AgentRepository            $agents
- * @property DiscoveryRepository        $discovery
- * @property EconomyRepository         $economy
- * @property IntentRepository           $intents
- * @property WorldRepository            $world
+ * @property AgentRepository          $agents
+ * @property DiscoveryRepository      $discovery
+ * @property EconomyRepository        $economy
+ * @property IntentRepository         $intents
+ * @property WorldRepository          $world
  *
  * @version 0.1.0
  */

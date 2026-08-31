@@ -30,17 +30,17 @@ use NHA\Repository\WorldRepository;
 /**
  * The NHA Client class.
  *
- * @property EmojiRepository $emojis
- * @property GuildRepository $guilds
+ * @property EmojiRepository          $emojis
+ * @property GuildRepository          $guilds
  * @property PrivateChannelRepository $private_channels
- * @property SoundRepository $sounds
- * @property StickerPackRepository $sticker_packs
- * @property UserRepository $users
- * @property AgentRepository $agents
- * @property DiscoveryRepository $discovery
- * @property EconomyRepository $economy
- * @property IntentRepository $intents
- * @property WorldRepository $world
+ * @property SoundRepository          $sounds
+ * @property StickerPackRepository    $sticker_packs
+ * @property UserRepository           $users
+ * @property AgentRepository          $agents
+ * @property DiscoveryRepository      $discovery
+ * @property EconomyRepository        $economy
+ * @property IntentRepository         $intents
+ * @property WorldRepository          $world
  */
 class Client extends DiscordClient
 {

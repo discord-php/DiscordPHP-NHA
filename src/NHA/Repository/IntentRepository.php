@@ -25,7 +25,7 @@ class IntentRepository extends AbstractRepository
     /**
      * Fetches the status of an intent.
      *
-     * @param string|object $intent_id
+     * @param  string|object    $intent_id
      * @return PromiseInterface
      */
     public function getIntentStatus(string|object $intent_id): PromiseInterface

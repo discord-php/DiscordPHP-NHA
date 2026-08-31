@@ -71,7 +71,7 @@ class WorldRepository extends AbstractRepository
     /**
      * Fetches colony information.
      *
-     * @param string $body
+     * @param  string           $body
      * @return PromiseInterface
      */
     public function getColony(string $body): PromiseInterface
@@ -84,7 +84,7 @@ class WorldRepository extends AbstractRepository
     /**
      * Fetches terraform information.
      *
-     * @param string $body
+     * @param  string           $body
      * @return PromiseInterface
      */
     public function getTerraform(string $body): PromiseInterface

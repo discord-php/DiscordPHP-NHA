@@ -25,7 +25,7 @@ class AgentRepository extends AbstractRepository
     /**
      * Fetches public info about any agent by id.
      *
-     * @param int $agent_id
+     * @param  int              $agent_id
      * @return PromiseInterface
      */
     public function getAgentInfo(int $agent_id): PromiseInterface

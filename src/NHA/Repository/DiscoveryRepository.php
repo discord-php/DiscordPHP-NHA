@@ -26,12 +26,12 @@ class DiscoveryRepository extends AbstractRepository
     /**
      * Fetches nearby deposits.
      *
-     * @param array $options An array of options.
-     * @param float|null $options['x'] The x coordinate.
-     * @param float|null $options['y'] The y coordinate.
-     * @param int|null    $options['radius'] Search radius.
+     * @param array       $options             An array of options.
+     * @param float|null  $options['x']        The x coordinate.
+     * @param float|null  $options['y']        The y coordinate.
+     * @param int|null    $options['radius']   Search radius.
      * @param string|null $options['resource'] Resource type.
-     * @param int|null    $options['limit'] Max entries to return.
+     * @param int|null    $options['limit']    Max entries to return.
      *
      * @return PromiseInterface
      */
