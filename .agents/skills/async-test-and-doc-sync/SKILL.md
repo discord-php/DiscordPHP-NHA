@@ -19,14 +19,14 @@ Keep tests, PHPDoc, and repository documentation synchronized with public behavi
 - unit tests assert semantic behavior without live Discord
 - integration tests are explicit, live, and opt-in
 - async tests use the shared ReactPHP wait bridges
-- every unit test extends `DiscordTestCase`
+- every unit test extends `NHATestCase`
 - PHPDoc describes local public APIs accurately
 - `README.md` and `.env.example` reflect the executable users actually run
 
 ## Read in this order
 
 1. `tests/functions.php` — `wait()`, `waitForDiscord()`, mock factories
-2. `tests/DiscordTestCase.php` — unit-safe base
+2. `tests/NHATestCase.php` — unit-safe base
 3. `tests/DiscordIntegrationTestCase.php` — live opt-in base
 4. `tests/bootstrap.php` — autoload and environment loading
 5. `tests/DiscordSingleton.php` — unit-safe and live Discord clients
@@ -43,7 +43,7 @@ Keep tests, PHPDoc, and repository documentation synchronized with public behavi
 
 Tests and docs form a contract surface:
 
-- all unit-test classes extend `DiscordTestCase`
+- all unit-test classes extend `NHATestCase`
 - tests requiring live Discord extend `DiscordIntegrationTestCase`
 - `wait()` uses the unit-safe `DiscordSingleton::get()`
 - `waitForDiscord()` uses the credential-gated live singleton
@@ -58,7 +58,7 @@ This repository does not own DiscordPHP's generated docs, `guide/`, gateway test
 
 ### Unit tests
 
-Every unit-test class extends `DiscordTestCase`, including tests for:
+Every unit-test class extends `NHATestCase`, including tests for:
 
 - endpoint binding
 - typed verb argument forwarding
@@ -298,7 +298,7 @@ Use repository-local scratch paths for new tests when possible; do not introduce
 Stop if you see:
 
 - a unit test extending raw `PHPUnit\Framework\TestCase`
-- a live test extending only `DiscordTestCase`
+- a live test extending only `NHATestCase`
 - default unit execution requiring Discord or NHA network access
 - `waitForDiscord()` in a unit test
 - `wait()` around synchronous assertions
@@ -311,7 +311,7 @@ Stop if you see:
 
 ## Checklist before commit
 
-- [ ] Every unit test class extends `DiscordTestCase`
+- [ ] Every unit test class extends `NHATestCase`
 - [ ] Every live Discord test extends `DiscordIntegrationTestCase`
 - [ ] Unit tests remain safe without credentials or network
 - [ ] Async unit tests use and return `wait()`
@@ -329,4 +329,4 @@ Stop if you see:
 
 ## Bottom line
 
-Tests prove local behavior, PHPDoc declares the API, and README/environment docs teach operation. Keep unit tests offline, live tests opt-in, all unit classes on `DiscordTestCase`, and every surface compatible with PHPUnit 9.
+Tests prove local behavior, PHPDoc declares the API, and README/environment docs teach operation. Keep unit tests offline, live tests opt-in, all unit classes on `NHATestCase`, and every surface compatible with PHPUnit 9.
