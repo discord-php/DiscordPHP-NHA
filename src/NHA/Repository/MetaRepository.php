@@ -11,10 +11,12 @@ declare(strict_types=1);
  * with this source code in the LICENSE.md file.
  */
 
-namespace NHA\Repositories;
+namespace NHA\Repository;
 
 use NHA\Http\Endpoint;
 use NHA\NHA;
+use NHA\Parts\Health;
+use NHA\Parts\Updates;
 use React\Promise\PromiseInterface;
 
 /**
@@ -22,23 +24,27 @@ use React\Promise\PromiseInterface;
  */
 class MetaRepository extends AbstractRepository
 {
+    protected string $class = Updates::class;
+
     /**
      * Fetches the health status.
      *
-     * @return PromiseInterface
+     * @return PromiseInterface<Health>
      */
     public function getHealth(): PromiseInterface
     {
-        return $this->client->fetch(Endpoint::HEALTHZ);
+        return $this->client->fetch(Endpoint::HEALTHZ)->then(
+            fn(array $data) => $this->factory->part(Health::class, (array) $data, true)
+        );
     }
 
     /**
      * Fetches recent updates.
      *
-     * @return PromiseInterface
+     * @return PromiseInterface<UpdatesOut>
      */
     public function getUpdates(): PromiseInterface
     {
-        return $this->client->fetch(Endpoint::UPDATES);
+        return $this->fetchAll(Endpoint::UPDATES);
     }
 }

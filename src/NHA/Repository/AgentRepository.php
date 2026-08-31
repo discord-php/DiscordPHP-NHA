@@ -11,7 +11,7 @@ declare(strict_types=1);
  * with this source code in the LICENSE.md file.
  */
 
-namespace NHA\Repositories;
+namespace NHA\Repository;
 
 use NHA\Http\Endpoint;
 use NHA\NHA;

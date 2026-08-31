@@ -11,10 +11,12 @@ declare(strict_types=1);
  * with this source code in the LICENSE.md file.
  */
 
-namespace NHA\Repositories;
+namespace NHA\Repository;
 
 use NHA\Http\Endpoint;
 use NHA\NHA;
+use NHA\Parts\World;
+use NHA\Parts\Map;
 use React\Promise\PromiseInterface;
 
 /**
@@ -25,21 +27,25 @@ class WorldRepository extends AbstractRepository
     /**
      * Fetches the current world state.
      *
-     * @return PromiseInterface
+     * @return PromiseInterface<World>
      */
     public function getWorld(): PromiseInterface
     {
-        return $this->client->fetch(Endpoint::WORLD);
+        return $this->client->fetch(Endpoint::WORLD)->then(
+            fn(array $data) => $this->factory->part(World::class, (array) $data, true)
+        );
     }
 
     /**
      * Fetches the map.
      *
-     * @return PromiseInterface
+     * @return PromiseInterface<Map>
      */
     public function getMap(): PromiseInterface
     {
-        return $this->client->fetch(Endpoint::MAP);
+        return $this->client->fetch(Endpoint::MAP)->then(
+            fn(array $data) => $this->factory->part(Map::class, (array) $data, true)
+        );
     }
 
     /**

@@ -9,9 +9,9 @@ use NHA\NHARepository;
 use NHA\NHA;
 use NHA\Http\Http;
 use NHA\Http\Endpoint;
-use NHA\Repositories\AgentRepository;
-use NHA\Repositories\DiscoveryRepository;
-use NHA\Repositories\WorldRepository;
+use NHA\Repository\AgentRepository;
+use NHA\Repository\DiscoveryRepository;
+use NHA\Repository\WorldRepository;
 use React\Promise\PromiseInterface;
 
 use function React\Promise\resolve;

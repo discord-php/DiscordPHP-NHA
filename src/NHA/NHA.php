@@ -18,12 +18,12 @@ use Discord\MessageCommandClient;
 use NHA\Http\Endpoint;
 use NHA\Http\Http;
 use NHA\Parts\AgentObservation;
-use NHA\Repositories\AgentRepository;
-use NHA\Repositories\DiscoveryRepository;
-use NHA\Repositories\EconomyRepository;
-use NHA\Repositories\IntentRepository;
-use NHA\Repositories\SocialRepository;
-use NHA\Repositories\WorldRepository;
+use NHA\Repository\AgentRepository;
+use NHA\Repository\DiscoveryRepository;
+use NHA\Repository\EconomyRepository;
+use NHA\Repository\IntentRepository;
+use NHA\Repository\SocialRepository;
+use NHA\Repository\WorldRepository;
 use React\Promise\PromiseInterface;
 
 use function React\Promise\resolve;

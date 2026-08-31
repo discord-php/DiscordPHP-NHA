@@ -15,7 +15,7 @@ Use this skill when work touches:
 - `src/NHA/Parts/AgentObservation.php`
 - the relay state in `bot.php`
 
-This is cache-and-persistence boundary skill. DiscordPHP-NHA now uses a local repository hierarchy where `NHA\Repositories\AbstractRepository` extends `Discord\Repository\AbstractRepository` to provide common NHA-specific dependency injection.
+This is cache-and-persistence boundary skill. DiscordPHP-NHA now uses a local repository hierarchy where `NHA\Repository\AbstractRepository` extends `Discord\Repository\AbstractRepository` to provide common NHA-specific dependency injection.
 
 ## Goal
 

@@ -11,10 +11,11 @@ declare(strict_types=1);
  * with this source code in the LICENSE.md file.
  */
 
-namespace NHA\Repositories;
+namespace NHA\Repository;
 
 use NHA\Http\Endpoint;
-use NHA\NHA;
+use NHA\Parts\Relations;
+use NHA\Parts\Social;
 use React\Promise\PromiseInterface;
 
 /**
@@ -22,14 +23,16 @@ use React\Promise\PromiseInterface;
  */
 class SocialRepository extends AbstractRepository
 {
+    protected string $class = Social::class;
+
     /**
      * Fetches the chat.
      *
-     * @return PromiseInterface
+     * @return PromiseInterface<Social>
      */
     public function getChat(): PromiseInterface
     {
-        return $this->client->fetch(Endpoint::CHAT);
+        return $this->fetchAll(Endpoint::CHAT);
     }
 
     /**
@@ -65,10 +68,10 @@ class SocialRepository extends AbstractRepository
     /**
      * Fetches relations.
      *
-     * @return PromiseInterface
+     * @return PromiseInterface<Relations>
      */
     public function getRelations(): PromiseInterface
     {
-        return $this->client->fetch(Endpoint::RELATIONS);
+        return $this->client->fetch(Endpoint::RELATIONS)->then(fn(array $data) => $this->factory->part(Relations::class,(array) $data, true));
     }
 }

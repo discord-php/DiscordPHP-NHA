@@ -11,10 +11,13 @@ declare(strict_types=1);
  * with this source code in the LICENSE.md file.
  */
 
-namespace NHA\Repositories;
+namespace NHA\Repository;
 
 use NHA\Http\Endpoint;
 use NHA\NHA;
+use NHA\Parts\Contracts;
+use NHA\Parts\Depot;
+use NHA\Parts\Market;
 use React\Promise\PromiseInterface;
 
 /**
@@ -25,30 +28,36 @@ class EconomyRepository extends AbstractRepository
     /**
      * Fetches the market.
      *
-     * @return PromiseInterface
+     * @return PromiseInterface<Market>
      */
     public function getMarket(): PromiseInterface
     {
-        return $this->client->fetch(Endpoint::MARKET);
+        return $this->client->fetch(Endpoint::MARKET)->then(
+            fn(array $data) => $this->factory->part(Market::class,(array) $data, true)
+        );
     }
 
     /**
      * Fetches the depot.
      *
-     * @return PromiseInterface
+     * @return PromiseInterface<Depot>
      */
     public function getDepot(): PromiseInterface
     {
-        return $this->client->fetch(Endpoint::DEPOT);
+        return $this->client->fetch(Endpoint::DEPOT)->then(
+            fn(array $data) => $this->factory->part(Depot::class,(array) $data, true)
+        );
     }
 
     /**
      * Fetches the contracts.
      *
-     * @return PromiseInterface
+     * @return PromiseInterface<Contracts>
      */
     public function getContracts(): PromiseInterface
     {
-        return $this->client->fetch(Endpoint::CONTRACTS);
+        return $this->client->fetch(Endpoint::CONTRACTS)->then(
+            fn(array $data) => $this->factory->part(Contracts::class,(array) $data, true)
+        );
     }
 }
