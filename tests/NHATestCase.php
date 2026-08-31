@@ -17,7 +17,7 @@ use PHPUnit\Framework\TestCase;
 
 class NHATestCase extends TestCase
 {
-    protected static Channel $channel;
+    protected static ?Channel $channel = null;
 
     public static function setUpBeforeClass(): void
     {
@@ -26,8 +26,11 @@ class NHATestCase extends TestCase
             $channel = $discord->getChannel(getenv('TEST_CHANNEL'));
             $resolve($channel);
         });
-        assert(self::$channel instanceof Channel, 'Channel not found. Please check your environment variables and ensure TEST_CHANNEL is set.');
-        self::$channel = $channel;
+        if ($channel instanceof Channel) {
+            self::$channel = $channel;
+        } else {
+            throw new \RuntimeException('Channel not found. Please check your environment variables and ensure TEST_CHANNEL is set.');
+        }
     }
 
     protected function channel()

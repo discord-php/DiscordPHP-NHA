@@ -2,10 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Tests\NHA;
-
 use Discord\Builders\MessageBuilder;
-use NHATestCase;
 use NHA\HelperTrait;
 
 class HelperTraitTest extends NHATestCase

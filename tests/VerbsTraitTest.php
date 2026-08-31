@@ -2,9 +2,6 @@
 
 declare(strict_types=1);
 
-namespace Tests\NHA;
-
-use NHATestCase;
 use NHA\VerbsTrait;
 use React\Promise\PromiseInterface;
 

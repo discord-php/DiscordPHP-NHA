@@ -2,9 +2,6 @@
 
 declare(strict_types=1);
 
-namespace Tests\NHA\Parts;
-
-use NHATestCase;
 use NHA\Parts\AgentObservation;
 
 class AgentObservationTest extends NHATestCase

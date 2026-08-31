@@ -1,10 +1,6 @@
 <?php
 
 declare(strict_types=1);
-
-namespace Tests\NHA;
-
-use NHATestCase;
 use NHA\StateStore;
 
 class StateStoreTest extends NHATestCase

@@ -2,9 +2,6 @@
 
 declare(strict_types=1);
 
-namespace Tests\NHA\Http;
-
-use NHATestCase;
 use NHA\Http\Endpoint;
 
 class EndpointTest extends NHATestCase
