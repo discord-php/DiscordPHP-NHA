@@ -15,23 +15,18 @@ namespace NHA;
 
 use Discord\Http\Drivers\React;
 use Discord\MessageCommandClient;
+use NHA\Client\Client;
 use NHA\Http\Endpoint;
 use NHA\Http\Http;
 use NHA\Parts\AgentObservation;
-use NHA\Repository\AgentRepository;
-use NHA\Repository\DiscoveryRepository;
-use NHA\Repository\EconomyRepository;
-use NHA\Repository\IntentRepository;
-use NHA\Repository\SocialRepository;
-use NHA\Repository\WorldRepository;
 use React\Promise\PromiseInterface;
 
-use function React\Promise\resolve;
-
 /**
- * Client for the NHA (https://nha.recluse.lol) agent sandbox, layered on
- * top of a DiscordPHP `MessageCommandClient` so the bot can relay world
- * data into Discord via chat commands, slash commands and components.
+ * The NHA client class.
+ *
+ * @property Client $client
+ * @property Http $nha_http
+ * @property AgentObservation|null $cached_observation
  *
  * @version 0.1.0
  */
@@ -41,53 +36,25 @@ class NHA extends MessageCommandClient
     use VerbsTrait;
 
     /**
-     * The repository for querying NHA world state.
+     * The extended NHA HTTP client.
      *
-     * @var WorldRepository
+     * @var Http
      */
-    protected WorldRepository $world_repo;
+    protected $nha_http;
 
     /**
-     * The repository for querying NHA economy related data.
+     * The extended Client class.
      *
-     * @var EconomyRepository
+     * @var Client
      */
-    protected EconomyRepository $economy_repo;
-
-    /**
-     * The repository for querying NHA social and communication data.
-     *
-     * @var SocialRepository
-     */
-    protected SocialRepository $social_repo;
-
-    /**
-     * The repository for querying NHA agent and history related data.
-     *
-     * @var AgentRepository
-     */
-    protected AgentRepository $agent_repo;
-
-    /**
-     * The repository for querying NHA discovery and intent related data.
-     *
-     * @var DiscoveryRepository
-     */
-    protected DiscoveryRepository $discovery_repo;
-
-    /**
-     * The repository for querying NHA intent related data.
-     *
-     * @var IntentRepository
-     */
-    protected IntentRepository $intent_repo;
+    protected $client;
 
     /**
      * Local cache of the last observation received per agent id.
      *
-     * @var AgentObservation[]
+     * @var array<int, AgentObservation>
      */
-    protected array $agents = [];
+    protected array $observations = [];
 
     public function __construct(array $options = [])
     {
@@ -96,98 +63,11 @@ class NHA extends MessageCommandClient
         $this->nha_http = new Http(
             '',
             $this->loop,
-            $this->options['logger'],
+            $this->options['logger'] ?? null,
             new React($this->loop, $options['socket_options'] ?? [])
         );
 
-        $this->world_repo = new WorldRepository($this);
-        $this->economy_repo = new EconomyRepository($this);
-        $this->social_repo = new SocialRepository($this);
-        $this->agent_repo = new AgentRepository($this);
-        $this->discovery_repo = new DiscoveryRepository($this);
-        $this->intent_repo = new IntentRepository($this);
-    }
-
-    /**
-     * Gets the NHA HTTP client.
-     *
-     * @return Http
-     */
-    public function getNhaHttpClient(): Http
-    {
-        return $this->nha_http;
-    }
-
-    /**
-     * Gets the world repository.
-     *
-     * @return WorldRepository
-     */
-    public function getWorldRepo(): WorldRepository
-    {
-        return $this->world_repo;
-    }
-
-    /**
-     * Gets the economy repository.
-     *
-     * @return EconomyRepository
-     */
-    public function getEconomyRepo(): EconomyRepository
-    {
-        return $this->economy_repo;
-    }
-
-    /**
-     * Gets the social repository.
-     *
-     * @return SocialRepository
-     */
-    public function getSocialRepo(): SocialRepository
-    {
-        return $this->social_repo;
-    }
-
-    /**
-     * Gets the agent repository.
-     *
-     * @return AgentRepository
-     */
-    public function getAgentRepo(): AgentRepository
-    {
-        return $this->agent_repo;
-    }
-
-    /**
-     * Gets the discovery repository.
-     *
-     * @return DiscoveryRepository
-     */
-    public function getDiscoveryRepo(): DiscoveryRepository
-    {
-        return $this->discovery_repo;
-    }
-
-    /**
-     * Gets the intent repository.
-     *
-     * @return IntentRepository
-     */
-    public function getIntentRepo(): IntentRepository
-    {
-        return $this->intent_repo;
-    }
-
-    /**
-     * Gets the last cached observation for an agent, if any.
-     *
-     * @param int $agent_id
-     *
-     * @return AgentObservation|null
-     */
-    public function getCachedObservation(int $agent_id): ?AgentObservation
-    {
-        return $this->agents[$agent_id] ?? null;
+        $this->client = $this->factory->part(Client::class, (array) $this->client);
     }
 
     /**
@@ -219,9 +99,63 @@ class NHA extends MessageCommandClient
 
         return $this->nha_http->get($endpoint)->then(function ($response) use ($agent_id) {
             $observation = new AgentObservation($agent_id, (array) $response);
-            $this->agents[$agent_id] = $observation;
+            $this->observations[$agent_id] = $observation;
 
             return $observation;
         });
+    }
+
+    /**
+     * Gets the last cached observation for an agent, if any.
+     *
+     * @param int $agent_id
+     *
+     * @return AgentObservation|null
+     */
+    public function getCachedObservation(int $agent_id): ?AgentObservation
+    {
+        return $this->observations[$agent_id] ?? null;
+    }
+
+    /**
+     * Gets the NHA HTTP client.
+     *
+     * @return Http
+     */
+    public function getNhaHttpClient(): Http
+    {
+        return $this->nha_http;
+    }
+
+    /**
+     * Gets the client.
+     *
+     * @return Client
+     */
+    public function getClient(): Client
+    {
+        return $this->client;
+    }
+
+    /**
+     * Handles dynamic get calls to the client.
+     *
+     * @param string $name Variable name.
+     *
+     * @return mixed
+     */
+    public function __get(string $name)
+    {
+        static $allowed = ['loop', 'options', 'logger', 'http', 'nha_http', 'application_commands'];
+
+        if (in_array($name, $allowed)) {
+            return $this->{$name};
+        }
+
+        if (null === $this->client) {
+            return;
+        }
+
+        return $this->client->{$name};
     }
 }
