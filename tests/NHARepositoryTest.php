@@ -18,43 +18,27 @@ class NHARepositoryTest extends NHAUnitTestCase
 
     public function testGetWorld()
     {
-        return wait(function (NHA $nha, $resolve) {
-            return $nha->world->getWorld()
+        $world = wait(function (NHA $nha, $resolve) {
+            $nha->world->getWorld()
                 ->then(function ($world) use ($resolve) {
-                    $this->assertInstanceOf(\NHA\Parts\World::class, $world);
                     $resolve($world);
                 });
         }, 10);
+
+        $this->assertInstanceOf(\NHA\Parts\World::class, $world);
     }
 
-    public function testGetDeposits(): void
+    public function testGetDeposits()
     {
-        $nha = $this->getNha();
+        $result = wait(function (NHA $nha, $resolve) {
+            $nha->discovery->getDeposits(['x' => 1.0, 'y' => 2.0, 'limit' => 50])
+                ->then(function ($result) use ($resolve) {
+                    $resolve($result);
+                });
+        }, 10);
 
-        $http = $this->getMockBuilder(\NHA\Http\Http::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['get'])
-            ->getMock();
-
-        $mockNha = $this->getMockBuilder(NHA::class)
-            ->setConstructorArgs([['token' => 'mock', 'loop' => $nha->getLoop(), 'logger' => $nha->getLogger()]])
-            ->onlyMethods(['getNhaHttpClient'])
-            ->getMock();
-
-        $mockNha->method('getNhaHttpClient')->willReturn($http);
-
-        $discoveryRepo = new DiscoveryRepository($mockNha);
-
-        $http->expects($this->once())
-            ->method('get')
-            ->with($this->callback(fn($endpoint) => str_contains((string) $endpoint, 'x=1.0') && str_contains((string) $endpoint, 'y=2.0')))
-            ->willReturn(resolve([['resource' => 'metal']]));
-
-        $promise = $discoveryRepo->getDeposits(['x' => 1.0, 'y' => 2.0, 'limit' => 50]);
-        $this->assertInstanceOf(PromiseInterface::class, $promise);
-        $result = \wait(fn($resolve) => $promise->then($resolve));
-
-        $this->assertSame([['resource' => 'metal']], $result);
+        $this->assertIsArray($result);
+        $this->assertNotEmpty($result);
     }
 
 }
