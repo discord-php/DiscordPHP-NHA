@@ -35,8 +35,18 @@ class NHASingleton
     {
         $loop = Loop::get();
 
+        $redis = (new Clue\React\Redis\Factory($loop))->createLazyClient('localhost:6379');
+        $cache = new WyriHaximus\React\Cache\Redis($redis);
+
+        //$cache = new WyriHaximus\React\Cache\Filesystem(React\Filesystem\Filesystem::create($loop), getenv('RUNNER_TEMP').DIRECTORY_SEPARATOR);
+
+        //$memcached = new \Memcached();
+        //$memcached->addServer('localhost', 11211);
+        //$psr6Cache = new \Symfony\Component\Cache\Adapter\MemcachedAdapter($memcached, 'dphp', 0);
+        //$cache = new RedisPsr16($psr6Cache);
+
         $logger = new Logger('NHAPHP-UnitTests');
-        $handler = new StreamHandler(fopen(__DIR__ . '/../phpunit.log', 'w'));
+        $handler = new StreamHandler(fopen(__DIR__.'/../phpunit.log', 'w'));
         $formatter = new LineFormatter(null, null, true, true);
         $handler->setFormatter($formatter);
         $logger->pushHandler($handler);
@@ -45,6 +55,7 @@ class NHASingleton
             'token' => getenv('NHA_TOKEN'),
             'loop' => $loop,
             'logger' => $logger,
+            'cache' => $cache,
         ]);
 
         $e = null;
