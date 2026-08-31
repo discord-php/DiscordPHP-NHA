@@ -26,7 +26,6 @@ use NHA\Repository\EconomyRepository;
 use NHA\Repository\HistoryRepository;
 use NHA\Repository\IntentRepository;
 use NHA\Repository\MetaRepository;
-use NHA\Repository\SocialRepository;
 use NHA\Repository\WorldRepository;
 
 class Client extends DiscordClient
