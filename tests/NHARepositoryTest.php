@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use NHA\NHA;
-use NHA\Repository\AgentRepository;
 use NHA\Repository\DiscoveryRepository;
 use NHA\Repository\WorldRepository;
 use React\Promise\PromiseInterface;
@@ -11,7 +10,7 @@ use Discord\Factory\Factory;
 
 use function React\Promise\resolve;
 
-class NHARepositoryTest extends NHATestCase
+class NHARepositoryTest extends NHAUnitTestCase
 {
     protected function createMockNha(): NHA
     {

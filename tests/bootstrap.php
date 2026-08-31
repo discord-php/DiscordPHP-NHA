@@ -11,8 +11,6 @@
 
 include __DIR__ . '/../vendor/autoload.php';
 
-//class RedisPsr16 extends \Symfony\Component\Cache\Psr16Cache {}
-
 // Load local .env into environment if present (simple loader, no extra deps)
 $envPath = __DIR__ . '/../.env';
 if (file_exists($envPath)) {
@@ -40,8 +38,7 @@ if (file_exists($envPath)) {
     }
 }
 
-include __DIR__ . '/NHAUnitTestCase.php';
-include __DIR__ . '/functions.php';
-include __DIR__ . '/HelperTraitTest.php';
-include __DIR__ . '/NHASingleton.php';
-include __DIR__ . '/NHATestCase.php';
+include_once __DIR__ . '/NHAUnitTestCase.php';
+include_once __DIR__ . '/functions.php';
+include_once __DIR__ . '/NHASingleton.php';
+include_once __DIR__ . '/NHATestCase.php';
