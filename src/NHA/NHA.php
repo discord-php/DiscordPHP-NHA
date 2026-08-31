@@ -64,7 +64,7 @@ class NHA extends MessageCommandClient
             '',
             $this->loop,
             $this->options['logger'] ?? null,
-            new React($this->loop, $options['socket_options'] ?? [])
+            new React($this->loop, $options['socket_options'] ?? []),
         );
 
         $this->client = $this->factory->part(Client::class, (array) $this->client);

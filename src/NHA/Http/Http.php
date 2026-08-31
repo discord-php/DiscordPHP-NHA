@@ -177,7 +177,7 @@ class Http extends DiscordHttp implements HttpInterface
         if (! is_null($content) && ! isset($headers['Content-Type'])) {
             $baseHeaders = array_merge(
                 $baseHeaders,
-                $this->guessContent($content)
+                $this->guessContent($content),
             );
         }
 

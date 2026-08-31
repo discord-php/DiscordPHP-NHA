@@ -102,7 +102,7 @@ $text = fn(string $content): Container => Container::new()->addComponents([TextD
 $replyToMessage = function (Message $message, PromiseInterface $promise) use ($nha, $text): void {
     $promise->then(
         fn($builder) => $message->channel->sendMessage($builder),
-        fn(\Throwable $e) => $message->channel->sendMessage($nha::createBuilder()->addComponent($text("❌ {$e->getMessage()}")))
+        fn(\Throwable $e) => $message->channel->sendMessage($nha::createBuilder()->addComponent($text("❌ {$e->getMessage()}"))),
     );
 };
 
@@ -113,7 +113,7 @@ $replyToMessage = function (Message $message, PromiseInterface $promise) use ($n
 $replyToInteraction = function (Interaction $interaction, PromiseInterface $promise) use ($nha, $text): PromiseInterface {
     return $interaction->acknowledgeWithResponse()->then(fn() => $promise)->then(
         fn($builder) => $interaction->updateOriginalResponse($builder),
-        fn(\Throwable $e) => $interaction->updateOriginalResponse($nha::createBuilder()->addComponent($text("❌ {$e->getMessage()}")))
+        fn(\Throwable $e) => $interaction->updateOriginalResponse($nha::createBuilder()->addComponent($text("❌ {$e->getMessage()}"))),
     );
 };
 

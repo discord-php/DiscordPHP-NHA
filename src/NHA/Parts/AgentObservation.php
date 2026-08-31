@@ -161,7 +161,7 @@ class AgentObservation implements JsonSerializable
 
         // After any quick-action, re-observe and refresh the message in place.
         $refresh = fn($interaction) => $nha->observe($this->agentId)->then(
-            fn(self $obs) => $interaction->updateMessage(NHA::createBuilder()->addComponent($obs->toContainer($nha)))
+            fn(self $obs) => $interaction->updateMessage(NHA::createBuilder()->addComponent($obs->toContainer($nha))),
         );
 
         $container = Container::new()->addComponents([

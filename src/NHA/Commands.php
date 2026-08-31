@@ -77,7 +77,7 @@ class Commands
             $this->state->setDefaultAgent($agent_id);
 
             return NHA::createBuilder()->addComponent(self::textContainer(
-                "### ✅ Registered agent **#{$agent_id}**\nThis is now the default agent for future commands."
+                "### ✅ Registered agent **#{$agent_id}**\nThis is now the default agent for future commands.",
             ));
         });
     }
@@ -85,7 +85,7 @@ class Commands
     public function observe(?int $agent_id): PromiseInterface
     {
         return $this->nha->observe($this->resolveAgentId($agent_id))->then(
-            fn(AgentObservation $obs) => NHA::createBuilder()->addComponent($obs->toContainer($this->nha))
+            fn(AgentObservation $obs) => NHA::createBuilder()->addComponent($obs->toContainer($this->nha)),
         );
     }
 
@@ -104,7 +104,7 @@ class Commands
         $agent_id = $this->resolveAgentId($agent_id);
 
         return $this->nha->intent($agent_id, $verb, $args)->then(
-            fn() => NHA::createBuilder()->addComponent(self::textContainer("✅ Queued **{$verb}** for agent #{$agent_id}."))
+            fn() => NHA::createBuilder()->addComponent(self::textContainer("✅ Queued **{$verb}** for agent #{$agent_id}.")),
         );
     }
 
@@ -113,7 +113,7 @@ class Commands
         $agent_id = $this->resolveAgentId($agent_id);
 
         return $this->nha->move($agent_id, $dx, $dy)->then(
-            fn() => NHA::createBuilder()->addComponent(self::textContainer("✅ Queued **move** ({$dx}, {$dy}) for agent #{$agent_id}."))
+            fn() => NHA::createBuilder()->addComponent(self::textContainer("✅ Queued **move** ({$dx}, {$dy}) for agent #{$agent_id}.")),
         );
     }
 
@@ -138,7 +138,7 @@ class Commands
         $n ??= 1;
 
         return $this->nha->intent($agent_id, $verb, ['n' => $n])->then(
-            fn() => NHA::createBuilder()->addComponent(self::textContainer("✅ Queued **{$verb}** x{$n} for agent #{$agent_id}."))
+            fn() => NHA::createBuilder()->addComponent(self::textContainer("✅ Queued **{$verb}** x{$n} for agent #{$agent_id}.")),
         );
     }
 
@@ -147,7 +147,7 @@ class Commands
         $agent_id = $this->resolveAgentId($agent_id);
 
         return $this->nha->say($agent_id, $text)->then(
-            fn() => NHA::createBuilder()->addComponent(self::textContainer("💬 Agent #{$agent_id} said: {$text}"))
+            fn() => NHA::createBuilder()->addComponent(self::textContainer("💬 Agent #{$agent_id} said: {$text}")),
         );
     }
 
@@ -156,7 +156,7 @@ class Commands
         $agent_id = $this->resolveAgentId($agent_id);
 
         return $this->nha->tell($agent_id, $to, $text)->then(
-            fn() => NHA::createBuilder()->addComponent(self::textContainer("💬 Agent #{$agent_id} told #{$to}: {$text}"))
+            fn() => NHA::createBuilder()->addComponent(self::textContainer("💬 Agent #{$agent_id} told #{$to}: {$text}")),
         );
     }
 

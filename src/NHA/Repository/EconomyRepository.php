@@ -33,7 +33,7 @@ class EconomyRepository extends AbstractRepository
     public function getMarket(): PromiseInterface
     {
         return $this->nha_http->get(Endpoint::MARKET)->then(
-            fn(array $data) => $this->factory->part(Market::class, (array) $data, true)
+            fn(array $data) => $this->factory->part(Market::class, (array) $data, true),
         );
     }
 
@@ -45,7 +45,7 @@ class EconomyRepository extends AbstractRepository
     public function getDepot(): PromiseInterface
     {
         return $this->nha_http->get(Endpoint::DEPOT)->then(
-            fn(array $data) => $this->factory->part(Depot::class, (array) $data, true)
+            fn(array $data) => $this->factory->part(Depot::class, (array) $data, true),
         );
     }
 
@@ -57,7 +57,7 @@ class EconomyRepository extends AbstractRepository
     public function getContracts(): PromiseInterface
     {
         return $this->nha_http->get(Endpoint::CONTRACTS)->then(
-            fn(array $data) => $this->factory->part(Contracts::class, (array) $data, true)
+            fn(array $data) => $this->factory->part(Contracts::class, (array) $data, true),
         );
     }
 }

@@ -32,7 +32,7 @@ class WorldRepository extends AbstractRepository
     public function getWorld(): PromiseInterface
     {
         return $this->nha_http->get(Endpoint::WORLD)->then(
-            fn(array $data) => $this->factory->part(World::class, (array) $data, true)
+            fn(array $data) => $this->factory->part(World::class, (array) $data, true),
         );
     }
 
@@ -44,7 +44,7 @@ class WorldRepository extends AbstractRepository
     public function getMap(): PromiseInterface
     {
         return $this->nha_http->get(Endpoint::MAP)->then(
-            fn(array $data) => $this->factory->part(Map::class, (array) $data, true)
+            fn(array $data) => $this->factory->part(Map::class, (array) $data, true),
         );
     }
 

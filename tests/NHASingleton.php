@@ -46,7 +46,7 @@ class NHASingleton
         //$cache = new RedisPsr16($psr6Cache);
 
         $logger = new Logger('NHAPHP-UnitTests');
-        $handler = new StreamHandler(fopen(__DIR__.'/../phpunit.log', 'w'));
+        $handler = new StreamHandler(fopen(__DIR__ . '/../phpunit.log', 'w'));
         $formatter = new LineFormatter(null, null, true, true);
         $handler->setFormatter($formatter);
         $logger->pushHandler($handler);
