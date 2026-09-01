@@ -56,18 +56,15 @@ class DepositsRepository extends AbstractRepository
         $options = $resolver->resolve($options);
 
         $endpoint = Endpoint::bind(Endpoint::DEPOSITS);
-
-        $query = [
-            'x' => (string) $options['x'],
-            'y' => (string) $options['y'],
-            'limit' => (string) $options['limit'],
-        ];
+        $endpoint->addQuery('x', $options['x']);
+        $endpoint->addQuery('y', $options['y']);
+        $endpoint->addQuery('limit', $options['limit']);
 
         if (isset($options['resource'])) {
-            $query['resource'] = $options['resource'];
+            $endpoint->addQuery('resource', $options['resource']);
         }
 
-        return $this->nha_http->get((string) $endpoint, $query)->then(function ($response) {
+        return $this->nha_http->get($endpoint)->then(function ($response) {
             $deposits = [];
             foreach ($response->deposits as $deposit) {
                 $deposits[] = $this->factory->part($this->class, (array) $deposit);
