@@ -32,12 +32,11 @@ class DepositsRepository extends AbstractRepository
     /**
      * Fetches nearby deposits.
      *
-     * @param array       $options             An array of options.
-     * @param float|null  $options['x']        The x coordinate.
-     * @param float|null  $options['y']        The y coordinate.
-     * @param int|null    $options['radius']   Search radius.
-     * @param string|null $options['resource'] Resource type.
-     * @param int|null    $options['limit']    Max entries to return.
+     * @param array        $options             An array of options.
+     * @param int          $options['x']        The x coordinate.
+     * @param int          $options['y']        The y coordinate.
+     * @param ?string|null $options['resource'] Resource type.
+     * @param ?int|null    $options['limit']    Max entries to return. Default 8. Max 50.
      *
      * @return PromiseInterface<Deposits[]>
      */
@@ -46,14 +45,12 @@ class DepositsRepository extends AbstractRepository
         $resolver = new OptionsResolver();
         $resolver
             ->setRequired(['x', 'y'])
-            ->setDefined(['radius', 'resource', 'limit'])
-            ->setAllowedTypes('x', 'float')
-            ->setAllowedTypes('y', 'float')
-            ->setAllowedTypes('radius', 'int')
+            ->setDefined(['resource', 'limit'])
+            ->setAllowedTypes('x', 'int')
+            ->setAllowedTypes('y', 'int')
             ->setAllowedTypes('resource', 'string')
             ->setAllowedTypes('limit', 'int')
-            ->setDefault('radius', 100)
-            ->setDefault('limit', 10)
+            ->setDefault('limit', 8)
             ->setAllowedValues('resource', fn($value) => $value === '' || is_string($value));
 
         $options = $resolver->resolve($options);
@@ -63,7 +60,6 @@ class DepositsRepository extends AbstractRepository
         $query = [
             'x' => (string) $options['x'],
             'y' => (string) $options['y'],
-            'radius' => (string) $options['radius'],
             'limit' => (string) $options['limit'],
         ];
 
