@@ -27,6 +27,8 @@ class Endpoint implements EndpointInterface
 
     // POST - register a new agent, GET - list agents (if supported)
     public const AGENTS = 'agents';
+    // POST - announce something
+    public const ANNOUNCE = 'announce';
     // GET - observe the world from an agent's perspective
     public const OBSERVE = 'observe/:agent_id';
     // POST - submit an intent (action) for an agent
@@ -40,6 +42,7 @@ class Endpoint implements EndpointInterface
     public const WORLD = 'world';
     public const MAP = 'map';
     public const SCENE = 'scene';
+    public const STATION = 'station';
     public const STRUCTURES = 'structures';
     public const MARKET = 'market';
     public const DEPOT = 'depot';
@@ -54,6 +57,7 @@ class Endpoint implements EndpointInterface
     public const ROSTER = 'roster';
     public const AGENT = 'agent/:agent_id';
     public const GUILD_PENDING = 'guild/pending';
+    public const GUILD_VERDICT = 'guild/verdict';
     public const HEALTHZ = 'healthz';
     public const UPDATES = 'updates';
     public const COLONY = 'colony/:body';
