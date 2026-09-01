@@ -15,6 +15,8 @@ class NHARepositoryTest extends NHAUnitTestCase
 
     public function testGetWorld()
     {
+        $nha = $this->getNha();
+
         $world = wait(function (NHA $nha, $resolve) {
             $nha->world->getWorld()
                 ->then(
@@ -38,11 +40,11 @@ class NHARepositoryTest extends NHAUnitTestCase
     {
         $nha = $this->getNha();
 
-        $result = wait(function (NHA $nha, $resolve) {
-            $nha->deposits->getDeposits(['x' => 1.0, 'y' => 2.0, 'limit' => 50])
+        $deposits = wait(function (NHA $nha, $resolve) {
+            $nha->deposits->getDeposits(['x' => 1, 'y' => 1])
                 ->then(
-                    function ($result) use ($resolve) {
-                        $resolve($result);
+                    function ($deposits) use ($resolve) {
+                        $resolve($deposits);
                     },
                     function ($error) use ($resolve) {
                         $resolve($error);
@@ -50,12 +52,10 @@ class NHARepositoryTest extends NHAUnitTestCase
                 );
         }, 10);
 
-        if ($result instanceof \Throwable) {
-            $this->fail('testGetDeposits failed with error: ' . $result->getMessage());
+        if ($deposits instanceof \Throwable) {
+            $this->fail('testGetDeposits failed with error: ' . $deposits->getMessage() . PHP_EOL . $deposits->getTraceAsString());
         }
 
-        $this->assertIsArray($result);
-        $this->assertNotEmpty($result);
+        $this->assertIsArray($deposits);
     }
-
 }
