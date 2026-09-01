@@ -65,11 +65,35 @@ the helper.
 | `NHA\Http\Endpoint` | NHA route constants plus `Discord\Http\EndpointInterface` / `EndpointTrait` behavior |
 | `NHA\Http\Request` | Extends `Discord\Http\Request` and prefixes `Http::BASE_URL` |
 | `NHA\Http\Http` | Implements `Discord\Http\HttpInterface`, uses `HttpTrait`, and queues NHA requests |
-| `Discord\Http\Drivers\React` | Dependency-provided asynchronous HTTP driver constructed by `NHA` |
+| `Discord\Http\Drivers\Guzzle` | Dependency-provided asynchronous HTTP driver constructed by `NHA` for `nha_http` |
 
 The local classes adapt `discord-php/http` contracts to the unauthenticated NHA
 API. Do not duplicate the dependency's queue, bucket, Promise, or endpoint
 machinery unless the contract requires a local override.
+
+### The NHA HTTP driver must be `Guzzle`, not `React`
+
+`NHA::__construct()` builds `nha_http` with `new Guzzle($this->loop, ...)`.
+Discord's own gateway/HTTP client is unaffected and still uses `React`
+internally — this is only about the second, NHA-specific HTTP client.
+
+**Do not change this back to `Discord\Http\Drivers\React` without re-verifying
+against the live host.** It was previously wired to `React`, and every request
+to `https://nha.recluse.lol` hung forever: the request was queued
+(`BUCKET ... queued REQ ...` logged) and then nothing — no success, no
+rejection, no timeout — ever again. `curl` and the `Guzzle` driver both
+complete the same request in under a second in the same process. The likely
+cause is a mid-handshake TLS renegotiation the server performs (visible as
+`schannel: remote party requests renegotiation` in `curl -v`) that PHP's
+openssl-backed `react/socket` streams do not complete, while curl/schannel and
+Guzzle's curl handler do.
+
+If you ever suspect a hang against the live NHA host again, the fastest way to
+confirm is a same-process A/B test: swap `$http`'s `driver` property (via
+reflection in a throwaway script) between `new React(...)` and
+`new Guzzle(...)` for the exact same request and compare. Do not assume a hang
+is a network or DNS problem before ruling out the driver — `curl` succeeding
+does not mean the ReactPHP driver will.
 
 ### Authentication boundary
 
@@ -134,6 +158,29 @@ Keep route constants relative. Do not:
 - put query-string assembly in `Request::getUrl()` when `Endpoint` already
   supports query parameters
 
+### Query strings belong on the `Endpoint`, never on `Http::get()`'s `$content`
+
+`HttpTrait::get(string|Endpoint $url, $content = null, array $headers = [])`
+treats a non-null `$content` as a request **body** (it gets JSON-encoded via
+`guessContent()`), not a query string. Passing an options array as the second
+argument to `->get()` silently sends it as a JSON body — the NHA API will
+reject GET requests that need query parameters (e.g. `deposits?x=&y=`) with a
+422, since the required fields never arrived as query params.
+
+Use `Endpoint::addQuery(string $key, $value)` before calling `->get($endpoint)`:
+
+```php
+$endpoint = Endpoint::bind(Endpoint::DEPOSITS);
+$endpoint->addQuery('x', $options['x']);
+$endpoint->addQuery('y', $options['y']);
+
+return $this->nha_http->get($endpoint)->then(...);
+```
+
+This was an actual bug in `DepositsRepository::getDeposits()` — fixed by
+switching to `addQuery()`. Any new repository method with query parameters
+must follow this pattern, not the `get($url, $arrayOfParams)` shape.
+
 ## ReactPHP promises
 
 All NHA network operations return `React\Promise\PromiseInterface`.
@@ -160,6 +207,27 @@ ambiguous values.
 
 Do not create orphaned Promises for side effects without deciding where
 rejection is observed.
+
+### 422 responses are our bug, not the server's
+
+The NHA sandbox is designed to fail safe: invalid or currently-illegal
+*gameplay* actions (e.g. an intent verb the game engine rejects) are simply
+rejected/dropped per the async intent model — that is expected and must not
+be treated as a transport error. A **422 Unprocessable Entity**, however,
+means the request we sent does not match the API's schema (missing/invalid
+field, wrong type, malformed query) — that is a bug in this codebase's request
+construction, not a gameplay outcome.
+
+`NHA\Http\Http::handleError()` overrides the inherited `HttpTrait::handleError()`
+to special-case 422: it logs the response body at `error` level and returns
+`NHA\Http\Exceptions\ValidationException` (extends `\DomainException`) instead
+of the generic `RequestFailedException`. The exception message includes the
+raw response body so the caller can see exactly which field/query was
+rejected.
+
+**Rule:** never add code that silently swallows or retries a 422. If a new
+endpoint or verb starts returning 422s, treat it as a signal to fix the
+request shape (check `/openapi.json`), not to catch-and-ignore the exception.
 
 ## StateStore
 
@@ -215,13 +283,26 @@ do not belong in JSON persistence.
 - blocking the ReactPHP event loop
 - storing volatile remote snapshots or runtime objects in `StateStore`
 - swallowing file or network errors and returning misleading success values
+- switching `nha_http`'s driver back to `Discord\Http\Drivers\React` (hangs
+  forever against the live NHA host — see "The NHA HTTP driver must be
+  `Guzzle`" above)
+- passing query parameters as `Http::get()`'s `$content` argument instead of
+  `Endpoint::addQuery()`
+- catching or retrying a 422/`ValidationException` instead of fixing the
+  request shape
+- using `isset($part->someMagicOrRepositoryProperty)` as a guard — DiscordPHP's
+  `PartTrait` defines `__get` but never `__isset`, so `isset()` on any
+  magic/repository property is **always false** in PHP regardless of whether
+  it actually resolves via `__get`. Guard with a direct call/access (or a
+  try/catch), never `isset()`, for Part-backed properties.
 
 ## Reference files
 
 - `src/NHA/HelperTrait.php` — safe builders and progress rendering
 - `src/NHA/Http/Endpoint.php` — NHA endpoint templates
 - `src/NHA/Http/Request.php` — NHA absolute URL construction
-- `src/NHA/Http/Http.php` — HTTP contract adapter and request queue
+- `src/NHA/Http/Http.php` — HTTP contract adapter, request queue, and 422 handling
+- `src/NHA/Http/Exceptions/ValidationException.php` — thrown for 422 responses
 - `src/NHA/StateStore.php` — JSON persistence
 - `src/NHA/NHA.php` — infrastructure composition and Promise APIs
 - `src/NHA/Commands.php` — Promise consumers and response builders
@@ -235,6 +316,12 @@ do not belong in JSON persistence.
 - [ ] Endpoints use named constants and placeholder binding
 - [ ] `Request::getUrl()` remains the NHA base-URL boundary
 - [ ] `Http` still honors `discord-php/http` interfaces and queue behavior
+- [ ] `nha_http` still uses the `Guzzle` driver, not `React`
+- [ ] Query parameters are bound with `Endpoint::addQuery()`, never passed as
+      `Http::get()`'s `$content` argument
+- [ ] 422 responses still surface as `ValidationException` with the response
+      body logged, not swallowed or retried
+- [ ] No new `isset()` guard on a Part-backed magic/repository property
 - [ ] NHA requests do not leak the Discord bot token
 - [ ] Public asynchronous methods return `PromiseInterface`
 - [ ] Promise resolved-value and rejection contracts remain intentional

@@ -12,6 +12,16 @@ Use this skill when adding or changing public behavior, writing or reviewing tes
 
 This is alignment skill. Load it when the question is not only "does the code work?" but "do tests prove it and do docs describe it?"
 
+> **Naming note:** some sections below describe base classes/helpers
+> (`DiscordIntegrationTestCase`, `DiscordSingleton`, `getMockDiscord()`,
+> `waitForDiscord()`) that do not exist verbatim in this repository today. The
+> actual current files are `tests/NHAUnitTestCase.php` (plain unit base),
+> `tests/NHATestCase.php` (resolves a live channel in `setUpBeforeClass()`),
+> `tests/NHASingleton.php`, and `tests/functions.php`'s `wait()`/`getMockNha()`.
+> Treat this skill's naming as the *intended shape* of the contract; when it
+> conflicts with what a file actually does, trust the file and update this
+> skill to match rather than silently reintroducing the old names.
+
 ## Goal
 
 Keep tests, PHPDoc, and repository documentation synchronized with public behavior:
@@ -85,6 +95,33 @@ Examples:
 Live tests require `DISCORD_TOKEN` or `TOKEN` and `TEST_CHANNEL`. Missing credentials must skip, not fail the ordinary unit suite.
 
 NHA network integration should also be opt-in and isolated from unit tests. Do not make the default suite depend on the public NHA service.
+
+## Testing against the live NHA sandbox is allowed
+
+Unlike Discord, the NHA API (`https://nha.recluse.lol`) is a public, read-mostly
+sandbox built to fail safe: unrecognized or currently-illegal *gameplay*
+actions are simply rejected or dropped per the async intent model (see
+AGENTS.md's "NHA async and intent model"). Because of that, it is acceptable
+for `NHA\Repository\*` / `NHA\Http\*` tests to call the real sandbox instead of
+mocking it — `tests/NHARepositoryTest.php` does this today via `NHASingleton`.
+
+This is **not** a license to skip assertions on error handling. When a test
+exercises a request that the API rejects with **422 Unprocessable Entity**,
+assert that it surfaces as `NHA\Http\Exceptions\ValidationException` (a
+`\DomainException`) with the response body available in the message — do not
+catch-and-ignore it, and do not treat a 422 as equivalent to a network
+failure or a gameplay rejection. A 422 always means the request we built is
+wrong.
+
+When writing or debugging a test that hits the live host and appears to hang:
+
+- confirm the request actually reaches the server first (`curl` the same URL)
+- if `curl` succeeds quickly but the PHPUnit run hangs, suspect the HTTP
+  driver, not the network — see `helpers-and-infra-keeper`'s "The NHA HTTP
+  driver must be `Guzzle`, not `React`" section for the exact failure mode and
+  how to reproduce/confirm it
+- never add a `Discord\Http\Drivers\React` instance to a test's HTTP client to
+  "go faster"; it is the slower/broken path against this host, not a shortcut
 
 ## The client factories
 
@@ -265,9 +302,11 @@ Use only these repository-provided commands. Do not invent static-analysis, cove
 ### HTTP tests should assert
 
 - placeholder binding
-- query binding
+- query binding (via `Endpoint::addQuery()`, not `Http::get()`'s `$content` argument)
 - local request URL construction
 - unauthenticated header behavior when isolated safely
+- a 422 response from a live or fixture-backed call surfaces as
+  `NHA\Http\Exceptions\ValidationException`, not a generic failure
 
 ### State tests should assert
 
@@ -308,6 +347,15 @@ Stop if you see:
 - README command/setup claims that do not match `bot.php`
 - references to nonexistent local `guide/` or `docs/` trees
 - commands documented that are not in `composer.json`
+- `isset($part->someProperty)` used to guard a Part-backed magic or
+  repository property — DiscordPHP's `PartTrait` never defines `__isset`, so
+  this is **always false** and will silently short-circuit real behavior (this
+  broke `NHARepositoryTest::testGetWorld()` previously; the fix was to remove
+  the `isset()` guard entirely, not to "fix" the isset check)
+- a test that catches a 422/`ValidationException` and treats it as a passing
+  or ignorable outcome instead of a real assertion failure
+- reintroducing `Discord\Http\Drivers\React` for `nha_http` in a test helper
+  (it hangs indefinitely against the live NHA host)
 
 ## Checklist before commit
 

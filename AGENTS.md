@@ -41,6 +41,8 @@ When a task involves actual NHA gameplay, intent verbs, observations, world stat
 13. **Do not assume observations remain current.** An observation is a snapshot of the world at a particular tick. Other agents and the game engine may change the world before an intent is applied.
 14. **NHA authentication and Discord authentication are separate.** NHA action tokens belong to the NHA API and must not be mixed with Discord credentials or headers.
 15. **Live NHA rules belong to the NHA service.** When current gameplay behavior matters, consult the live NHA API schema and rules instead of assuming this repository's wrappers are the complete specification.
+16. **The NHA HTTP client uses the `Guzzle` driver, not `React`.** `Discord\Http\Drivers\React` hangs indefinitely against `https://nha.recluse.lol` (the server performs a mid-handshake TLS renegotiation that PHP's openssl-backed `react/socket` streams never complete). Discord's own gateway/HTTP client is unaffected and keeps using `React`; only `NHA::$nha_http` must stay on `Guzzle`. See `helpers-and-infra-keeper/SKILL.md` for how to reproduce/confirm this if you suspect a regression.
+17. **A 422 response is our bug, not the server's.** `NHA\Http\Http::handleError()` turns 422 Unprocessable Entity into `NHA\Http\Exceptions\ValidationException` (a `\DomainException`) with the response body logged and included in the message. Never catch-and-ignore or silently retry a 422 — it means the request we built does not match the API schema (check `/openapi.json` and fix the request), unlike a rejected gameplay intent, which is expected/normal.
 
 ## Skill map
 
@@ -547,8 +549,10 @@ If you touch one of these, inspect the companions too:
 | NHA gameplay guidance | `.agents/skills/nha-agent/SKILL.md`, upstream NHA `AGENTS.md`, current API/rules |
 | authentication behavior | `StateStore`, NHA HTTP request headers/body, README setup documentation |
 | polling or tick scheduling | `NHA::observe()`, `bot.php`, ReactPHP loop usage, async tests |
+| `src/NHA/Http/Http.php` driver wiring or error handling | `helpers-and-infra-keeper` skill, `NHA::__construct()`, `src/NHA/Http/Exceptions/ValidationException.php`, `NHARepositoryTest` |
+| a repository method with query parameters | `Endpoint::addQuery()` usage, not `Http::get()`'s `$content` argument |
 
-## Change playbooks
+## Common companion surfaces
 
 ### Playbook: editing the extension client
 
@@ -724,6 +728,10 @@ If you see one of these, slow down:
 - silently converting an NHA rejection into a successful application-level response
 - adding a new game verb without checking `/openapi.json`
 - changing game-domain behavior without updating `nha-agent` guidance when appropriate
+- wiring `nha_http` to `Discord\Http\Drivers\React` (hangs forever against the live NHA host; use `Guzzle`)
+- passing query parameters as `Http::get()`'s `$content` argument instead of `Endpoint::addQuery()` (they get JSON-encoded into the body instead of the query string, and the API responds 422)
+- swallowing, retrying, or downgrading a 422/`ValidationException` into a generic error
+- using `isset()` to guard access to a Discord Part's magic or repository property (e.g. `isset($nha->world)`) — DiscordPHP's `PartTrait` defines `__get` but never `__isset`, so this is always `false` regardless of whether the property actually resolves
 
 ## Preferred reference files
 
