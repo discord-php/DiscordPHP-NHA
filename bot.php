@@ -293,17 +293,28 @@ $registerSlashCommands = function (NHA $nha) use ($commands, $userCommands, $tex
             return $replyToInteraction($interaction, $dispatch($chosen->name, $args));
         });
 
-        if (! $existing->get('name', 'nha')) {
-            $nha->logger->debug('[GLOBAL APPLICATION COMMAND] Creating `nha` command...');
-            $builder = CommandBuilder::new()
-                ->setName('nha')
-                ->setType(Command::CHAT_INPUT)
-                ->setDescription('Control your NHA (https://nha.recluse.lol) agent.');
-            foreach ($subCommands as $subCommand) {
-                $builder->addOption($subCommand);
+        /**
+         * Creates a global command if it isn't already registered, logging the attempt
+         * and its outcome so a failed/rejected save() is never silently missing.
+         */
+        $createCommand = function (string $name, string $description, array $options = []) use ($nha, $existing): void {
+            if ($existing->get('name', $name)) {
+                return;
             }
-            $builder->create($existing)->save('nha initial creation');
-        }
+
+            $nha->logger->debug("[GLOBAL APPLICATION COMMAND] Creating `{$name}` command...");
+            $builder = CommandBuilder::new()->setName($name)->setType(Command::CHAT_INPUT)->setDescription($description);
+            foreach ($options as $option) {
+                $builder->addOption($option);
+            }
+
+            $builder->create($existing)->save("{$name} initial creation")->then(
+                fn() => $nha->logger->info("[GLOBAL APPLICATION COMMAND] Created `{$name}` command."),
+                fn(\Throwable $e) => $nha->logger->error("[GLOBAL APPLICATION COMMAND] Failed to create `{$name}` command: {$e->getMessage()}"),
+            );
+        };
+
+        $createCommand('nha', 'Control your NHA (https://nha.recluse.lol) agent.', $subCommands);
 
         $nha->listenCommand('start', function (Interaction $interaction) use ($userCommands): PromiseInterface {
             return $interaction->acknowledgeWithResponse(true)->then(
@@ -386,15 +397,7 @@ $registerSlashCommands = function (NHA $nha) use ($commands, $userCommands, $tex
         }
 
         foreach ($userSlashCommands as $name => [$options, $description]) {
-            if ($existing->get('name', $name)) {
-                continue;
-            }
-
-            $builder = CommandBuilder::new()->setName($name)->setType(Command::CHAT_INPUT)->setDescription($description);
-            foreach ($options as $option) {
-                $builder->addOption($option);
-            }
-            $builder->create($existing)->save("{$name} initial creation");
+            $createCommand($name, $description, $options);
         }
     });
 };
