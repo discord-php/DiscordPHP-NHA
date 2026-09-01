@@ -37,9 +37,6 @@ class NHARepositoryTest extends NHAUnitTestCase
     public function testGetDeposits()
     {
         $nha = $this->getNha();
-        if (!isset($nha->deposits)) {
-            $this->fail('NHA deposits repository is not set (is null).');
-        }
 
         $result = wait(function (NHA $nha, $resolve) {
             $nha->deposits->getDeposits(['x' => 1.0, 'y' => 2.0, 'limit' => 50])
