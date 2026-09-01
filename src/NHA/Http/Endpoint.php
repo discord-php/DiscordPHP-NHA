@@ -125,6 +125,23 @@ class Endpoint implements EndpointInterface
     protected $query = [];
 
     /**
+     * Creates an NHA endpoint and binds its positional arguments.
+     *
+     * The upstream trait instantiates Discord's endpoint class, which loses
+     * the NHA-specific endpoint type for bound routes and queries.
+     *
+     * @param string   $endpoint
+     * @param string[] $args
+     */
+    public static function bind(string $endpoint, ...$args): self
+    {
+        $boundEndpoint = new self($endpoint);
+        $boundEndpoint->bindArgs(...$args);
+
+        return $boundEndpoint;
+    }
+
+    /**
      * Endpoint constructor.
      *
      * @param string $endpoint

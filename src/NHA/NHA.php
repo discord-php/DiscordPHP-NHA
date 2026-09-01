@@ -98,7 +98,19 @@ class NHA extends MessageCommandClient
             new Guzzle($this->loop, $options['socket_options'] ?? []),
         );
 
-        $this->client = $this->factory->part(Client::class, (array) $this->client);
+        $this->ensureClient();
+    }
+
+    /**
+     * Ensures the internal NHA client registry exists even before Discord bootstraps it.
+     */
+    protected function ensureClient(): void
+    {
+        if ($this->client instanceof Client) {
+            return;
+        }
+
+        $this->client = $this->factory->part(Client::class, []);
     }
 
     /**
@@ -183,9 +195,7 @@ class NHA extends MessageCommandClient
             return $this->{$name};
         }
 
-        if (null === $this->client) {
-            return null;
-        }
+        $this->ensureClient();
 
         return $this->client->{$name} ?? null;
     }
@@ -203,6 +213,10 @@ class NHA extends MessageCommandClient
 
         if (in_array($name, $allowed)) {
             return isset($this->{$name});
+        }
+
+        if (null === $this->client) {
+            $this->ensureClient();
         }
 
         if (null === $this->client) {
