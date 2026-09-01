@@ -40,6 +40,38 @@ class StateStore
         $this->save();
     }
 
+    /**
+     * Gets the NHA identity assigned to a Discord user.
+     *
+     * @return array{agent_id: int, name: string, token: string}|null
+     */
+    public function getDiscordUserAgent(string $discord_user_id): ?array
+    {
+        $agent = $this->data['discord_users'][$discord_user_id] ?? null;
+        if (! is_array($agent) || ! isset($agent['agent_id'], $agent['name'], $agent['token'])) {
+            return null;
+        }
+
+        return [
+            'agent_id' => (int) $agent['agent_id'],
+            'name' => (string) $agent['name'],
+            'token' => (string) $agent['token'],
+        ];
+    }
+
+    /**
+     * Saves a Discord user's NHA identity for later turns.
+     */
+    public function setDiscordUserAgent(string $discord_user_id, int $agent_id, string $name, string $token): void
+    {
+        $this->data['discord_users'][$discord_user_id] = [
+            'agent_id' => $agent_id,
+            'name' => $name,
+            'token' => $token,
+        ];
+        $this->save();
+    }
+
     protected function save(): void
     {
         $dir = dirname($this->path);

@@ -89,6 +89,7 @@ set_exception_handler($reportFatalError);
 
 $state = new StateStore(__DIR__ . '/var/state.json');
 $commands = new Commands($nha, $state);
+$userCommands = new UserCommands($nha, $state);
 
 /**
  * Builds a container carrying a single line of text, used for quick
@@ -205,8 +206,8 @@ foreach (['observe', 'say', 'act'] as $alias) {
 // handlers, registered lazily once the application/gateway are both ready.
 // -----------------------------------------------------------------------
 
-$registerSlashCommands = function (NHA $nha) use ($commands, $replyToInteraction, $flattenOptions): void {
-    $nha->application->commands->freshen()->then(function (GlobalCommandRepository $existing) use ($nha, $commands, $replyToInteraction, $flattenOptions): void {
+$registerSlashCommands = function (NHA $nha) use ($commands, $userCommands, $text, $replyToInteraction, $flattenOptions): void {
+    $nha->application->commands->freshen()->then(function (GlobalCommandRepository $existing) use ($nha, $commands, $userCommands, $text, $replyToInteraction, $flattenOptions): void {
         $opt = function (int $type, string $name, string $description, bool $required = false) use ($nha): Option {
             /** @var Option $option */
             $option = $nha->getFactory()->part(Option::class);
@@ -301,19 +302,96 @@ $registerSlashCommands = function (NHA $nha) use ($commands, $replyToInteraction
             $builder->create($existing)->save('nha initial creation');
         }
 
-        // Standalone top-level aliases mirroring the chat command aliases.
-        foreach (['observe' => [$agentIdOpt()], 'say' => [$opt(Option::STRING, 'text', 'Message text.', true), $agentIdOpt()]] as $name => $options) {
-            $nha->listenCommand($name, function (Interaction $interaction) use ($replyToInteraction, $flattenOptions, $dispatch, $name): PromiseInterface {
-                return $replyToInteraction($interaction, $dispatch($name, $flattenOptions($interaction->data->options ?? [])));
-            });
+        $nha->listenCommand('start', function (Interaction $interaction) use ($userCommands): PromiseInterface {
+            return $interaction->acknowledgeWithResponse(true)->then(
+                fn() => $interaction->updateOriginalResponse($userCommands->start((string) $interaction->user->id)),
+            );
+        });
 
-            if (! $existing->get('name', $name)) {
-                $aliasBuilder = CommandBuilder::new()->setName($name)->setType(Command::CHAT_INPUT)->setDescription("Shortcut for /nha {$name}.");
-                foreach ($options as $option) {
-                    $aliasBuilder->addOption($option);
-                }
-                $aliasBuilder->create($existing)->save("{$name} alias creation");
+        $nha->listenCommand('login', function (Interaction $interaction) use ($userCommands, $nha, $text): PromiseInterface {
+            return $interaction->acknowledgeWithResponse(true)->then(
+                fn() => $userCommands->login((string) $interaction->user->id),
+            )->then(
+                fn($builder) => $interaction->updateOriginalResponse($builder),
+                fn(\Throwable $e) => $interaction->updateOriginalResponse($nha::createBuilder()->addComponent($text("❌ {$e->getMessage()}"))),
+            );
+        });
+
+        $nha->listenCommand('observe', function (Interaction $interaction) use ($userCommands, $nha, $text): PromiseInterface {
+            return $interaction->acknowledgeWithResponse(true)->then(
+                fn() => $userCommands->observe((string) $interaction->user->id),
+            )->then(
+                fn($builder) => $interaction->updateOriginalResponse($builder),
+                fn(\Throwable $e) => $interaction->updateOriginalResponse($nha::createBuilder()->addComponent($text("❌ {$e->getMessage()}"))),
+            );
+        });
+
+        $nha->listenCommand('move', function (Interaction $interaction) use ($userCommands, $nha, $text, $flattenOptions): PromiseInterface {
+            $args = $flattenOptions($interaction->data->options ?? []);
+
+            return $interaction->acknowledgeWithResponse(true)->then(
+                fn() => $userCommands->move((string) $interaction->user->id, (int) $args['dx'], (int) $args['dy']),
+            )->then(
+                fn($builder) => $interaction->updateOriginalResponse($builder),
+                fn(\Throwable $e) => $interaction->updateOriginalResponse($nha::createBuilder()->addComponent($text("❌ {$e->getMessage()}"))),
+            );
+        });
+
+        $playerActionCommands = [
+            'mine' => [[ $opt(Option::INTEGER, 'n', 'Amount to mine.') ], fn(array $args) => ['mine', ['n' => (int) ($args['n'] ?? 1)]]],
+            'chop' => [[ $opt(Option::INTEGER, 'n', 'Amount to chop.') ], fn(array $args) => ['chop', ['n' => (int) ($args['n'] ?? 1)]]],
+            'gather' => [[ $opt(Option::INTEGER, 'n', 'Amount to gather.') ], fn(array $args) => ['gather', ['n' => (int) ($args['n'] ?? 1)]]],
+            'plant' => [[], fn(array $args) => ['plant', []]],
+            'ride' => [[], fn(array $args) => ['ride', []]],
+            'launch' => [[], fn(array $args) => ['launch', []]],
+            'land' => [[], fn(array $args) => ['land', []]],
+            'dock' => [[], fn(array $args) => ['dock', []]],
+            'attune' => [[], fn(array $args) => ['attune', []]],
+            'say' => [[ $opt(Option::STRING, 'text', 'World chat message.', true) ], fn(array $args) => ['say', ['text' => $args['text']]]],
+            'tell' => [[
+                $opt(Option::INTEGER, 'to', 'Target agent id.', true),
+                $opt(Option::STRING, 'text', 'Private message.', true),
+            ], fn(array $args) => ['tell', ['to' => (int) $args['to'], 'text' => $args['text']]]],
+        ];
+
+        foreach ($playerActionCommands as $name => [$options, $toIntent]) {
+            $nha->listenCommand($name, function (Interaction $interaction) use ($userCommands, $nha, $text, $flattenOptions, $toIntent): PromiseInterface {
+                $args = $flattenOptions($interaction->data->options ?? []);
+                [$verb, $intentArgs] = $toIntent($args);
+
+                return $interaction->acknowledgeWithResponse(true)->then(
+                    fn() => $userCommands->act((string) $interaction->user->id, $verb, $intentArgs),
+                )->then(
+                    fn($builder) => $interaction->updateOriginalResponse($builder),
+                    fn(\Throwable $e) => $interaction->updateOriginalResponse($nha::createBuilder()->addComponent($text("❌ {$e->getMessage()}"))),
+                );
+            });
+        }
+
+        $userSlashCommands = [
+            'start' => [[], 'Open your private NHA control panel.'],
+            'login' => [[], 'Create or reopen your personal NHA agent.'],
+            'observe' => [[], 'Observe your personal NHA agent.'],
+            'move' => [[
+                $opt(Option::INTEGER, 'dx', 'Horizontal movement delta.', true),
+                $opt(Option::INTEGER, 'dy', 'Vertical movement delta.', true),
+            ], 'Queue movement for your personal NHA agent.'],
+        ];
+
+        foreach ($playerActionCommands as $name => [$options]) {
+            $userSlashCommands[$name] = [$options, "Queue {$name} for your personal NHA agent."];
+        }
+
+        foreach ($userSlashCommands as $name => [$options, $description]) {
+            if ($existing->get('name', $name)) {
+                continue;
             }
+
+            $builder = CommandBuilder::new()->setName($name)->setType(Command::CHAT_INPUT)->setDescription($description);
+            foreach ($options as $option) {
+                $builder->addOption($option);
+            }
+            $builder->create($existing)->save("{$name} initial creation");
         }
     });
 };

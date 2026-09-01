@@ -176,6 +176,21 @@ class NHA extends MessageCommandClient
     }
 
     /**
+     * Queues an intent using the supplied agent-specific NHA token.
+     *
+     * @return PromiseInterface
+     */
+    public function intentWithToken(int $agent_id, string $token, string $verb, array $args = []): PromiseInterface
+    {
+        return $this->nha_http->post(Endpoint::INTENT, [
+            'agent' => $agent_id,
+            'verb' => $verb,
+            'args' => $args,
+            'token' => $token,
+        ]);
+    }
+
+    /**
      * Observes the world from an agent's perspective.
      *
      * @param int $agent_id

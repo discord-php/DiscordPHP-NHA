@@ -59,4 +59,19 @@ class StateStoreTest extends NHAUnitTestCase
 
         $this->assertSame(2, $store->getDefaultAgent());
     }
+
+    public function testDiscordUserAgentPersistsToDisk(): void
+    {
+        $store = new StateStore($this->path);
+        $store->setDiscordUserAgent('123', 42, 'discord-123', 'secret-token');
+
+        $reloaded = new StateStore($this->path);
+
+        $this->assertSame([
+            'agent_id' => 42,
+            'name' => 'discord-123',
+            'token' => 'secret-token',
+        ], $reloaded->getDiscordUserAgent('123'));
+        $this->assertNull($reloaded->getDiscordUserAgent('456'));
+    }
 }
