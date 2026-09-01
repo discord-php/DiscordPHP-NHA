@@ -22,6 +22,6 @@ class Feed extends Out
 {
     /** @inheritdoc */
     protected $attributes = [
-        'feed',
+        'actions',
     ];
 }

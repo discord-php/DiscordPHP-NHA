@@ -49,7 +49,10 @@ use NHA\Repository\WorldRepository;
  * @property AgentRepository          $agents
  * @property DepositsRepository       $deposits
  * @property EconomyRepository        $economy
+ * @property HistoryRepository        $history
  * @property IntentRepository         $intents
+ * @property MetaRepository           $meta
+ * @property SocialRepository         $social
  * @property WorldRepository          $world
  *
  * @version 0.1.0

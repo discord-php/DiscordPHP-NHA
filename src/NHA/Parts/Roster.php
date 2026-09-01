@@ -22,6 +22,6 @@ class Roster extends Out
 {
     /** @inheritdoc */
     protected $attributes = [
-        'roster',
+        'agents',
     ];
 }

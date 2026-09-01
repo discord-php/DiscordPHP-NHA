@@ -17,10 +17,10 @@ use NHA\Http\Endpoint;
 use NHA\NHA;
 use NHA\Parts\World;
 use NHA\Parts\Map;
+use NHA\Parts\Rules;
 use NHA\Parts\Scene;
-use NHA\Parts\Structure;
-use NHA\Parts\Colony;
-use NHA\Parts\Terraform;
+use NHA\Parts\Station;
+use NHA\Parts\Structures;
 use NHA\Parts\Expansion;
 use React\Promise\PromiseInterface;
 
@@ -63,17 +63,33 @@ class WorldRepository extends AbstractRepository
      */
     public function getScene(): PromiseInterface
     {
-        return $this->nha_http->get(Endpoint::SCENE);
+        return $this->nha_http->get(Endpoint::SCENE)->then(
+            fn(array $data) => $this->factory->part(Scene::class, (array) $data, true),
+        );
     }
 
     /**
      * Fetches the structures in the scene.
      *
-     * @return PromiseInterface
+     * @return PromiseInterface<Structures>
      */
     public function getStructures(): PromiseInterface
     {
-        return $this->nha_http->get(Endpoint::STRUCTURES);
+        return $this->nha_http->get(Endpoint::STRUCTURES)->then(
+            fn(array $data) => $this->factory->part(Structures::class, (array) $data, true),
+        );
+    }
+
+    /**
+     * Fetches the station state.
+     *
+     * @return PromiseInterface<Station>
+     */
+    public function getStation(): PromiseInterface
+    {
+        return $this->nha_http->get(Endpoint::STATION)->then(
+            fn(array $data) => $this->factory->part(Station::class, (array) $data, true),
+        );
     }
 
     /**
@@ -119,6 +135,8 @@ class WorldRepository extends AbstractRepository
      */
     public function getRules(): PromiseInterface
     {
-        return $this->nha_http->get(Endpoint::RULES);
+        return $this->nha_http->get(Endpoint::RULES)->then(
+            fn(array $data) => $this->factory->part(Rules::class, (array) $data, true),
+        );
     }
 }

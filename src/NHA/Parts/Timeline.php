@@ -22,6 +22,6 @@ class Timeline extends Out
 {
     /** @inheritdoc */
     protected $attributes = [
-        'events',
+        'timeline',
     ];
 }

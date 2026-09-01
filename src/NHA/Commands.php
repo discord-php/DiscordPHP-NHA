@@ -164,36 +164,36 @@ class Commands
 
     public function world(): PromiseInterface
     {
-        return $this->nha->getWorldRepo()->getWorld()->then(fn($data) => self::jsonMessage('World', $data));
+        return $this->nha->world->getWorld()->then(fn($data) => self::jsonMessage('World', $data));
     }
 
     public function map(): PromiseInterface
     {
-        return $this->nha->getWorldRepo()->getMap()->then(fn($data) => self::jsonMessage('Map', $data));
+        return $this->nha->world->getMap()->then(fn($data) => self::jsonMessage('Map', $data));
     }
 
     public function market(): PromiseInterface
     {
-        return $this->nha->getEconomyRepo()->getMarket()->then(fn($data) => self::jsonMessage('Market', $data));
+        return $this->nha->economy->getMarket()->then(fn($data) => self::jsonMessage('Market', $data));
     }
 
     public function roster(): PromiseInterface
     {
-        return $this->nha->getSocialRepo()->getRoster()->then(fn($data) => self::jsonMessage('Roster', $data));
+        return $this->nha->social->getRoster()->then(fn($data) => self::jsonMessage('Roster', $data));
     }
 
     public function rules(): PromiseInterface
     {
-        return $this->nha->getSocialRepo()->getRules()->then(fn($data) => self::jsonMessage('Rules', $data));
+        return $this->nha->social->getRules()->then(fn($data) => self::jsonMessage('Rules', $data));
     }
 
     public function contracts(): PromiseInterface
     {
-        return $this->nha->getEconomyRepo()->getContracts()->then(fn($data) => self::jsonMessage('Contracts', $data));
+        return $this->nha->economy->getContracts()->then(fn($data) => self::jsonMessage('Contracts', $data));
     }
 
     public function agentInfo(int $agent_id): PromiseInterface
     {
-        return $this->nha->getAgentRepo()->getAgentInfo($agent_id)->then(fn($data) => self::jsonMessage("Agent #{$agent_id}", $data));
+        return $this->nha->agents->getAgentInfo($agent_id)->then(fn($data) => self::jsonMessage("Agent #{$agent_id}", $data));
     }
 }

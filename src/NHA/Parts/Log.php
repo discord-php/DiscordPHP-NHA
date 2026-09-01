@@ -22,6 +22,6 @@ class Log extends Out
 {
     /** @inheritdoc */
     protected $attributes = [
-        'logs',
+        'log',
     ];
 }

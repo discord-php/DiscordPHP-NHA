@@ -21,7 +21,5 @@ namespace NHA\Parts;
 class Records extends Out
 {
     /** @inheritdoc */
-    protected $attributes = [
-        'records',
-    ];
+    protected $attributes = [];
 }

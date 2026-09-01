@@ -22,9 +22,11 @@ class AgentProfile extends Out
 {
     /** @inheritdoc */
     protected $attributes = [
-        'agent_id',
-        'name',
-        'avatar',
-        'status',
+        'agent',
+        'vehicles',
+        'vehicle_count',
+        'discoveries',
+        'milestones',
+        'recent',
     ];
 }

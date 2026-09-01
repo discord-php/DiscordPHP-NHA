@@ -22,6 +22,7 @@ class Inventors extends Out
 {
     /** @inheritdoc */
     protected $attributes = [
-        'inventors',
+        'leaderboard',
+        'discoveries',
     ];
 }

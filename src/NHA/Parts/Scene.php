@@ -22,8 +22,11 @@ class Scene extends Out
 {
     /** @inheritdoc */
     protected $attributes = [
-        'description',
-        'entities',
-        'items',
+        'w',
+        'h',
+        'biomes',
+        'deposits',
+        'agents',
+        'loading',
     ];
 }

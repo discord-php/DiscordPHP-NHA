@@ -69,4 +69,25 @@ class AgentObservationTest extends NHATestCase
 
         $this->assertSame(['hp' => 10], $obs->jsonSerialize());
     }
+
+    public function testPartsMatchOpenApiSchemaKeys(): void
+    {
+        $expected = [
+            'AgentProfile' => ['agent', 'discoveries', 'milestones', 'recent', 'vehicle_count', 'vehicles'],
+            'Feed' => ['actions'],
+            'Inventors' => ['discoveries', 'leaderboard'],
+            'Log' => ['log'],
+            'Records' => [],
+            'Scene' => ['agents', 'biomes', 'deposits', 'h', 'loading', 'w'],
+            'Timeline' => ['timeline'],
+        ];
+
+        foreach ($expected as $class => $properties) {
+            $reflection = new ReflectionClass('NHA\\Parts\\' . $class);
+            $attribute = $reflection->getProperty('attributes');
+            $attribute->setAccessible(true);
+
+            $this->assertSame($properties, $attribute->getValue(new $reflection->name()));
+        }
+    }
 }
