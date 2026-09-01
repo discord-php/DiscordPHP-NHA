@@ -43,11 +43,17 @@ trait VerbsTrait
      */
     public function intent(int $agent_id, string $verb, array $args = []): PromiseInterface
     {
-        return $this->nha_http->post(Endpoint::INTENT, [
+        $payload = [
             'agent' => $agent_id,
             'verb' => $verb,
             'args' => $args,
-        ]);
+        ];
+
+        if (method_exists($this, 'getAgentToken') && $token = $this->getAgentToken()) {
+            $payload['token'] = $token;
+        }
+
+        return $this->nha_http->post(Endpoint::INTENT, $payload);
     }
 
     // --- Move & gather -----------------------------------------------

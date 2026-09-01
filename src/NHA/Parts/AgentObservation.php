@@ -53,8 +53,11 @@ class AgentObservation implements JsonSerializable
     {
         $value = $this->raw;
         foreach (explode('.', $path) as $segment) {
-            $value = is_array($value) ? ($value[$segment] ?? null) : ($value->{$segment} ?? null);
-            if (null === $value) {
+            if (is_array($value) && array_key_exists($segment, $value)) {
+                $value = $value[$segment];
+            } elseif (is_object($value) && isset($value->{$segment})) {
+                $value = $value->{$segment};
+            } else {
                 return $default;
             }
         }
@@ -82,7 +85,7 @@ class AgentObservation implements JsonSerializable
         return (array) ($this->get('inventory') ?? []);
     }
 
-    public function getVision(): ?int
+    public function getVision(): mixed
     {
         return $this->get('vision') ?? $this->get('sight_radius');
     }
@@ -131,10 +134,13 @@ class AgentObservation implements JsonSerializable
         $position = $this->getPosition();
         $positionText = $position ? sprintf('`(%s, %s)`', $position['x'] ?? '?', $position['y'] ?? '?') : 'unknown';
 
+        $vision = $this->getVision();
+        $visionText = is_scalar($vision) && $vision !== '' ? " · Vision: {$vision}" : '';
+
         $lines = [
             "### Agent #{$this->agentId}",
             'HP: ' . self::bar((float) ($this->getHp() ?? 0), $this->getMaxHp()),
-            "Position: {$positionText}" . ($this->getVision() ? " · Vision: {$this->getVision()}" : ''),
+            "Position: {$positionText}{$visionText}",
         ];
 
         if ($inventory = $this->getInventory()) {

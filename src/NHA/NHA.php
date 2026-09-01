@@ -86,8 +86,20 @@ class NHA extends MessageCommandClient
      */
     protected array $observations = [];
 
+    /**
+     * NHA action token for the current agent, if configured.
+     *
+     * This is distinct from the Discord bot token.
+     *
+     * @var string
+     */
+    protected string $agentToken = '';
+
     public function __construct(array $options = [])
     {
+        $this->agentToken = (string) ($options['nha_token'] ?? '');
+        unset($options['nha_token']);
+
         parent::__construct($options);
 
         // The react/socket driver hangs indefinitely against the live NHA host (TLS renegotiation is never completed).
@@ -123,10 +135,44 @@ class NHA extends MessageCommandClient
      */
     public function registerAgent(string $name, array $materials = []): PromiseInterface
     {
+        return $this->registerAgentIdentity($name, $materials)->then(
+            fn(array $identity) => $identity['agent_id'],
+        );
+    }
+
+    /**
+     * Registers an agent and returns its durable identity data.
+     *
+     * @param string $name
+     * @param array  $materials e.g. ['metal' => 40, 'credits' => 150]
+     *
+     * @return PromiseInterface<array{agent_id: int, token: string}>
+     */
+    public function registerAgentIdentity(string $name, array $materials = []): PromiseInterface
+    {
         return $this->nha_http->post(Endpoint::AGENTS, [
             'name' => $name,
             'materials' => $materials,
-        ])->then(fn($response) => $response->agent_id);
+        ])->then(function ($response): array {
+            $response = (array) $response;
+
+            if (! isset($response['agent_id'])) {
+                throw new \UnexpectedValueException('NHA registration response did not include an agent_id.');
+            }
+
+            return [
+                'agent_id' => (int) $response['agent_id'],
+                'token' => (string) ($response['token'] ?? ''),
+            ];
+        });
+    }
+
+    /**
+     * Gets the configured NHA action token.
+     */
+    public function getAgentToken(): string
+    {
+        return $this->agentToken;
     }
 
     /**
