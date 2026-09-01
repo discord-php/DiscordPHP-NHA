@@ -22,6 +22,4 @@ namespace NHA\Http\Exceptions;
  *
  * @author Valithor Obsidion <valithor@discordphp.org>
  */
-class ValidationException extends \DomainException
-{
-}
+class ValidationException extends \DomainException {}

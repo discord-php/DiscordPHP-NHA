@@ -29,7 +29,10 @@ use React\Promise\PromiseInterface;
 use NHA\Repository\AgentRepository;
 use NHA\Repository\DepositsRepository;
 use NHA\Repository\EconomyRepository;
+use NHA\Repository\HistoryRepository;
 use NHA\Repository\IntentRepository;
+use NHA\Repository\MetaRepository;
+use NHA\Repository\SocialRepository;
 use NHA\Repository\WorldRepository;
 
 /**

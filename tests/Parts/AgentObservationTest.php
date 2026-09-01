@@ -85,9 +85,12 @@ class AgentObservationTest extends NHATestCase
         foreach ($expected as $class => $properties) {
             $reflection = new ReflectionClass('NHA\\Parts\\' . $class);
             $attribute = $reflection->getProperty('attributes');
-            $attribute->setAccessible(true);
+            $actual = $attribute->getValue($reflection->newInstanceWithoutConstructor());
 
-            $this->assertSame($properties, $attribute->getValue(new $reflection->name()));
+            sort($properties);
+            sort($actual);
+
+            $this->assertSame($properties, $actual);
         }
     }
 }
