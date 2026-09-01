@@ -73,8 +73,11 @@ class Commands
         $name ??= 'my-bot';
         $materials = array_filter(['metal' => $metal, 'credits' => $credits], fn($v) => null !== $v);
 
-        return $this->nha->registerAgent($name, $materials)->then(function (int $agent_id) {
-            $this->state->setDefaultAgent($agent_id);
+        return $this->nha->registerAgentIdentity($name, $materials)->then(function (array $identity) {
+            $agent_id = $identity['agent_id'];
+
+            $this->state->setDefaultAgent($agent_id, $identity['token']);
+            $this->nha->setAgentToken($identity['token']);
 
             return NHA::createBuilder()->addComponent(self::textContainer(
                 "### ✅ Registered agent **#{$agent_id}**\nThis is now the default agent for future commands.",

@@ -34,10 +34,27 @@ class StateStore
         return isset($this->data['default_agent']) ? (int) $this->data['default_agent'] : null;
     }
 
-    public function setDefaultAgent(int $agent_id): void
+    /**
+     * Sets the default agent id and, when known, its NHA action token.
+     *
+     * Passing `null` for `$token` leaves any previously stored token intact,
+     * so callers that only know the agent id don't clobber it.
+     */
+    public function setDefaultAgent(int $agent_id, ?string $token = null): void
     {
         $this->data['default_agent'] = $agent_id;
+        if (null !== $token) {
+            $this->data['default_agent_token'] = $token;
+        }
         $this->save();
+    }
+
+    /**
+     * Gets the NHA action token for the default agent, if known.
+     */
+    public function getDefaultAgentToken(): ?string
+    {
+        return isset($this->data['default_agent_token']) ? (string) $this->data['default_agent_token'] : null;
     }
 
     /**

@@ -88,6 +88,9 @@ set_rejection_handler($reportFatalError);
 set_exception_handler($reportFatalError);
 
 $state = new StateStore(__DIR__ . '/var/state.json');
+if ($token = $state->getDefaultAgentToken()) {
+    $nha->setAgentToken($token);
+}
 $commands = new Commands($nha, $state);
 $userCommands = new UserCommands($nha, $state);
 

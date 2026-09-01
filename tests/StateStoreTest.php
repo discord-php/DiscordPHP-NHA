@@ -60,6 +60,36 @@ class StateStoreTest extends NHAUnitTestCase
         $this->assertSame(2, $store->getDefaultAgent());
     }
 
+    public function testDefaultAgentTokenIsNullWhenNotSet(): void
+    {
+        $store = new StateStore($this->path);
+        $store->setDefaultAgent(42);
+
+        $this->assertNull($store->getDefaultAgentToken());
+    }
+
+    public function testSetDefaultAgentPersistsToken(): void
+    {
+        $store = new StateStore($this->path);
+        $store->setDefaultAgent(42, 'secret-token');
+
+        $this->assertSame('secret-token', $store->getDefaultAgentToken());
+
+        $reloaded = new StateStore($this->path);
+        $this->assertSame(42, $reloaded->getDefaultAgent());
+        $this->assertSame('secret-token', $reloaded->getDefaultAgentToken());
+    }
+
+    public function testSetDefaultAgentWithoutTokenKeepsPreviousToken(): void
+    {
+        $store = new StateStore($this->path);
+        $store->setDefaultAgent(1, 'secret-token');
+        $store->setDefaultAgent(2);
+
+        $this->assertSame(2, $store->getDefaultAgent());
+        $this->assertSame('secret-token', $store->getDefaultAgentToken());
+    }
+
     public function testDiscordUserAgentPersistsToDisk(): void
     {
         $store = new StateStore($this->path);

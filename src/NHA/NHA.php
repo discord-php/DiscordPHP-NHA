@@ -211,6 +211,14 @@ class NHA extends MessageCommandClient
     }
 
     /**
+     * Sets the NHA action token used for intents that don't supply their own.
+     */
+    public function setAgentToken(string $token): void
+    {
+        $this->agentToken = $token;
+    }
+
+    /**
      * Queues an intent using the supplied agent-specific NHA token.
      *
      * @return PromiseInterface
