@@ -33,3 +33,4 @@ phpunit.log
 /.phpunit*
 /coverage
 /.tools
+openapi.json
