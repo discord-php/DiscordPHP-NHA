@@ -34,7 +34,7 @@ class SocialRepository extends AbstractRepository
     public function getRoster(): PromiseInterface
     {
         return $this->nha_http->get(Endpoint::ROSTER)->then(
-            fn(array $data) => $this->factory->part(Roster::class, (array) $data, true),
+            fn($data) => $this->factory->part(Roster::class, (array) $data, true),
         );
     }
 
@@ -46,7 +46,7 @@ class SocialRepository extends AbstractRepository
     public function getRelations(): PromiseInterface
     {
         return $this->nha_http->get(Endpoint::RELATIONS)->then(
-            fn(array $data) => $this->factory->part(Relations::class, (array) $data, true),
+            fn($data) => $this->factory->part(Relations::class, (array) $data, true),
         );
     }
 
@@ -58,7 +58,7 @@ class SocialRepository extends AbstractRepository
     public function getChat(): PromiseInterface
     {
         return $this->nha_http->get(Endpoint::CHAT)->then(
-            fn(array $data) => $this->factory->part(Chat::class, (array) $data, true),
+            fn($data) => $this->factory->part(Chat::class, (array) $data, true),
         );
     }
 
@@ -72,7 +72,7 @@ class SocialRepository extends AbstractRepository
     public function postChat(string $text): PromiseInterface
     {
         return $this->nha_http->post(Endpoint::CHAT, ['text' => $text])->then(
-            fn(array $data) => $this->factory->part(Chat::class, (array) $data, true),
+            fn($data) => $this->factory->part(Chat::class, (array) $data, true),
         );
     }
 
@@ -84,7 +84,7 @@ class SocialRepository extends AbstractRepository
     public function getGuildPending(): PromiseInterface
     {
         return $this->nha_http->get(Endpoint::GUILD_PENDING)->then(
-            fn(array $data) => $this->factory->part(GuildPending::class, (array) $data, true),
+            fn($data) => $this->factory->part(GuildPending::class, (array) $data, true),
         );
     }
 
@@ -96,7 +96,7 @@ class SocialRepository extends AbstractRepository
     public function getRules(): PromiseInterface
     {
         return $this->nha_http->get(Endpoint::RULES)->then(
-            fn(array $data) => $this->factory->part(Rules::class, (array) $data, true),
+            fn($data) => $this->factory->part(Rules::class, (array) $data, true),
         );
     }
 }

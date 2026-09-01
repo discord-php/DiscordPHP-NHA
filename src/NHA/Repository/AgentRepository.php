@@ -15,6 +15,8 @@ namespace NHA\Repository;
 
 use NHA\Http\Endpoint;
 use NHA\NHA;
+use NHA\Parts\AgentProfile;
+use NHA\Parts\Agents;
 use React\Promise\PromiseInterface;
 
 /**
@@ -22,36 +24,33 @@ use React\Promise\PromiseInterface;
  */
 class AgentRepository extends AbstractRepository
 {
+    /** @inheritdoc */
+    protected $class = AgentProfile::class;
+
     /**
      * Fetches public info about any agent by id.
      *
      * @param  int              $agent_id
-     * @return PromiseInterface
+     * @return PromiseInterface<AgentProfile>
      */
     public function getAgentInfo(int $agent_id): PromiseInterface
     {
         $endpoint = Endpoint::bind(Endpoint::AGENT)->bindAssoc(['agent_id' => $agent_id]);
 
-        return $this->nha_http->get($endpoint);
+        return $this->nha_http->get($endpoint)->then(
+            fn($data) => $this->factory->part(AgentProfile::class, (array) $data, true),
+        );
     }
 
     /**
      * Fetches the agent list.
      *
-     * @return PromiseInterface
+     * @return PromiseInterface<Agents>
      */
     public function getAgents(): PromiseInterface
     {
-        return $this->nha_http->get(Endpoint::AGENTS_LIST);
-    }
-
-    /**
-     * Fetches the roster.
-     *
-     * @return PromiseInterface
-     */
-    public function getRoster(): PromiseInterface
-    {
-        return $this->nha_http->get(Endpoint::ROSTER);
+        return $this->nha_http->get(Endpoint::AGENTS_LIST)->then(
+            fn($data) => $this->factory->part(Agents::class, (array) $data, true),
+        );
     }
 }

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace NHA;
 
+use Discord\Parts\OAuth\Application;
 use Discord\Parts\User\Client as DiscordClient;
 use Discord\Repository\EmojiRepository;
 use Discord\Repository\GuildRepository;
@@ -68,4 +69,17 @@ class Client extends DiscordClient
         'social' => SocialRepository::class,
         'world' => WorldRepository::class,
     ];
+
+    /**
+     * Discord's own bootstrap `Discord\Parts\User\Client` (created before NHA
+     * upgrades `$discord->client` to this class) already issues the one
+     * `GET applications/@me` request; fetching it again here would race that
+     * request and intermittently leave `application` unresolved when this
+     * instance is read. `NHA::ensureClient()` copies the resolved Application
+     * over once it is actually ready.
+     */
+    public function afterConstruct(): void
+    {
+        $this->application = $this->factory->part(Application::class, [], true);
+    }
 }

@@ -36,7 +36,7 @@ class HistoryRepository extends AbstractRepository
     public function getFeed(): PromiseInterface
     {
         return $this->nha_http->get(Endpoint::FEED)->then(
-            fn(array $data) => $this->factory->part(Feed::class, (array) $data, true),
+            fn($data) => $this->factory->part(Feed::class, (array) $data, true),
         );
     }
 
@@ -58,7 +58,7 @@ class HistoryRepository extends AbstractRepository
     public function getInventors(): PromiseInterface
     {
         return $this->nha_http->get(Endpoint::INVENTORS)->then(
-            fn(array $data) => $this->factory->part(Inventors::class, (array) $data, true),
+            fn($data) => $this->factory->part(Inventors::class, (array) $data, true),
         );
     }
 
@@ -70,7 +70,7 @@ class HistoryRepository extends AbstractRepository
     public function getRecords(): PromiseInterface
     {
         return $this->nha_http->get(Endpoint::RECORDS)->then(
-            fn(array $data) => $this->factory->part(Records::class, (array) $data, true),
+            fn($data) => $this->factory->part(Records::class, (array) $data, true),
         );
     }
 
@@ -82,7 +82,7 @@ class HistoryRepository extends AbstractRepository
     public function getLog(): PromiseInterface
     {
         return $this->nha_http->get(Endpoint::LOG)->then(
-            fn(array $data) => $this->factory->part(Log::class, (array) $data, true),
+            fn($data) => $this->factory->part(Log::class, (array) $data, true),
         );
     }
 
@@ -94,7 +94,7 @@ class HistoryRepository extends AbstractRepository
     public function getMilestones(): PromiseInterface
     {
         return $this->nha_http->get(Endpoint::MILESTONES)->then(
-            fn(array $data) => $this->factory->part(Milestones::class, (array) $data, true),
+            fn($data) => $this->factory->part(Milestones::class, (array) $data, true),
         );
     }
 
@@ -106,7 +106,7 @@ class HistoryRepository extends AbstractRepository
     public function getTimeline(): PromiseInterface
     {
         return $this->nha_http->get(Endpoint::TIMELINE)->then(
-            fn(array $data) => $this->factory->part(Timeline::class, (array) $data, true),
+            fn($data) => $this->factory->part(Timeline::class, (array) $data, true),
         );
     }
 }

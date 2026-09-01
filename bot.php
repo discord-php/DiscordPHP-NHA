@@ -263,7 +263,7 @@ $registerSlashCommands = function (NHA $nha) use ($commands, $userCommands, $tex
 
         $dispatch = function (string $sub, array $a) use ($commands): PromiseInterface {
             return match ($sub) {
-                'register' => $commands->register($a['name'] ?? null, $a['metal'] ?? null, $a['credits'] ?? null),
+                'register' => $commands->register($a['name'] ?? null, $a['metal'] ?? 40, $a['credits'] ?? 150),
                 'observe' => $commands->observe($a['agent_id'] ?? null),
                 'act' => $commands->act($a['agent_id'] ?? null, $a['verb'], $a['args'] ?? null),
                 'move' => $commands->move($a['agent_id'] ?? null, (int) $a['dx'], (int) $a['dy']),

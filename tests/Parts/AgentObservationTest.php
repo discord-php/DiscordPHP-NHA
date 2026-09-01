@@ -74,6 +74,7 @@ class AgentObservationTest extends NHATestCase
     {
         $expected = [
             'AgentProfile' => ['agent', 'discoveries', 'milestones', 'recent', 'vehicle_count', 'vehicles'],
+            'Agents' => ['agents', 'tick'],
             'Feed' => ['actions'],
             'Inventors' => ['discoveries', 'leaderboard'],
             'Log' => ['log'],

@@ -15,6 +15,7 @@ namespace NHA;
 
 use Discord\Http\Drivers\Guzzle;
 use Discord\MessageCommandClient;
+use Discord\Parts\User\Client as DiscordClient;
 use Discord\Repository\EmojiRepository;
 use Discord\Repository\GuildRepository;
 use Discord\Repository\LobbyRepository;
@@ -80,6 +81,13 @@ class NHA extends MessageCommandClient
     protected $client;
 
     /**
+     * Whether `$client` has already been upgraded to `NHA\Client`.
+     *
+     * @var bool
+     */
+    protected bool $clientUpgraded = false;
+
+    /**
      * Local cache of the last observation received per agent id.
      *
      * @var array<int, AgentObservation>
@@ -118,11 +126,38 @@ class NHA extends MessageCommandClient
      */
     protected function ensureClient(): void
     {
-        if ($this->client instanceof Client) {
+        if ($this->clientUpgraded) {
+            return;
+        }
+        $this->clientUpgraded = true;
+
+        // Discord's own constructor already created a base Client and kicked off its
+        // `applications/@me` fetch; capture it so its resolved Application can be
+        // mirrored below instead of NHA\Client issuing a second, racy fetch.
+        $bootstrapClient = $this->client;
+
+        $this->client = $this->factory->part(Client::class, []);
+
+        $this->once('application-init', function () use ($bootstrapClient): void {
+            if ($bootstrapClient instanceof DiscordClient && ($application = $bootstrapClient->application ?? null)) {
+                $this->client->application = $application;
+            }
+        });
+    }
+
+    /**
+     * Keeps `$client` pinned to the upgraded `NHA\Client` once set, ignoring Discord's
+     * own bootstrap Client resolving afterwards and trying to reclaim the pointer
+     * (which would silently drop the NHA repositories and re-trigger `ensureClient()`
+     * on the next magic property access).
+     */
+    public function setClient(DiscordClient $client): void
+    {
+        if ($this->clientUpgraded && ! $client instanceof Client) {
             return;
         }
 
-        $this->client = $this->factory->part(Client::class, []);
+        parent::setClient($client);
     }
 
     /**

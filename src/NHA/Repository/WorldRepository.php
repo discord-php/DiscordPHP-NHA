@@ -52,7 +52,7 @@ class WorldRepository extends AbstractRepository
     public function getMap(): PromiseInterface
     {
         return $this->nha_http->get(Endpoint::MAP)->then(
-            fn(array $data) => $this->factory->part(Map::class, (array) $data, true),
+            fn($data) => $this->factory->part(Map::class, (array) $data, true),
         );
     }
 
@@ -64,7 +64,7 @@ class WorldRepository extends AbstractRepository
     public function getScene(): PromiseInterface
     {
         return $this->nha_http->get(Endpoint::SCENE)->then(
-            fn(array $data) => $this->factory->part(Scene::class, (array) $data, true),
+            fn($data) => $this->factory->part(Scene::class, (array) $data, true),
         );
     }
 
@@ -76,7 +76,7 @@ class WorldRepository extends AbstractRepository
     public function getStructures(): PromiseInterface
     {
         return $this->nha_http->get(Endpoint::STRUCTURES)->then(
-            fn(array $data) => $this->factory->part(Structures::class, (array) $data, true),
+            fn($data) => $this->factory->part(Structures::class, (array) $data, true),
         );
     }
 
@@ -88,7 +88,7 @@ class WorldRepository extends AbstractRepository
     public function getStation(): PromiseInterface
     {
         return $this->nha_http->get(Endpoint::STATION)->then(
-            fn(array $data) => $this->factory->part(Station::class, (array) $data, true),
+            fn($data) => $this->factory->part(Station::class, (array) $data, true),
         );
     }
 
@@ -136,7 +136,7 @@ class WorldRepository extends AbstractRepository
     public function getRules(): PromiseInterface
     {
         return $this->nha_http->get(Endpoint::RULES)->then(
-            fn(array $data) => $this->factory->part(Rules::class, (array) $data, true),
+            fn($data) => $this->factory->part(Rules::class, (array) $data, true),
         );
     }
 }

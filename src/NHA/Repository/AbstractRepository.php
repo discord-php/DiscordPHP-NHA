@@ -17,6 +17,7 @@ use Discord\Discord;
 use Discord\Repository\AbstractRepository as DiscordAbstractRepository;
 use NHA\Http\Http;
 use NHA\NHA;
+use NHA\Parts\Out;
 
 /**
  * Repositories provide a way to store and update parts on the NHA server.
@@ -26,6 +27,14 @@ use NHA\NHA;
 abstract class AbstractRepository extends DiscordAbstractRepository
 {
     use AbstractRepositoryTrait;
+
+    /**
+     * NHA repositories return one-off `Out` parts rather than a typed collection,
+     * but the parent Discord repository constructor requires a non-null class name.
+     *
+     * @var string
+     */
+    protected $class = Out::class;
 
     /**
      * The extended HTTP client.

@@ -23,5 +23,6 @@ class Agents extends Out
     /** @inheritdoc */
     protected $attributes = [
         'agents',
+        'tick',
     ];
 }

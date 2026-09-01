@@ -47,9 +47,9 @@ class NHASingleton
             'logger' => $logger,
         ]);
 
-        // For unit tests, we might want to trigger 'ready' immediately if no token is provided
+        // For unit tests, we might want to trigger 'init' immediately if no token is provided
         if (empty(getenv('NHA_TOKEN'))) {
-            $nha->emit('ready', [$nha]);
+            $nha->emit('init', [$nha]);
         }
 
         $e = null;
@@ -58,7 +58,7 @@ class NHASingleton
             $e = new Exception('Timed out trying to connect to NHA.');
         });
 
-        $nha->on('ready', function (NHA $nha) use ($timer) {
+        $nha->on('init', function (NHA $nha) use ($timer) {
             $nha->getLoop()->cancelTimer($timer);
             $nha->getLoop()->stop();
         });
@@ -86,8 +86,8 @@ class NHASingleton
         ]);
 
         if (empty(getenv('NHA_TOKEN'))) {
-            // Immediate ready for unit tests without a real token
-            $nha->emit('ready', [$nha]);
+            // Immediate init for unit tests without a real token
+            $nha->emit('init', [$nha]);
         }
 
         $e = null;
@@ -96,7 +96,7 @@ class NHASingleton
             $e = new Exception('Timed out trying to connect to NHA.');
         });
 
-        $nha->on('ready', function (NHA $nha) use ($timer) {
+        $nha->on('init', function (NHA $nha) use ($timer) {
             $nha->getLoop()->cancelTimer($timer);
             $nha->getLoop()->stop();
         });
