@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace NHA;
 
-use Discord\Http\Drivers\React;
+use Discord\Http\Drivers\Guzzle;
 use Discord\MessageCommandClient;
 use Discord\Repository\EmojiRepository;
 use Discord\Repository\GuildRepository;
@@ -84,11 +84,12 @@ class NHA extends MessageCommandClient
     {
         parent::__construct($options);
 
+        // The react/socket driver hangs indefinitely against the live NHA host (TLS renegotiation is never completed).
         $this->nha_http = new Http(
             '',
             $this->loop,
             $this->options['logger'] ?? null,
-            new React($this->loop, $options['socket_options'] ?? []),
+            new Guzzle($this->loop, $options['socket_options'] ?? []),
         );
 
         $this->client = $this->factory->part(Client::class, (array) $this->client);
@@ -177,9 +178,32 @@ class NHA extends MessageCommandClient
         }
 
         if (null === $this->client) {
-            return;
+            return null;
         }
 
-        return $this->client->{$name};
+        return $this->client->{$name} ?? null;
     }
+
+    /**
+     * Determines if a property is set.
+     *
+     * @param string $name Variable name.
+     *
+     * @return bool
+     */
+    public function __isset(string $name): bool
+    {
+        static $allowed = ['loop', 'options', 'logger', 'http', 'nha_http', 'application_commands'];
+
+        if (in_array($name, $allowed)) {
+            return isset($this->{$name});
+        }
+
+        if (null === $this->client) {
+            return false;
+        }
+
+        return isset($this->client->{$name});
+    }
+
 }
