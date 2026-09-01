@@ -25,20 +25,39 @@ class Endpoint implements EndpointInterface
 {
     use EndpointTrait;
 
-    // POST - register a new agent, GET - list agents (if supported)
+    /**
+     * POST - register a new agent, GET - list agents (if supported)
+     */
     public const AGENTS = 'agents';
-    // POST - announce something
+
+    /**
+     * POST - announce something
+     */
     public const ANNOUNCE = 'announce';
-    // GET - observe the world from an agent's perspective
+
+    /**
+     * GET - observe the world from an agent's perspective
+     */
     public const OBSERVE = 'observe/:agent_id';
-    // POST - submit an intent (action) for an agent
+
+    /**
+     * POST - submit an intent (action) for an agent
+     */
     public const INTENT = 'intent';
-    // GET - check the outcome of an intent
+
+    /**
+     * GET - check the outcome of an intent
+     */
     public const INTENT_STATUS = 'intent/:intent_id';
-    // GET - find nearest deposits to a point
+
+    /**
+     * GET - find nearest deposits to a point
+     */
     public const DEPOSITS = 'deposits';
 
-    // Read-only world/state endpoints
+    /**
+     * Read-only world/state endpoints
+     */
     public const WORLD = 'world';
     public const MAP = 'map';
     public const SCENE = 'scene';
