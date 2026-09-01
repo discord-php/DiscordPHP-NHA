@@ -20,6 +20,8 @@ use Discord\Http\DriverInterface;
 use Discord\Http\Endpoint;
 use Discord\Http\HttpInterface;
 use Discord\Http\HttpTrait;
+use NHA\Http\Exceptions\ValidationException;
+use Psr\Http\Message\ResponseInterface;
 use Psr\Log\LoggerInterface;
 use React\EventLoop\LoopInterface;
 use React\EventLoop\TimerInterface;
@@ -195,5 +197,25 @@ class Http extends DiscordHttp implements HttpInterface
     public function getUserAgent(): string
     {
         return 'DiscordPHP-NHA (https://github.com/discord-php/DiscordPHP-NHA, ' . self::VERSION . ')';
+    }
+
+    /**
+     * A 422 means the NHA API rejected the request body/query as malformed or
+     * schema-mismatched — this is a bug in the request we sent, not a transient
+     * failure, so it is logged loudly and surfaced as a {@see ValidationException}
+     * rather than the generic `RequestFailedException`.
+     *
+     * @inheritDoc
+     */
+    public function handleError(ResponseInterface $response): \Throwable
+    {
+        if ($response->getStatusCode() === 422) {
+            $body = (string) $response->getBody();
+            $this->logger->error('NHA API rejected request as unprocessable (422)', ['body' => $body]);
+
+            return new ValidationException("NHA API returned 422 Unprocessable Entity: {$body}");
+        }
+
+        return parent::handleError($response);
     }
 }
