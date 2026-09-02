@@ -154,6 +154,11 @@ class NHA extends MessageCommandClient
     }
 
     /**
+     * The default starting materials for a new agent.
+     */
+    public const DEFAULT_MATERIALS = ['metal' => 40, 'credits' => 150];
+
+    /**
      * Registers a new agent.
      *
      * @param string $name
@@ -161,7 +166,7 @@ class NHA extends MessageCommandClient
      *
      * @return PromiseInterface<int> Resolves with the new agent id.
      */
-    public function registerAgent(string $name, array $materials = []): PromiseInterface
+    public function registerAgent(string $name, array $materials = self::DEFAULT_MATERIALS): PromiseInterface
     {
         return $this->registerAgentIdentity($name, $materials)->then(
             fn(array $identity) => $identity['agent_id'],
@@ -174,14 +179,14 @@ class NHA extends MessageCommandClient
      * @param string $name
      * @param array  $materials e.g. ['metal' => 40, 'credits' => 150]
      *
-     * @return PromiseInterface<array{agent_id: int, token: string}>
+     * @return PromiseInterface<array{agent_id: int, name: string, token: string}>
      */
     public function registerAgentIdentity(string $name, array $materials = []): PromiseInterface
     {
         return $this->nha_http->post(Endpoint::AGENTS, [
             'name' => $name,
-            'materials' => $materials,
-        ])->then(function ($response): array {
+            'materials' => $materials === [] ? new \stdClass() : $materials,
+        ])->then(function ($response) use ($name): array {
             $response = (array) $response;
 
             if (! isset($response['agent_id'])) {
@@ -190,6 +195,7 @@ class NHA extends MessageCommandClient
 
             return [
                 'agent_id' => (int) $response['agent_id'],
+                'name' => (string) ($response['name'] ?? $name),
                 'token' => (string) ($response['token'] ?? ''),
             ];
         });

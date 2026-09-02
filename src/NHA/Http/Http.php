@@ -27,7 +27,7 @@ use React\EventLoop\LoopInterface;
 use React\EventLoop\TimerInterface;
 use React\Promise\Deferred;
 use React\Promise\PromiseInterface;
-use SplQueue;
+use Psr\Log\LogLevel;
 
 /**
  * HTTP client for the NHA (https://nha.recluse.lol) agent sandbox.
@@ -107,14 +107,14 @@ class Http extends DiscordHttp implements HttpInterface
     /**
      * Request queue to prevent API overload.
      *
-     * @var SplQueue
+     * @var \SplQueue
      */
     protected $queue;
 
     /**
      * Request queue used for unbound (fire-and-forget) endpoints.
      *
-     * @var SplQueue
+     * @var \SplQueue
      */
     protected $unboundQueue;
 
@@ -146,24 +146,17 @@ class Http extends DiscordHttp implements HttpInterface
         $this->loop = $loop;
         $this->logger = $logger;
         $this->driver = $driver;
-        $this->queue = new SplQueue();
-        $this->unboundQueue = new SplQueue();
+        $this->queue = new \SplQueue();
+        $this->unboundQueue = new \SplQueue();
     }
 
     /**
-     * Builds and queues a request. The NHA API needs no `Authorization`
-     * header, so we skip the header set that `HttpTrait::queueRequest()`
-     * assumes for Discord requests.
-     *
-     * @param string   $method
-     * @param Endpoint $url
-     * @param mixed    $content
-     * @param array    $headers
-     *
-     * @return PromiseInterface
+     * @inheritDoc
      */
     public function queueRequest(string $method, Endpoint $url, $content, array $headers = []): PromiseInterface
     {
+        $this->logger->debug('NHA HTTP Request: ' . strtoupper($method) . ' ' . (string) $url);
+
         $deferred = new Deferred();
 
         if (is_null($this->driver)) {

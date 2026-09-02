@@ -66,15 +66,34 @@ class Commands
         return NHA::createBuilder()->addComponent(self::textContainer("### {$title}\n```json\n{$json}\n```"));
     }
 
-    // --- Agent lifecycle ---------------------------------------------------
+    /**
+     * Agent lifecycle ---------------------------------------------------
+     */
 
-    public function register(?string $name, ?int $metal, ?int $credits): PromiseInterface
+    public function register(?string $name, ?int $metal = 40, ?int $credits = 150, ?string $provider_id = null): PromiseInterface
     {
-        $name ??= 'my-bot';
-        $materials = array_filter(['metal' => $metal, 'credits' => $credits], fn($v) => null !== $v);
+        if ($provider_id !== null) {
+            if ($existing = $this->state->getDiscordUserAgent($provider_id)) {
+                return reject(new \RuntimeException(
+                    "An existing agent (**#{$existing['agent_id']}**, name: \"{$existing['name']}\") is already linked to your Discord account.",
+                ));
+            }
+            $name = $name ?? 'user-' . $provider_id;
+        } else {
+            $name = $name ?? 'agent-' . substr(bin2hex(random_bytes(4)), 0, 8);
+        }
 
-        return $this->nha->registerAgentIdentity($name, $materials)->then(function (array $identity) {
+        $materials = $metal !== null || $credits !== null
+            ? array_filter(['metal' => $metal, 'credits' => $credits], fn($v) => null !== $v)
+            : NHA::DEFAULT_MATERIALS;
+
+        return $this->nha->registerAgentIdentity($name, $materials)->then(function (array $identity) use ($provider_id) {
+
             $agent_id = $identity['agent_id'];
+
+            if ($provider_id !== null) {
+                $this->state->setDiscordUserAgent($provider_id, $agent_id, $identity['name'] ?? 'unknown', $identity['token']);
+            }
 
             $this->state->setDefaultAgent($agent_id, $identity['token']);
             $this->nha->setAgentToken($identity['token']);
@@ -167,7 +186,7 @@ class Commands
 
     /**
      * Fetches the current world state.
-     * 
+     *
      * @return PromiseInterface<MessageBuilder>
      */
     public function world(): PromiseInterface

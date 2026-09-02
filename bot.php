@@ -151,7 +151,11 @@ $nha_cmd = $nha->registerCommand('nha', function (Message $message, array $args)
 
 $nha_cmd->registerSubCommand('register', function (Message $message, array $args) use ($commands, $replyToMessage): void {
     [$name, $metal, $credits] = array_pad($args, 3, null);
-    $replyToMessage($message, $commands->register($name, null !== $metal ? (int) $metal : null, null !== $credits ? (int) $credits : null));
+    $materials = [
+        'metal' => null !== $metal ? (int) $metal : NHA::DEFAULT_MATERIALS['metal'],
+        'credits' => null !== $credits ? (int) $credits : NHA::DEFAULT_MATERIALS['credits'],
+    ];
+    $replyToMessage($message, $commands->register($name, $materials['metal'], $materials['credits'], (string) $message->author->id));
 }, ['description' => 'Register a new agent (becomes the default for future commands).', 'usage' => '[name] [metal] [credits]']);
 
 $nha_cmd->registerSubCommand('observe', function (Message $message, array $args) use ($commands, $replyToMessage): void {

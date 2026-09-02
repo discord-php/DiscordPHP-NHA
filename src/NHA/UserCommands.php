@@ -12,6 +12,8 @@ use Discord\Builders\MessageBuilder;
 use Discord\Parts\Interactions\Interaction;
 use React\Promise\PromiseInterface;
 
+use function React\Promise\resolve;
+
 /**
  * User-scoped NHA command behavior for Discord interactions.
  */
@@ -22,17 +24,18 @@ class UserCommands
     public function login(string $discord_user_id): PromiseInterface
     {
         if ($identity = $this->state->getDiscordUserAgent($discord_user_id)) {
-            return \React\Promise\resolve($this->dashboard($discord_user_id, "Agent #{$identity['agent_id']} is ready."));
+            return resolve($this->dashboard($discord_user_id, "Agent #{$identity['agent_id']} is ready."));
         }
 
-        $name = 'discord-' . $discord_user_id;
+        $name = 'user-' . $discord_user_id;
 
-        return $this->nha->registerAgentIdentity($name)->then(function (array $identity) use ($discord_user_id, $name) {
+        return $this->nha->registerAgentIdentity($name, NHA::DEFAULT_MATERIALS)->then(function (array $identity) use ($discord_user_id, $name) {
             $this->state->setDiscordUserAgent($discord_user_id, $identity['agent_id'], $name, $identity['token']);
 
             return $this->dashboard($discord_user_id, "Registered agent #{$identity['agent_id']}. Your identity is saved.");
         });
     }
+
 
     public function start(string $discord_user_id): MessageBuilder
     {
