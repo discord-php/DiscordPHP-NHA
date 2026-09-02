@@ -69,6 +69,7 @@ $nha = new NHA([
     'logger' => $logger,
     'token' => getenv('TOKEN'),
     'prefix' => '!',
+    'disableVoiceClient' => true,
 ]);
 
 /**
