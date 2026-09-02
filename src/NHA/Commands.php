@@ -165,6 +165,11 @@ class Commands
 
     // --- Read-only world data -----------------------------------------------
 
+    /**
+     * Fetches the current world state.
+     * 
+     * @return PromiseInterface<MessageBuilder>
+     */
     public function world(): PromiseInterface
     {
         return $this->nha->world->getWorld()->then(fn($data) => self::jsonMessage('World', $data));

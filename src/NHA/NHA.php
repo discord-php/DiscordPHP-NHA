@@ -67,13 +67,6 @@ class NHA extends MessageCommandClient
     use VerbsTrait;
 
     /**
-     * The extended NHA HTTP client.
-     *
-     * @var Http
-     */
-    protected $nha_http;
-
-    /**
      * The extended Client class.
      *
      * @var Client
