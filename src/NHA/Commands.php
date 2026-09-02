@@ -80,7 +80,7 @@ class Commands
             }
             $name = $name ?? 'user-' . $provider_id;
         } else {
-            $name = $name ?? 'agent-' . substr(bin2hex(random_bytes(4)), 0, 8);
+            $name = $name ?? 'user-' . $provider_id;
         }
 
         $materials = $metal !== null || $credits !== null
