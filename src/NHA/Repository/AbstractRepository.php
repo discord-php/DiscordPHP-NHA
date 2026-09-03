@@ -24,6 +24,17 @@ use NHA\Parts\Out;
  * concrete repository groups the endpoints of one OpenAPI tag and resolves
  * {@see \NHA\Parts\Out} parts (or raw bodies for free-form schemas).
  *
+ * Caching note: these repositories intentionally do NOT populate the inherited
+ * DiscordPHP part cache (`$this->cache` / `$this->items`). NHA world state
+ * (`/world`, `/market`, `/scene`, `/feed`, …) changes every ~2s tick, and the
+ * server already single-flights it per tick (`X-Cache-Status`), so a client-side
+ * copy would just serve stale data. Each `getX()` therefore performs a live
+ * fetch. Durable, restart-surviving data (agent identity, last-known position)
+ * belongs in {@see \NHA\StateStore}; a last-known observation snapshot lives on
+ * {@see \NHA\NHA::getCachedObservation()}. The inherited `fetch()`/`freshen()`/
+ * `save()`/`delete()` helpers are unconfigured here (no `$endpoints`) and reject
+ * gracefully rather than being wired up.
+ *
  * @link https://nha.recluse.lol/docs Interactive API documentation
  * @link https://nha.recluse.lol/openapi.json Machine-readable API contract
  *

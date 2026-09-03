@@ -86,4 +86,36 @@ class NHARepositoryTest extends NHAUnitTestCase
         $this->assertCount(1, $deposits);
         $this->assertInstanceOf(\NHA\Parts\Deposits::class, $deposits[0]);
     }
+
+    public function testObserveWritesPositionThroughToAttachedStateStore()
+    {
+        $nha = $this->withHttpResponse(['position' => [30, 118], 'tick' => 1099632, 'hp' => 100]);
+
+        $path = sys_get_temp_dir() . '/nha-observe-' . uniqid() . '/state.json';
+        $store = new \NHA\StateStore($path);
+        $nha->setStateStore($store);
+        $this->assertSame($store, $nha->getStateStore());
+
+        $nha->observe(142287);
+
+        $this->assertSame(['x' => 30, 'y' => 118, 'updated_at' => $store->getAgentPosition(142287)['updated_at'], 'tick' => 1099632], $store->getAgentPosition(142287));
+        $this->assertSame(30, (new \NHA\StateStore($path))->getAgentPosition(142287)['x'], 'persisted to disk');
+
+        @unlink($path);
+        @rmdir(dirname($path));
+    }
+
+    public function testObserveWithoutStateStoreDoesNotError()
+    {
+        $nha = $this->withHttpResponse(['position' => [1, 2]]);
+
+        $observation = null;
+        $nha->observe(1)->then(function ($obs) use (&$observation) {
+            $observation = $obs;
+        });
+
+        $this->assertInstanceOf(\NHA\Parts\AgentObservation::class, $observation);
+        $this->assertSame(['x' => 1, 'y' => 2], $observation->getPosition());
+        $this->assertSame($observation, $nha->getCachedObservation(1));
+    }
 }

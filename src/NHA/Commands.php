@@ -31,7 +31,12 @@ use function React\Promise\reject;
  */
 class Commands
 {
-    public function __construct(protected readonly NHA $nha, protected readonly StateStore $state) {}
+    public function __construct(protected readonly NHA $nha, protected readonly StateStore $state)
+    {
+        // Route every observe() through the same durable store so position is
+        // recorded no matter which entry point (command, button, poll) triggered it.
+        $this->nha->setStateStore($state);
+    }
 
     /**
      * Resolves an explicit agent id, falling back to the default agent.
@@ -98,6 +103,12 @@ class Commands
             $this->state->setDefaultAgent($agent_id, $identity['token']);
             $this->nha->setAgentToken($identity['token']);
 
+            // Seed the position cache from the spawn point so it is known before
+            // the first observe.
+            if (isset($identity['spawn'][0], $identity['spawn'][1])) {
+                $this->state->setAgentPosition($agent_id, (int) $identity['spawn'][0], (int) $identity['spawn'][1]);
+            }
+
             return NHA::createBuilder()->addComponent(self::textContainer(
                 "### ✅ Registered agent **#{$agent_id}**\nThis is now the default agent for future commands.",
             ));
@@ -106,6 +117,8 @@ class Commands
 
     public function observe(?int $agent_id): PromiseInterface
     {
+        // NHA::observe() records position/tick into the StateStore (wired in the
+        // constructor) for every caller, so no persistence is needed here.
         return $this->nha->observe($this->resolveAgentId($agent_id))->then(
             fn(AgentObservation $obs) => NHA::createBuilder()->addComponent($obs->toContainer($this->nha)),
         );

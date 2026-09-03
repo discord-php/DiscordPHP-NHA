@@ -24,8 +24,13 @@ use JsonSerializable;
 
 /**
  * A lightweight, read-only wrapper around a single `GET /observe/:id`
- * response. This is intentionally a plain data holder (not a Discord
- * `Part`) since observations describe world state, not Discord entities.
+ * response (the `ObserveOut` schema). This is intentionally a plain data
+ * holder (not a Discord `Part`) since observations describe world state,
+ * not Discord entities. Exact keys vary by era and agent state, so every
+ * accessor normalises the shapes the world is known to emit.
+ *
+ * @link https://nha.recluse.lol/docs#/agent/observe_ep_observe__agent_id__get Endpoint reference
+ * @link https://nha.recluse.lol/openapi.json #/components/schemas/ObserveOut
  *
  * @since 0.1.0
  */
@@ -75,13 +80,39 @@ class AgentObservation implements JsonSerializable
         return (float) ($this->get('max_hp') ?? $this->get('hp_max') ?? 100);
     }
 
+    /**
+     * The agent's world position, always normalised to `['x' => int, 'y' => int]`
+     * (or `null` when the payload carries none).
+     *
+     * `GET /observe/:id` returns `position` as a positional `[x, y]` pair; older
+     * shapes used a `{x, y}` object under `position`/`pos`, and some payloads put
+     * flat `x`/`y` scalars at the top level. All three are accepted here so
+     * callers never have to care which one the world sent.
+     */
     public function getPosition(): ?array
     {
         $pos = $this->get('position') ?? $this->get('pos');
+
         if (is_object($pos)) {
-            return (array) $pos;
+            $pos = (array) $pos;
         }
-        return is_array($pos) ? $pos : null;
+
+        if (is_array($pos)) {
+            if (isset($pos['x'], $pos['y'])) {
+                return ['x' => (int) $pos['x'], 'y' => (int) $pos['y']];
+            }
+            if (array_key_exists(0, $pos) && array_key_exists(1, $pos)) {
+                return ['x' => (int) $pos[0], 'y' => (int) $pos[1]];
+            }
+        }
+
+        $x = $this->get('x');
+        $y = $this->get('y');
+        if (is_numeric($x) && is_numeric($y)) {
+            return ['x' => (int) $x, 'y' => (int) $y];
+        }
+
+        return null;
     }
 
     public function getInventory(): array
@@ -101,7 +132,7 @@ class AgentObservation implements JsonSerializable
 
     public function getThreats(): array
     {
-        return (array) ($this->get('threats') ?? $this->get('threat_alerts') ?? []);
+        return (array) ($this->get('alerts') ?? $this->get('threats') ?? $this->get('threat_alerts') ?? []);
     }
 
     public function getContracts(): array
@@ -116,7 +147,7 @@ class AgentObservation implements JsonSerializable
 
     public function getNearbyAgents(): array
     {
-        return (array) ($this->get('nearby.agents') ?? $this->get('agents') ?? []);
+        return (array) ($this->get('nearby_agents') ?? $this->get('nearby.agents') ?? $this->get('agents') ?? []);
     }
 
     /**

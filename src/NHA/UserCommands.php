@@ -19,7 +19,12 @@ use function React\Promise\resolve;
  */
 class UserCommands
 {
-    public function __construct(private readonly NHA $nha, private readonly StateStore $state) {}
+    public function __construct(private readonly NHA $nha, private readonly StateStore $state)
+    {
+        // Route every observe() through the same durable store so position is
+        // recorded no matter which entry point (command, button, poll) triggered it.
+        $this->nha->setStateStore($state);
+    }
 
     public function login(string $discord_user_id): PromiseInterface
     {
@@ -31,6 +36,10 @@ class UserCommands
 
         return $this->nha->registerAgentIdentity($name, NHA::DEFAULT_MATERIALS)->then(function (array $identity) use ($discord_user_id, $name) {
             $this->state->setDiscordUserAgent($discord_user_id, $identity['agent_id'], $name, $identity['token']);
+
+            if (isset($identity['spawn'][0], $identity['spawn'][1])) {
+                $this->state->setAgentPosition($identity['agent_id'], (int) $identity['spawn'][0], (int) $identity['spawn'][1]);
+            }
 
             return $this->dashboard($discord_user_id, "Registered agent #{$identity['agent_id']}. Your identity is saved.");
         });
@@ -49,9 +58,11 @@ class UserCommands
     {
         $target_id = $agent_id ?? $this->identity($discord_user_id)['agent_id'];
 
-        return $this->nha->observe($target_id)->then(function ($observation) {
-            return NHA::createBuilder()->addComponent($observation->toContainer($this->nha));
-        });
+        // NHA::observe() records position/tick into the StateStore (wired in the
+        // constructor) for every caller, so no persistence is needed here.
+        return $this->nha->observe($target_id)->then(
+            fn($observation) => NHA::createBuilder()->addComponent($observation->toContainer($this->nha)),
+        );
     }
 
     public function move(string $discord_user_id, int $dx, int $dy): PromiseInterface

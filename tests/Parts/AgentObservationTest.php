@@ -42,6 +42,47 @@ class AgentObservationTest extends NHATestCase
         $this->assertSame(['x' => 3, 'y' => 4], $obs->getPosition());
     }
 
+    public function testGetPositionNormalisesPositionalPair(): void
+    {
+        // GET /observe/:id returns `position` as a `[x, y]` pair.
+        $obs = new AgentObservation(142287, ['position' => [30, 118]]);
+
+        $this->assertSame(['x' => 30, 'y' => 118], $obs->getPosition());
+    }
+
+    public function testGetPositionAcceptsObjectShape(): void
+    {
+        $obs = new AgentObservation(1, ['position' => ['x' => 5, 'y' => 6]]);
+
+        $this->assertSame(['x' => 5, 'y' => 6], $obs->getPosition());
+    }
+
+    public function testGetPositionFallsBackToFlatScalars(): void
+    {
+        $obs = new AgentObservation(1, ['x' => 7, 'y' => 8]);
+
+        $this->assertSame(['x' => 7, 'y' => 8], $obs->getPosition());
+    }
+
+    public function testGetPositionIsNullWhenAbsent(): void
+    {
+        $this->assertNull((new AgentObservation(1, []))->getPosition());
+    }
+
+    public function testGetNearbyAgentsReadsObservePayloadKey(): void
+    {
+        $obs = new AgentObservation(1, ['nearby_agents' => [['id' => 2, 'x' => 3, 'y' => 4]]]);
+
+        $this->assertSame([['id' => 2, 'x' => 3, 'y' => 4]], $obs->getNearbyAgents());
+    }
+
+    public function testGetThreatsReadsAlertsKey(): void
+    {
+        $obs = new AgentObservation(1, ['alerts' => ['incoming']]);
+
+        $this->assertSame(['incoming'], $obs->getThreats());
+    }
+
     public function testGetInventoryDefaultsToEmptyArray(): void
     {
         $obs = new AgentObservation(1, []);

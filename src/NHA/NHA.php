@@ -47,9 +47,8 @@ use NHA\Repository\WorldRepository;
  * @link https://nha.recluse.lol/openapi.json Machine-readable API contract
  * @link https://nha.recluse.lol/AGENTS.md Agent API reference
  *
- * @property Client                $client
- * @property Http                  $nha_http
- * @property AgentObservation|null $cached_observation
+ * @property Client $client
+ * @property Http   $nha_http
  *
  * @property EmojiRepository          $emojis
  * @property GuildRepository          $guilds
@@ -89,11 +88,25 @@ class NHA extends MessageCommandClient
     protected bool $clientUpgraded = false;
 
     /**
-     * Local cache of the last observation received per agent id.
+     * In-memory cache of the last observation received per agent id. This is a
+     * last-known-state convenience only (read via {@see getCachedObservation()});
+     * it is not durable and is not a repository. It holds one entry per distinct
+     * agent id ever observed — bounded in practice by how many agents a single
+     * bot process drives.
      *
      * @var array<int, AgentObservation>
      */
     protected array $observations = [];
+
+    /**
+     * Optional durable store. When set (see {@see setStateStore()}), every
+     * {@see observe()} snapshots the agent's world position + tick into it, so
+     * position survives restarts and is refreshed no matter which caller
+     * triggered the observe (command, refresh button, or the relay poll loop).
+     *
+     * @var StateStore|null
+     */
+    protected ?StateStore $stateStore = null;
 
     /**
      * NHA action token for the current agent, if configured.
@@ -288,8 +301,13 @@ class NHA extends MessageCommandClient
 
     /**
      * Observes the world from an agent's perspective
-     * (`GET /observe/{agent_id}` → `ObserveOut`) and refreshes the per-agent
-     * observation cache.
+     * (`GET /observe/{agent_id}` → `ObserveOut`).
+     *
+     * Every call refreshes the in-memory {@see getCachedObservation()} snapshot
+     * and, when a {@see StateStore} has been attached via {@see setStateStore()},
+     * durably records the agent's position + tick. Routing that write through
+     * this one method keeps it consistent across every caller — slash/prefix
+     * commands, the in-message refresh buttons and the relay poll loop.
      *
      * @link https://nha.recluse.lol/docs#/agent/observe_ep_observe__agent_id__get
      * @link https://nha.recluse.lol/openapi.json #/components/schemas/ObserveOut
@@ -305,6 +323,7 @@ class NHA extends MessageCommandClient
         return $this->nha_http->get($endpoint)->then(function ($response) use ($agent_id) {
             $observation = new AgentObservation($agent_id, (array) $response);
             $this->observations[$agent_id] = $observation;
+            $this->stateStore?->recordObservation($agent_id, $observation);
 
             return $observation;
         });
@@ -320,6 +339,23 @@ class NHA extends MessageCommandClient
     public function getCachedObservation(int $agent_id): ?AgentObservation
     {
         return $this->observations[$agent_id] ?? null;
+    }
+
+    /**
+     * Attaches the durable {@see StateStore} that {@see observe()} snapshots
+     * agent position into. Idempotent; pass `null` to detach.
+     */
+    public function setStateStore(?StateStore $store): void
+    {
+        $this->stateStore = $store;
+    }
+
+    /**
+     * Gets the attached durable state store, if any.
+     */
+    public function getStateStore(): ?StateStore
+    {
+        return $this->stateStore;
     }
 
     /**
