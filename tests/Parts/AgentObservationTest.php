@@ -70,28 +70,75 @@ class AgentObservationTest extends NHATestCase
         $this->assertSame(['hp' => 10], $obs->jsonSerialize());
     }
 
+    /**
+     * Guards that every response Part's `$fillable` list stays in lock-step with
+     * its `*Out` schema in openapi.json. `Deposits` is excluded because it models
+     * a single row of `DepositsOut.deposits`, not the envelope.
+     *
+     * @link https://nha.recluse.lol/openapi.json
+     */
     public function testPartsMatchOpenApiSchemaKeys(): void
     {
-        $expected = [
-            'AgentProfile' => ['agent', 'discoveries', 'milestones', 'recent', 'vehicle_count', 'vehicles'],
-            'Agents' => ['agents', 'tick'],
-            'Feed' => ['actions'],
-            'Inventors' => ['discoveries', 'leaderboard'],
-            'Log' => ['log'],
-            'Records' => [],
-            'Scene' => ['agents', 'biomes', 'deposits', 'h', 'loading', 'w'],
-            'Timeline' => ['timeline'],
+        $schema = json_decode(file_get_contents(__DIR__ . '/../../openapi.json'), true);
+        $schemas = $schema['components']['schemas'];
+
+        $map = [
+            'AgentProfile' => 'AgentProfileOut',
+            'Agents' => 'AgentsOut',
+            'Chat' => 'ChatOut',
+            'Contracts' => 'ContractsOut',
+            'Depot' => 'DepotOut',
+            'Feed' => 'FeedOut',
+            'GuildPending' => 'GuildPendingOut',
+            'Health' => 'HealthOut',
+            'IntentStatus' => 'IntentStatusOut',
+            'Inventors' => 'InventorsOut',
+            'Log' => 'LogOut',
+            'Map' => 'MapOut',
+            'Market' => 'MarketOut',
+            'Milestones' => 'MilestonesOut',
+            'Records' => 'RecordsOut',
+            'Relations' => 'RelationsOut',
+            'Roster' => 'RosterOut',
+            'Rules' => 'RulesOut',
+            'Scene' => 'SceneOut',
+            'Station' => 'StationOut',
+            'Structures' => 'StructuresOut',
+            'Timeline' => 'TimelineOut',
+            'Updates' => 'UpdatesOut',
+            'World' => 'WorldOut',
         ];
 
-        foreach ($expected as $class => $properties) {
-            $reflection = new ReflectionClass('NHA\\Parts\\' . $class);
-            $attribute = $reflection->getProperty('attributes');
-            $actual = $attribute->getValue($reflection->newInstanceWithoutConstructor());
+        foreach ($map as $class => $schemaName) {
+            $this->assertArrayHasKey($schemaName, $schemas, "openapi.json is missing {$schemaName}");
 
-            sort($properties);
+            $expected = array_keys($schemas[$schemaName]['properties'] ?? []);
+            sort($expected);
+
+            $reflection = new ReflectionClass('NHA\\Parts\\' . $class);
+            $actual = $reflection->getProperty('fillable')->getValue($reflection->newInstanceWithoutConstructor());
             sort($actual);
 
-            $this->assertSame($properties, $actual);
+            $this->assertSame($expected, $actual, "{$class}::\$fillable is out of sync with {$schemaName}");
         }
+    }
+
+    public function testDepositsPartModelsOneRow(): void
+    {
+        $reflection = new ReflectionClass(\NHA\Parts\Deposits::class);
+        $actual = $reflection->getProperty('fillable')->getValue($reflection->newInstanceWithoutConstructor());
+        sort($actual);
+
+        $this->assertSame(['amount', 'dist', 'id', 'resource', 'x', 'y'], $actual);
+    }
+
+    public function testOutBaseKeepsUndeclaredKeysAndSerialisesLosslessly(): void
+    {
+        $part = (new ReflectionClass(\NHA\Parts\World::class))->newInstanceWithoutConstructor();
+        $part->fill(['tick' => 3, 'undocumented' => 'kept']);
+
+        $this->assertSame(3, $part->tick);
+        $this->assertSame('kept', $part->undocumented);
+        $this->assertSame(['tick' => 3, 'undocumented' => 'kept'], $part->jsonSerialize());
     }
 }

@@ -20,7 +20,12 @@ use NHA\NHA;
 use NHA\Parts\Out;
 
 /**
- * Repositories provide a way to store and update parts on the NHA server.
+ * Base class for the NHA read repositories hung off {@see \NHA\Client}. Each
+ * concrete repository groups the endpoints of one OpenAPI tag and resolves
+ * {@see \NHA\Parts\Out} parts (or raw bodies for free-form schemas).
+ *
+ * @link https://nha.recluse.lol/docs Interactive API documentation
+ * @link https://nha.recluse.lol/openapi.json Machine-readable API contract
  *
  * @author Valithor Obsidion <valithor@discordphp.org>
  */

@@ -321,9 +321,12 @@ $registerSlashCommands = function (NHA $nha) use ($commands, $userCommands, $tex
 
         $createCommand('nha', 'Control your NHA (https://nha.recluse.lol) agent.', $subCommands);
 
-        $nha->listenCommand('start', function (Interaction $interaction) use ($userCommands): PromiseInterface {
+        $nha->listenCommand('start', function (Interaction $interaction) use ($userCommands, $nha, $text): PromiseInterface {
             return $interaction->acknowledgeWithResponse(true)->then(
-                fn() => $interaction->updateOriginalResponse($userCommands->start((string) $interaction->user->id)),
+                fn() => $userCommands->start((string) $interaction->user->id),
+            )->then(
+                fn($builder) => $interaction->updateOriginalResponse($builder),
+                fn(\Throwable $e) => $interaction->updateOriginalResponse($nha::createBuilder()->addComponent($text("❌ {$e->getMessage()}"))),
             );
         });
 
@@ -336,9 +339,10 @@ $registerSlashCommands = function (NHA $nha) use ($commands, $userCommands, $tex
             );
         });
 
-        $nha->listenCommand('observe', function (Interaction $interaction) use ($userCommands, $nha, $text): PromiseInterface {
+        $nha->listenCommand('observe', function (Interaction $interaction) use ($commands, $nha, $text, $flattenOptions): PromiseInterface {
+            $args = $flattenOptions($interaction->data->options ?? []);
             return $interaction->acknowledgeWithResponse(true)->then(
-                fn() => $userCommands->observe((string) $interaction->user->id),
+                fn() => $commands->observe((string) $interaction->user->id, $args['agent_id'] ?? null),
             )->then(
                 fn($builder) => $interaction->updateOriginalResponse($builder),
                 fn(\Throwable $e) => $interaction->updateOriginalResponse($nha::createBuilder()->addComponent($text("❌ {$e->getMessage()}"))),

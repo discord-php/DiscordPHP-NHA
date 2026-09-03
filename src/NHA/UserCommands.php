@@ -45,18 +45,12 @@ class UserCommands
         return $this->dashboard($discord_user_id, $status);
     }
 
-    public function observe(string $discord_user_id): PromiseInterface
+    public function observe(string $discord_user_id, ?int $agent_id = null): PromiseInterface
     {
-        $identity = $this->identity($discord_user_id);
+        $target_id = $agent_id ?? $this->identity($discord_user_id)['agent_id'];
 
-        return $this->nha->observe($identity['agent_id'])->then(function ($observation) use ($discord_user_id, $identity) {
-            $position = (array) ($observation->getPosition() ?? []);
-            $positionText = $position === [] ? 'unknown' : sprintf('(%s, %s)', $position['x'] ?? '?', $position['y'] ?? '?');
-
-            return $this->dashboard(
-                $discord_user_id,
-                "Agent #{$identity['agent_id']} | HP {$observation->getHp()}/{$observation->getMaxHp()} | Position {$positionText}",
-            );
+        return $this->nha->observe($target_id)->then(function ($observation) {
+            return NHA::createBuilder()->addComponent($observation->toContainer($this->nha));
         });
     }
 

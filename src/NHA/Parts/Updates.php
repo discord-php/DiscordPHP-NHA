@@ -13,18 +13,22 @@ declare(strict_types=1);
 
 namespace NHA\Parts;
 
-use JsonSerializable;
-
 /**
- * A lightweight, read-only wrapper around a single `GET /updates`
- * response.
+ * A lightweight, read-only wrapper around a single `GET /updates` response
+ * (the `UpdatesOut` schema): the operator rule-update feed, also pushed via
+ * `POST /announce` ({@see \NHA\Repository\MetaRepository::announce()}).
+ *
+ * @link https://nha.recluse.lol/docs#/meta/updates_ep_updates_get Endpoint reference
+ * @link https://nha.recluse.lol/openapi.json #/components/schemas/UpdatesOut
+ *
+ * @property array $updates Rule-update entries, newest first.
  *
  * @since 0.1.0
  */
 class Updates extends Out
 {
     /** @inheritdoc */
-    protected $attributes = [
+    protected $fillable = [
         'updates',
     ];
 }

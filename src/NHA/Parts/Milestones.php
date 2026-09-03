@@ -14,14 +14,20 @@ declare(strict_types=1);
 namespace NHA\Parts;
 
 /**
- * A lightweight, read-only wrapper around system milestones.
+ * A lightweight, read-only wrapper around a single `GET /milestones` response
+ * (the `MilestonesOut` schema): notable world firsts and achievements.
+ *
+ * @link https://nha.recluse.lol/docs#/history/milestones_milestones_get Endpoint reference
+ * @link https://nha.recluse.lol/openapi.json #/components/schemas/MilestonesOut
+ *
+ * @property array $milestones Milestone rows, newest first.
  *
  * @since 0.1.0
  */
 class Milestones extends Out
 {
     /** @inheritdoc */
-    protected $attributes = [
+    protected $fillable = [
         'milestones',
     ];
 }

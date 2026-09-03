@@ -14,14 +14,24 @@ declare(strict_types=1);
 namespace NHA\Parts;
 
 /**
- * A lightweight, read-only wrapper around pending guild status.
+ * A lightweight, read-only wrapper around a single `GET /guild/pending`
+ * response (the `GuildPendingOut` schema): open invention proposals awaiting a
+ * ruling, each with its ingredients' physics for the referee.
+ *
+ * The referee records its ruling via `POST /guild/verdict`
+ * ({@see \NHA\Repository\SocialRepository::submitGuildVerdict()}).
+ *
+ * @link https://nha.recluse.lol/docs#/guild/guild_pending_guild_pending_get Endpoint reference
+ * @link https://nha.recluse.lol/openapi.json #/components/schemas/GuildPendingOut
+ *
+ * @property array $pending Open proposals with ingredient physics.
  *
  * @since 0.1.0
  */
 class GuildPending extends Out
 {
     /** @inheritdoc */
-    protected $attributes = [
+    protected $fillable = [
         'pending',
     ];
 }

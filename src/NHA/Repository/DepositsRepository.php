@@ -19,10 +19,14 @@ use React\Promise\PromiseInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
 /**
- * The nearest live (amount>0) deposits to (x,y), optionally of one resource — so an agent can find materials its local observe.nearby_deposits (a small local window) doesn't show, then move{x,y} straight to one.
- * Each row: {id, resource, amount, x, y, dist}.
+ * The nearest live (amount > 0) deposits to `(x, y)`, optionally of one
+ * `resource` — so an agent can navigate straight to materials its local
+ * `observe.nearby_deposits` window does not show. Read-only, cached per tick.
  *
- * Read-only, cached per tick.
+ * @link https://nha.recluse.lol/docs#/world/deposits_ep_deposits_get Endpoint reference
+ * @link https://nha.recluse.lol/openapi.json #/components/schemas/DepositsOut
+ *
+ * @since 0.1.0
  */
 class DepositsRepository extends AbstractRepository
 {
@@ -30,13 +34,17 @@ class DepositsRepository extends AbstractRepository
     protected $class = Deposits::class;
 
     /**
-     * Fetches nearby deposits.
+     * Fetches the nearest deposits to a reference point, one {@see Deposits} row
+     * per result (`GET /deposits` → `DepositsOut.deposits`).
      *
-     * @param array        $options             An array of options.
-     * @param int          $options['x']        The x coordinate.
-     * @param int          $options['y']        The y coordinate.
-     * @param ?string|null $options['resource'] Resource type.
-     * @param ?int|null    $options['limit']    Max entries to return. Default 8. Max 50.
+     * @link https://nha.recluse.lol/docs#/world/deposits_ep_deposits_get
+     *
+     * @param array  $options {
+     * @var   int    $x        Reference x, 0-4095 (required — usually your position).
+     * @var   int    $y        Reference y, 0-4095 (required).
+     * @var   string $resource Filter to one resource, e.g. aluminum/silicon/titanium; omit for any.
+     * @var   int    $limit    Max rows, 1-50. Default 8.
+     *               }
      *
      * @return PromiseInterface<Deposits[]>
      */
@@ -51,6 +59,9 @@ class DepositsRepository extends AbstractRepository
             ->setAllowedTypes('resource', 'string')
             ->setAllowedTypes('limit', 'int')
             ->setDefault('limit', 8)
+            ->setAllowedValues('x', fn($v) => $v >= 0 && $v <= 4095)
+            ->setAllowedValues('y', fn($v) => $v >= 0 && $v <= 4095)
+            ->setAllowedValues('limit', fn($v) => $v >= 1 && $v <= 50)
             ->setAllowedValues('resource', fn($value) => $value === '' || is_string($value));
 
         $options = $resolver->resolve($options);
@@ -67,8 +78,9 @@ class DepositsRepository extends AbstractRepository
         return $this->nha_http->get($endpoint)->then(function ($response) {
             $deposits = [];
             foreach ($response->deposits as $deposit) {
-                $deposits[] = $this->factory->part($this->class, (array) $deposit);
+                $deposits[] = $this->factory->part($this->class, (array) $deposit, true);
             }
+
             return $deposits;
         });
     }

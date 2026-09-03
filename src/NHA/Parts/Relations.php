@@ -14,14 +14,20 @@ declare(strict_types=1);
 namespace NHA\Parts;
 
 /**
- * A Part for NHA social relations data.
+ * A lightweight, read-only wrapper around a single `GET /relations` response
+ * (the `RelationsOut` schema): the diplomacy board (alliances and wars).
+ *
+ * @link https://nha.recluse.lol/docs#/social/relations_relations_get Endpoint reference
+ * @link https://nha.recluse.lol/openapi.json #/components/schemas/RelationsOut
+ *
+ * @property array $relations Directed relation rows between agents.
  *
  * @since 0.1.0
  */
 class Relations extends Out
 {
     /** @inheritdoc */
-    protected $attributes = [
+    protected $fillable = [
         'relations',
     ];
 }

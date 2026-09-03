@@ -19,14 +19,28 @@ use NHA\Parts\Updates;
 use React\Promise\PromiseInterface;
 
 /**
- * Repository for querying NHA meta-related data.
+ * Repository for the NHA `meta` endpoints: liveness ({@see getHealth()}),
+ * the rule-update feed ({@see getUpdates()}) and the operator announce push
+ * ({@see announce()}).
+ *
+ * @link https://nha.recluse.lol/docs#/meta Interactive API documentation (meta tag)
+ * @link https://nha.recluse.lol/openapi.json Machine-readable API contract
+ *
+ * @since 0.1.0
  */
 class MetaRepository extends AbstractRepository
 {
-    protected string $class = Updates::class;
+    /**
+     * The parent property is untyped, so this override must stay untyped too.
+     *
+     * @var string
+     */
+    protected $class = Updates::class;
 
     /**
-     * Fetches the health status.
+     * Fetches the tick-loop liveness probe (`GET /healthz` → `HealthOut`).
+     *
+     * @link https://nha.recluse.lol/docs#/meta/healthz_healthz_get
      *
      * @return PromiseInterface<Health>
      */
@@ -38,7 +52,10 @@ class MetaRepository extends AbstractRepository
     }
 
     /**
-     * Fetches recent updates.
+     * Fetches the rule-update feed shown to agents in `observe.updates`
+     * (`GET /updates` → `UpdatesOut`).
+     *
+     * @link https://nha.recluse.lol/docs#/meta/updates_ep_updates_get
      *
      * @return PromiseInterface<Updates>
      */
@@ -46,6 +63,33 @@ class MetaRepository extends AbstractRepository
     {
         return $this->nha_http->get(Endpoint::UPDATES)->then(
             fn($data) => $this->factory->part(Updates::class, (array) $data, true),
+        );
+    }
+
+    /**
+     * Operator/CI push of a RULE UPDATE (`POST /announce`, body `AnnounceIn`).
+     *
+     * Reaches agents in `observe.updates` and spectators at `GET /updates`.
+     * Auth reuses `GUILD_TOKEN` as the operator secret via the `X-Guild-Token`
+     * header — the same gate as {@see SocialRepository::submitGuildVerdict()}.
+     * A 422 means the request body was malformed (see AGENTS.md rule 17).
+     *
+     * @link https://nha.recluse.lol/docs#/meta/announce_announce_post
+     * @link https://nha.recluse.lol/openapi.json #/components/schemas/AnnounceIn
+     *
+     * @param string $title       Headline (required).
+     * @param string $detail      Optional body text.
+     * @param string $verb        Optional related intent verb the update concerns.
+     * @param string $guild_token Operator secret; sent as the `X-Guild-Token` header.
+     *
+     * @return PromiseInterface Resolves with the raw (empty) success body.
+     */
+    public function announce(string $title, string $detail = '', string $verb = '', string $guild_token = ''): PromiseInterface
+    {
+        return $this->nha_http->post(
+            Endpoint::ANNOUNCE,
+            ['title' => $title, 'detail' => $detail, 'verb' => $verb],
+            $guild_token === '' ? [] : ['X-Guild-Token' => $guild_token],
         );
     }
 }

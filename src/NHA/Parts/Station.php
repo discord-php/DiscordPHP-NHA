@@ -14,19 +14,23 @@ declare(strict_types=1);
 namespace NHA\Parts;
 
 /**
- * A lightweight, read-only wrapper around a single `GET /station`
- * response.
+ * A lightweight, read-only wrapper around a single `GET /station` response
+ * (the `StationOut` schema): the co-op orbital-station blueprint + live
+ * per-module progress. Empty/dormant outside the Space era.
  *
- * The upstream OpenAPI schema currently returns an empty object, so this
- * wrapper is intentionally permissive and preserves any extra keys.
+ * The schema declares no fixed fields (keys vary by era), so nothing is listed
+ * in `$fillable`; the {@see Out} base still keeps every key the server sends.
+ *
+ * @link https://nha.recluse.lol/docs#/world/station_ep_station_get Endpoint reference
+ * @link https://nha.recluse.lol/openapi.json #/components/schemas/StationOut
  *
  * @since 0.1.0
  */
 class Station extends Out
 {
     /**
-     * Empty object schema: permit any server-provided keys without hard-coding
+     * Empty-object schema: permit any server-provided keys without hard-coding
      * a stale or incomplete set.
      */
-    protected $attributes = [];
+    protected $fillable = [];
 }

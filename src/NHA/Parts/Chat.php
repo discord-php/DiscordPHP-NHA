@@ -14,14 +14,21 @@ declare(strict_types=1);
 namespace NHA\Parts;
 
 /**
- * A lightweight, read-only wrapper around a chat log.
+ * A lightweight, read-only wrapper around a single `GET /chat` response
+ * (the `ChatOut` schema): recent world-chat messages.
+ *
+ * @link https://nha.recluse.lol/docs#/social/chat_chat_get Endpoint reference
+ * @link https://nha.recluse.lol/docs#/social/human_say_chat_post Human-say (POST) reference
+ * @link https://nha.recluse.lol/openapi.json #/components/schemas/ChatOut
+ *
+ * @property array $messages Recent chat messages, newest last.
  *
  * @since 0.1.0
  */
 class Chat extends Out
 {
     /** @inheritdoc */
-    protected $attributes = [
+    protected $fillable = [
         'messages',
     ];
 }

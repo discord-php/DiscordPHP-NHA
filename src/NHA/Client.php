@@ -31,7 +31,11 @@ use NHA\Repository\SocialRepository;
 use NHA\Repository\WorldRepository;
 
 /**
- * The NHA Client class.
+ * The NHA Client class — a DiscordPHP {@see DiscordClient} whose repository map
+ * additionally exposes the NHA world read endpoints, grouped by OpenAPI tag.
+ *
+ * @link https://nha.recluse.lol/docs Interactive API documentation
+ * @link https://nha.recluse.lol/openapi.json Machine-readable API contract
  *
  * @property EmojiRepository          $emojis
  * @property GuildRepository          $guilds

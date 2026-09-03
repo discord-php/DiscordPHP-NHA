@@ -14,15 +14,20 @@ declare(strict_types=1);
 namespace NHA\Parts;
 
 /**
- * A lightweight, read-only wrapper around a single `GET /depot`
- * response.
+ * A lightweight, read-only wrapper around a single `GET /depot` response
+ * (the `DepotOut` schema): the fixed depot buy/sell price sheet.
+ *
+ * @link https://nha.recluse.lol/docs#/economy/depot_depot_get Endpoint reference
+ * @link https://nha.recluse.lol/openapi.json #/components/schemas/DepotOut
+ *
+ * @property array|null $prices Map of resource => price, or null when the depot is closed.
  *
  * @since 0.1.0
  */
 class Depot extends Out
 {
     /** @inheritdoc */
-    protected $attributes = [
+    protected $fillable = [
         'prices',
     ];
 }

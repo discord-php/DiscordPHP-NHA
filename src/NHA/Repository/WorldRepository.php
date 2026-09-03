@@ -14,18 +14,23 @@ declare(strict_types=1);
 namespace NHA\Repository;
 
 use NHA\Http\Endpoint;
-use NHA\NHA;
-use NHA\Parts\World;
 use NHA\Parts\Map;
 use NHA\Parts\Rules;
 use NHA\Parts\Scene;
 use NHA\Parts\Station;
 use NHA\Parts\Structures;
-use NHA\Parts\Expansion;
+use NHA\Parts\World;
 use React\Promise\PromiseInterface;
 
 /**
- * Repository for querying NHA world state.
+ * Repository for the NHA `world` endpoints: global state, the biome map / 3D
+ * scene, structures, the space station, the Expansion-era spectator boards and
+ * the crafting rules codex.
+ *
+ * @link https://nha.recluse.lol/docs#/world Interactive API documentation (world tag)
+ * @link https://nha.recluse.lol/openapi.json Machine-readable API contract
+ *
+ * @since 0.1.0
  */
 class WorldRepository extends AbstractRepository
 {
@@ -33,7 +38,9 @@ class WorldRepository extends AbstractRepository
     protected $class = World::class;
 
     /**
-     * Fetches the current world state.
+     * Fetches the current world state (`GET /world` → `WorldOut`).
+     *
+     * @link https://nha.recluse.lol/docs#/world/world_world_get
      *
      * @return PromiseInterface<World>
      */
@@ -45,7 +52,9 @@ class WorldRepository extends AbstractRepository
     }
 
     /**
-     * Fetches the map.
+     * Fetches the ASCII biome map (`GET /map` → `MapOut`).
+     *
+     * @link https://nha.recluse.lol/docs#/world/world_map_map_get
      *
      * @return PromiseInterface<Map>
      */
@@ -57,19 +66,29 @@ class WorldRepository extends AbstractRepository
     }
 
     /**
-     * Fetches the current scene.
+     * Fetches the 3D World-tab scene graph (`GET /scene` → `SceneOut`).
      *
-     * @return PromiseInterface
+     * @link https://nha.recluse.lol/docs#/world/scene_scene_get
+     *
+     * @param bool $static When true (default) request the static `biomes`/`deposits`
+     *                     layers too; pass false to omit them (they arrive as null).
+     *
+     * @return PromiseInterface<Scene>
      */
-    public function getScene(): PromiseInterface
+    public function getScene(bool $static = true): PromiseInterface
     {
-        return $this->nha_http->get(Endpoint::SCENE)->then(
+        $endpoint = Endpoint::bind(Endpoint::SCENE);
+        $endpoint->addQuery('static', $static ? 1 : 0);
+
+        return $this->nha_http->get($endpoint)->then(
             fn($data) => $this->factory->part(Scene::class, (array) $data, true),
         );
     }
 
     /**
-     * Fetches the structures in the scene.
+     * Fetches placed structures (`GET /structures` → `StructuresOut`).
+     *
+     * @link https://nha.recluse.lol/docs#/world/structures_ep_structures_get
      *
      * @return PromiseInterface<Structures>
      */
@@ -81,7 +100,10 @@ class WorldRepository extends AbstractRepository
     }
 
     /**
-     * Fetches the station state.
+     * Fetches the co-op orbital-station blueprint + progress
+     * (`GET /station` → `StationOut`; `{}` outside the Space era).
+     *
+     * @link https://nha.recluse.lol/docs#/world/station_ep_station_get
      *
      * @return PromiseInterface<Station>
      */
@@ -93,33 +115,42 @@ class WorldRepository extends AbstractRepository
     }
 
     /**
-     * Fetches colony information.
+     * Fetches a body's Expansion colony board (`GET /colony/{body}`).
      *
-     * @param  string           $body
+     * The response schema is free-form (empty schema / null off-era), so the
+     * raw decoded body is resolved without wrapping it in a Part.
+     *
+     * @link https://nha.recluse.lol/docs#/world/colony_ep_colony__body__get
+     *
+     * @param string $body One of phobos/deimos/mars/venus.
+     *
      * @return PromiseInterface
      */
     public function getColony(string $body): PromiseInterface
     {
-        $endpoint = Endpoint::bind(Endpoint::COLONY)->bindAssoc(['body' => $body]);
-
-        return $this->nha_http->get((string) $endpoint);
+        return $this->nha_http->get(Endpoint::bind(Endpoint::COLONY)->bindAssoc(['body' => $body]));
     }
 
     /**
-     * Fetches terraform information.
+     * Fetches a planet's Expansion terraforming program
+     * (`GET /terraform/{body}`; free-form / null off-era).
      *
-     * @param  string           $body
+     * @link https://nha.recluse.lol/docs#/world/terraform_ep_terraform__body__get
+     *
+     * @param string $body One of mars/venus.
+     *
      * @return PromiseInterface
      */
     public function getTerraform(string $body): PromiseInterface
     {
-        $endpoint = Endpoint::bind(Endpoint::TERRAFORM)->bindAssoc(['body' => $body]);
-
-        return $this->nha_http->get((string) $endpoint);
+        return $this->nha_http->get(Endpoint::bind(Endpoint::TERRAFORM)->bindAssoc(['body' => $body]));
     }
 
     /**
-     * Fetches expansion information.
+     * Fetches the whole-Expansion-Era spectator summary
+     * (`GET /expansion`; free-form / null off-era).
+     *
+     * @link https://nha.recluse.lol/docs#/world/expansion_ep_expansion_get
      *
      * @return PromiseInterface
      */
@@ -129,9 +160,13 @@ class WorldRepository extends AbstractRepository
     }
 
     /**
-     * Fetches the rules.
+     * Fetches the crafting rules codex (`GET /rules` → `RulesOut`): resources +
+     * physics tags, formation patterns, pending proposals and dynamic inventions.
      *
-     * @return PromiseInterface
+     * @link https://nha.recluse.lol/docs#/world/rules_rules_get
+     * @link https://nha.recluse.lol/rules Human-readable rules page
+     *
+     * @return PromiseInterface<Rules>
      */
     public function getRules(): PromiseInterface
     {

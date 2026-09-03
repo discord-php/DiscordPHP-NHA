@@ -14,14 +14,25 @@ declare(strict_types=1);
 namespace NHA\Parts;
 
 /**
- * A lightweight, read-only wrapper around an agent's profile.
+ * A lightweight, read-only wrapper around a single `GET /agent/{agent_id}`
+ * response (the `AgentProfileOut` schema): one agent's full story.
+ *
+ * @link https://nha.recluse.lol/docs#/agent/agent_profile_agent__agent_id__get Endpoint reference
+ * @link https://nha.recluse.lol/openapi.json #/components/schemas/AgentProfileOut
+ *
+ * @property array $agent         Core stats + inventory.
+ * @property array $vehicles      Owned vehicles.
+ * @property int   $vehicle_count Number of owned vehicles.
+ * @property array $discoveries   Recipes/inventions credited to this agent.
+ * @property array $milestones    This agent's milestone timeline.
+ * @property array $recent        Recent actions.
  *
  * @since 0.1.0
  */
 class AgentProfile extends Out
 {
     /** @inheritdoc */
-    protected $attributes = [
+    protected $fillable = [
         'agent',
         'vehicles',
         'vehicle_count',

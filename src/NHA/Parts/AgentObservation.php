@@ -77,7 +77,11 @@ class AgentObservation implements JsonSerializable
 
     public function getPosition(): ?array
     {
-        return $this->get('position') ?? $this->get('pos');
+        $pos = $this->get('position') ?? $this->get('pos');
+        if (is_object($pos)) {
+            return (array) $pos;
+        }
+        return is_array($pos) ? $pos : null;
     }
 
     public function getInventory(): array

@@ -211,7 +211,7 @@ class Commands
 
     public function rules(): PromiseInterface
     {
-        return $this->nha->social->getRules()->then(fn($data) => self::jsonMessage('Rules', $data));
+        return $this->nha->world->getRules()->then(fn($data) => self::jsonMessage('Rules', $data));
     }
 
     public function contracts(): PromiseInterface

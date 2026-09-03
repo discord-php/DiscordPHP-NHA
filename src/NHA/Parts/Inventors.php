@@ -14,14 +14,21 @@ declare(strict_types=1);
 namespace NHA\Parts;
 
 /**
- * A lightweight, read-only wrapper around inventor information.
+ * A lightweight, read-only wrapper around a single `GET /inventors` response
+ * (the `InventorsOut` schema): the invention leaderboard and discovery list.
+ *
+ * @link https://nha.recluse.lol/docs#/history/inventors_inventors_get Endpoint reference
+ * @link https://nha.recluse.lol/openapi.json #/components/schemas/InventorsOut
+ *
+ * @property array $leaderboard Ranked inventors.
+ * @property array $discoveries Recorded discoveries.
  *
  * @since 0.1.0
  */
 class Inventors extends Out
 {
     /** @inheritdoc */
-    protected $attributes = [
+    protected $fillable = [
         'leaderboard',
         'discoveries',
     ];

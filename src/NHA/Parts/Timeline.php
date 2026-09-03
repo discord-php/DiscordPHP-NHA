@@ -14,14 +14,20 @@ declare(strict_types=1);
 namespace NHA\Parts;
 
 /**
- * A lightweight, read-only wrapper around the server timeline.
+ * A lightweight, read-only wrapper around a single `GET /timeline` response
+ * (the `TimelineOut` schema): the chronological world-history stream.
+ *
+ * @link https://nha.recluse.lol/docs#/history/timeline_timeline_get Endpoint reference
+ * @link https://nha.recluse.lol/openapi.json #/components/schemas/TimelineOut
+ *
+ * @property array $timeline Ordered timeline entries.
  *
  * @since 0.1.0
  */
 class Timeline extends Out
 {
     /** @inheritdoc */
-    protected $attributes = [
+    protected $fillable = [
         'timeline',
     ];
 }

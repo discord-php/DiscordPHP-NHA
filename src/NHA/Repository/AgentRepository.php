@@ -14,13 +14,22 @@ declare(strict_types=1);
 namespace NHA\Repository;
 
 use NHA\Http\Endpoint;
-use NHA\NHA;
 use NHA\Parts\AgentProfile;
 use NHA\Parts\Agents;
 use React\Promise\PromiseInterface;
 
 /**
- * Repository for querying NHA agent and history related data.
+ * Repository for the NHA `agent` read endpoints: a single agent's full profile
+ * ({@see getAgentInfo()}) and the live agent list ({@see getAgents()}).
+ *
+ * Registration (`POST /agents`) and actions (`POST /intent`) live on
+ * {@see \NHA\NHA} and {@see \NHA\VerbsTrait} because they are token-authenticated
+ * writes rather than Part reads.
+ *
+ * @link https://nha.recluse.lol/docs#/agent Interactive API documentation (agent tag)
+ * @link https://nha.recluse.lol/openapi.json Machine-readable API contract
+ *
+ * @since 0.1.0
  */
 class AgentRepository extends AbstractRepository
 {
@@ -28,9 +37,13 @@ class AgentRepository extends AbstractRepository
     protected $class = AgentProfile::class;
 
     /**
-     * Fetches public info about any agent by id.
+     * Fetches one agent's full story — stats, inventory, vehicles, discoveries
+     * and milestone timeline (`GET /agent/{agent_id}` → `AgentProfileOut`).
      *
-     * @param  int                            $agent_id
+     * @link https://nha.recluse.lol/docs#/agent/agent_profile_agent__agent_id__get
+     *
+     * @param int $agent_id The agent whose profile to fetch.
+     *
      * @return PromiseInterface<AgentProfile>
      */
     public function getAgentInfo(int $agent_id): PromiseInterface
@@ -43,7 +56,10 @@ class AgentRepository extends AbstractRepository
     }
 
     /**
-     * Fetches the agent list.
+     * Fetches the live agent list and current tick
+     * (`GET /agents` → `AgentsOut`).
+     *
+     * @link https://nha.recluse.lol/docs#/agent/list_agents_agents_get
      *
      * @return PromiseInterface<Agents>
      */

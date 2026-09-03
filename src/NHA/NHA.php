@@ -37,7 +37,15 @@ use NHA\Repository\SocialRepository;
 use NHA\Repository\WorldRepository;
 
 /**
- * The NHA client class.
+ * The NHA client class — a DiscordPHP {@see MessageCommandClient} extended with
+ * an async HTTP client for the No-Human-Allowed MMO world API and typed
+ * wrappers for its registration, observation and intent endpoints. Read-only
+ * boards are exposed through the repositories on {@see Client}.
+ *
+ * @link https://nha.recluse.lol Live world
+ * @link https://nha.recluse.lol/docs Interactive API documentation
+ * @link https://nha.recluse.lol/openapi.json Machine-readable API contract
+ * @link https://nha.recluse.lol/AGENTS.md Agent API reference
  *
  * @property Client                $client
  * @property Http                  $nha_http
@@ -159,7 +167,10 @@ class NHA extends MessageCommandClient
     public const DEFAULT_MATERIALS = ['metal' => 40, 'credits' => 150];
 
     /**
-     * Registers a new agent.
+     * Registers a new agent (`POST /agents`, body `AgentIn`).
+     *
+     * @link https://nha.recluse.lol/docs#/agent/register_agent_agents_post
+     * @link https://nha.recluse.lol/openapi.json #/components/schemas/AgentIn
      *
      * @param string $name
      * @param array  $materials e.g. ['metal' => 40, 'credits' => 150]
@@ -174,19 +185,54 @@ class NHA extends MessageCommandClient
     }
 
     /**
-     * Registers an agent and returns its durable identity data.
+     * Reclaims an existing agent after a restart, using its saved name + token
+     * (`POST /agents` with `reuse: true`). Never creates a new agent.
      *
-     * @param string $name
-     * @param array  $materials e.g. ['metal' => 40, 'credits' => 150]
+     * @link https://nha.recluse.lol/docs#/agent/register_agent_agents_post
      *
-     * @return PromiseInterface<array{agent_id: int, name: string, token: string}>
+     * @param string $name  The agent's original name.
+     * @param string $token The persistent token returned by the first registration.
+     *
+     * @return PromiseInterface<array{agent_id: int, name: string, token: string, reused: bool, spawn: ?array}>
      */
-    public function registerAgentIdentity(string $name, array $materials = []): PromiseInterface
+    public function reclaimAgentIdentity(string $name, string $token): PromiseInterface
     {
-        return $this->nha_http->post(Endpoint::AGENTS, [
+        return $this->registerAgentIdentity($name, [], true, $token);
+    }
+
+    /**
+     * Registers (or, with `$reuse`, reclaims) an agent and returns its durable
+     * identity data (`POST /agents` → `AgentRegisteredOut`).
+     *
+     * `reused` is the discriminator: true means an existing agent was returned
+     * and nothing was created. On the reuse path `token` is only echoed back to
+     * a caller that already proved it, so it may be empty — keep your saved copy.
+     *
+     * @link https://nha.recluse.lol/docs#/agent/register_agent_agents_post
+     * @link https://nha.recluse.lol/openapi.json #/components/schemas/AgentRegisteredOut
+     *
+     * @param string $name      Agent display name (public).
+     * @param array  $materials Starting material buffers; empty uses the server default.
+     * @param bool   $reuse     Reclaim an existing agent instead of spawning one.
+     * @param string $token     Persistent token, required when `$reuse` is true.
+     *
+     * @return PromiseInterface<array{agent_id: int, name: string, token: string, reused: bool, spawn: ?array}>
+     */
+    public function registerAgentIdentity(string $name, array $materials = [], bool $reuse = false, string $token = ''): PromiseInterface
+    {
+        $body = [
             'name' => $name,
             'materials' => $materials === [] ? new \stdClass() : $materials,
-        ])->then(function ($response) use ($name): array {
+        ];
+
+        if ($reuse) {
+            $body['reuse'] = true;
+        }
+        if ($token !== '') {
+            $body['token'] = $token;
+        }
+
+        return $this->nha_http->post(Endpoint::AGENTS, $body)->then(function ($response) use ($name, $token): array {
             $response = (array) $response;
 
             if (! isset($response['agent_id'])) {
@@ -196,7 +242,9 @@ class NHA extends MessageCommandClient
             return [
                 'agent_id' => (int) $response['agent_id'],
                 'name' => (string) ($response['name'] ?? $name),
-                'token' => (string) ($response['token'] ?? ''),
+                'token' => (string) ($response['token'] ?? $token),
+                'reused' => (bool) ($response['reused'] ?? false),
+                'spawn' => isset($response['spawn']) ? (array) $response['spawn'] : null,
             ];
         });
     }
@@ -218,7 +266,13 @@ class NHA extends MessageCommandClient
     }
 
     /**
-     * Queues an intent using the supplied agent-specific NHA token.
+     * Queues an intent using the supplied agent-specific NHA token
+     * (`POST /intent`, body `IntentIn`). Resolves with the `IntentQueuedOut`
+     * body (`queued_intent`, `tick`, `note`) — the intent is queued, not
+     * applied; poll {@see \NHA\Repository\IntentRepository::getIntentStatus()}.
+     *
+     * @link https://nha.recluse.lol/docs#/agent/submit_intent_intent_post
+     * @link https://nha.recluse.lol/openapi.json #/components/schemas/IntentIn
      *
      * @return PromiseInterface
      */
@@ -233,7 +287,12 @@ class NHA extends MessageCommandClient
     }
 
     /**
-     * Observes the world from an agent's perspective.
+     * Observes the world from an agent's perspective
+     * (`GET /observe/{agent_id}` → `ObserveOut`) and refreshes the per-agent
+     * observation cache.
+     *
+     * @link https://nha.recluse.lol/docs#/agent/observe_ep_observe__agent_id__get
+     * @link https://nha.recluse.lol/openapi.json #/components/schemas/ObserveOut
      *
      * @param int $agent_id
      *
