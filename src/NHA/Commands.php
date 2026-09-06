@@ -13,9 +13,12 @@ declare(strict_types=1);
 
 namespace NHA;
 
+use Discord\Builders\Components\ActionRow;
+use Discord\Builders\Components\Button;
 use Discord\Builders\Components\Container;
 use Discord\Builders\Components\TextDisplay;
 use Discord\Builders\MessageBuilder;
+use Discord\Parts\Interactions\Interaction;
 use NHA\Brain\AutoPlayer;
 use NHA\Parts\AgentObservation;
 use React\Promise\PromiseInterface;
@@ -37,6 +40,8 @@ use function React\Promise\resolve;
  */
 class Commands
 {
+    use ActorTrait;
+
     /**
      * Read-only boards reachable through {@see board()}, mapped to the
      * repository call that fetches each. Keep in sync with the NHA `GET`
@@ -71,6 +76,18 @@ class Commands
         }
 
         throw new \RuntimeException('No agent registered yet. Use `register` first, or pass an explicit agent id.');
+    }
+
+    /**
+     * Normalises the first argument every action method accepts into an
+     * {@see AgentContext}. A ready context passes through unchanged; an int
+     * (or null) is treated as a bare agent id for the bot's default agent.
+     */
+    private function context(AgentContext|int|null $agent): AgentContext
+    {
+        return $agent instanceof AgentContext
+            ? $agent
+            : AgentContext::bot($this->resolveAgentId($agent));
     }
 
     protected static function textContainer(string $text): Container
@@ -134,12 +151,16 @@ class Commands
         });
     }
 
-    public function observe(?int $agent_id): PromiseInterface
+    public function observe(AgentContext|int|null $agent = null): PromiseInterface
     {
+        $ctx = $this->context($agent);
+
         // NHA::observe() records position/tick into the StateStore (wired in the
-        // constructor) for every caller, so no persistence is needed here.
-        return $this->nha->observe($this->resolveAgentId($agent_id))->then(
-            fn(AgentObservation $obs) => NHA::createBuilder()->addComponent($obs->toContainer($this->nha)),
+        // constructor) for every caller, so no persistence is needed here. The
+        // context's token flows into the container so its quick-action buttons
+        // act as whoever ran the observe.
+        return $this->nha->observe($ctx->agentId)->then(
+            fn(AgentObservation $obs) => NHA::createBuilder()->addComponent($obs->toContainer($this->nha, $ctx->token)),
         );
     }
 
@@ -151,298 +172,304 @@ class Commands
      *
      * @param array<string, mixed> $args
      */
-    public function queueVerb(?int $agent_id, string $verb, array $args = []): PromiseInterface
+    public function queueVerb(AgentContext|int|null $agent, string $verb, array $args = []): PromiseInterface
     {
-        $agent_id = $this->resolveAgentId($agent_id);
+        $ctx = $this->context($agent);
+        $token = $ctx->token ?? $this->nha->getAgentToken();
 
-        return $this->nha->intent($agent_id, $verb, $args)->then(function ($queued) use ($verb, $agent_id) {
+        return $this->nha->intentWithToken($ctx->agentId, $token, $verb, $args)->then(function ($queued) use ($verb, $ctx) {
             $queued = (array) $queued;
             $id = $queued['queued_intent'] ?? null;
 
             $ref = $id !== null ? " · check the outcome with `intent {$id}`" : '';
             $note = isset($queued['note']) && $queued['note'] ? "\n> {$queued['note']}" : '';
 
-            return self::message("✅ Queued **{$verb}** for agent #{$agent_id}{$ref}{$note}");
+            return self::message("✅ Queued **{$verb}** for agent #{$ctx->agentId}{$ref}{$note}");
         });
     }
 
-    /** Raw verb + JSON-string args (the `/nha act` escape hatch for any verb). */
-    public function act(?int $agent_id, string $verb, ?string $argsJson): PromiseInterface
+    /**
+     * Raw verb + args escape hatch for any verb. `$args` may be a JSON string
+     * (the `/nha act` slash option) or an already-decoded array.
+     *
+     * @param string|array<string, mixed>|null $args
+     */
+    public function act(AgentContext|int|null $agent, string $verb, string|array|null $args): PromiseInterface
     {
-        $args = [];
-        if ($argsJson !== null && trim($argsJson) !== '') {
-            $args = json_decode($argsJson, true);
-            if (! is_array($args)) {
+        if (is_string($args)) {
+            $decoded = trim($args) === '' ? [] : json_decode($args, true);
+            if (! is_array($decoded)) {
                 return reject(new \InvalidArgumentException('`args` must be a valid JSON object, e.g. `{"dx":1,"dy":0}`.'));
             }
+            $args = $decoded;
         }
 
-        return $this->queueVerb($agent_id, $verb, $args);
+        return $this->queueVerb($agent, $verb, $args ?? []);
     }
 
-    public function move(?int $agent_id, int $dx, int $dy): PromiseInterface
+    public function move(AgentContext|int|null $agent, int $dx, int $dy): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'move', ['dx' => $dx, 'dy' => $dy]);
+        return $this->queueVerb($agent, 'move', ['dx' => $dx, 'dy' => $dy]);
     }
 
-    public function moveTo(?int $agent_id, int $x, int $y): PromiseInterface
+    public function moveTo(AgentContext|int|null $agent, int $x, int $y): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'move', ['x' => $x, 'y' => $y]);
+        return $this->queueVerb($agent, 'move', ['x' => $x, 'y' => $y]);
     }
 
-    public function mine(?int $agent_id, ?int $n = null, ?string $resource = null): PromiseInterface
+    public function mine(AgentContext|int|null $agent, ?int $n = null, ?string $resource = null): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'mine', array_filter(
+        return $this->queueVerb($agent, 'mine', array_filter(
             ['n' => $n ?? 1, 'resource' => $resource],
             fn($v) => null !== $v,
         ));
     }
 
-    public function chop(?int $agent_id, ?int $n = null): PromiseInterface
+    public function chop(AgentContext|int|null $agent, ?int $n = null): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'chop', ['n' => $n ?? 1]);
+        return $this->queueVerb($agent, 'chop', ['n' => $n ?? 1]);
     }
 
-    public function gather(?int $agent_id, ?int $n = null): PromiseInterface
+    public function gather(AgentContext|int|null $agent, ?int $n = null): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'gather', ['n' => $n ?? 1]);
+        return $this->queueVerb($agent, 'gather', ['n' => $n ?? 1]);
     }
 
-    public function say(?int $agent_id, string $text): PromiseInterface
+    public function say(AgentContext|int|null $agent, string $text): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'say', ['text' => $text]);
+        return $this->queueVerb($agent, 'say', ['text' => $text]);
     }
 
-    public function tell(?int $agent_id, int $to, string $text): PromiseInterface
+    public function tell(AgentContext|int|null $agent, int $to, string $text): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'tell', ['to' => $to, 'text' => $text]);
+        return $this->queueVerb($agent, 'tell', ['to' => $to, 'text' => $text]);
     }
 
     // No-arg verbs: `verb => label` — every one just queues that verb.
-    public function plant(?int $agent_id): PromiseInterface
+    public function plant(AgentContext|int|null $agent): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'plant');
+        return $this->queueVerb($agent, 'plant');
     }
 
-    public function ride(?int $agent_id): PromiseInterface
+    public function ride(AgentContext|int|null $agent): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'ride');
+        return $this->queueVerb($agent, 'ride');
     }
 
-    public function launch(?int $agent_id): PromiseInterface
+    public function launch(AgentContext|int|null $agent): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'launch');
+        return $this->queueVerb($agent, 'launch');
     }
 
-    public function land(?int $agent_id): PromiseInterface
+    public function land(AgentContext|int|null $agent): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'land');
+        return $this->queueVerb($agent, 'land');
     }
 
-    public function landMoon(?int $agent_id): PromiseInterface
+    public function landMoon(AgentContext|int|null $agent): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'land_moon');
+        return $this->queueVerb($agent, 'land_moon');
     }
 
-    public function dock(?int $agent_id): PromiseInterface
+    public function dock(AgentContext|int|null $agent): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'dock');
+        return $this->queueVerb($agent, 'dock');
     }
 
-    public function attune(?int $agent_id): PromiseInterface
+    public function attune(AgentContext|int|null $agent): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'attune');
+        return $this->queueVerb($agent, 'attune');
     }
 
-    public function deploy(?int $agent_id): PromiseInterface
+    public function deploy(AgentContext|int|null $agent): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'deploy');
+        return $this->queueVerb($agent, 'deploy');
     }
 
-    public function arm(?int $agent_id): PromiseInterface
+    public function arm(AgentContext|int|null $agent): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'arm');
+        return $this->queueVerb($agent, 'arm');
     }
 
-    public function landBody(?int $agent_id): PromiseInterface
+    public function landBody(AgentContext|int|null $agent): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'land_body');
+        return $this->queueVerb($agent, 'land_body');
     }
 
-    public function distress(?int $agent_id): PromiseInterface
+    public function distress(AgentContext|int|null $agent): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'distress');
+        return $this->queueVerb($agent, 'distress');
     }
 
     // Craft & build.
-    public function combine(?int $agent_id, array $ingredients, ?string $name = null, ?int $n = null): PromiseInterface
+    public function combine(AgentContext|int|null $agent, array $ingredients, ?string $name = null, ?int $n = null): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'combine', array_filter(
+        return $this->queueVerb($agent, 'combine', array_filter(
             ['ingredients' => $ingredients, 'name' => $name, 'n' => $n],
             fn($v) => null !== $v,
         ));
     }
 
-    public function build(?int $agent_id, string $part, array $with = []): PromiseInterface
+    public function build(AgentContext|int|null $agent, string $part, array $with = []): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'build', array_filter(
+        return $this->queueVerb($agent, 'build', array_filter(
             ['part' => $part, 'with' => $with ?: null],
             fn($v) => null !== $v,
         ));
     }
 
-    public function finalize(?int $agent_id, ?string $name = null): PromiseInterface
+    public function finalize(AgentContext|int|null $agent, ?string $name = null): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'finalize', null === $name ? [] : ['name' => $name]);
+        return $this->queueVerb($agent, 'finalize', null === $name ? [] : ['name' => $name]);
     }
 
     /** @param array<string, mixed> $args Shape-specific keys (size/height/color, module, kind, body, stage, w, h). */
-    public function construct(?int $agent_id, string $shape, array $args = []): PromiseInterface
+    public function construct(AgentContext|int|null $agent, string $shape, array $args = []): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'construct', ['shape' => $shape] + $args);
+        return $this->queueVerb($agent, 'construct', ['shape' => $shape] + $args);
     }
 
-    public function invest(?int $agent_id, string $module, int $credits, ?string $resource = null): PromiseInterface
+    public function invest(AgentContext|int|null $agent, string $module, int $credits, ?string $resource = null): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'invest', array_filter(
+        return $this->queueVerb($agent, 'invest', array_filter(
             ['module' => $module, 'credits' => $credits, 'resource' => $resource],
             fn($v) => null !== $v,
         ));
     }
 
     // Economy.
-    public function sell(?int $agent_id, string $resource, ?int $n = null): PromiseInterface
+    public function sell(AgentContext|int|null $agent, string $resource, ?int $n = null): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'sell', array_filter(['resource' => $resource, 'n' => $n], fn($v) => null !== $v));
+        return $this->queueVerb($agent, 'sell', array_filter(['resource' => $resource, 'n' => $n], fn($v) => null !== $v));
     }
 
-    public function buy(?int $agent_id, string $resource, ?int $n = null): PromiseInterface
+    public function buy(AgentContext|int|null $agent, string $resource, ?int $n = null): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'buy', array_filter(['resource' => $resource, 'n' => $n], fn($v) => null !== $v));
+        return $this->queueVerb($agent, 'buy', array_filter(['resource' => $resource, 'n' => $n], fn($v) => null !== $v));
     }
 
-    public function order(?int $agent_id, string $side, string $resource, int $qty, float $price): PromiseInterface
+    public function order(AgentContext|int|null $agent, string $side, string $resource, int $qty, float $price): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'order', ['side' => $side, 'resource' => $resource, 'qty' => $qty, 'price' => $price]);
+        return $this->queueVerb($agent, 'order', ['side' => $side, 'resource' => $resource, 'qty' => $qty, 'price' => $price]);
     }
 
-    public function cancelOrder(?int $agent_id, int|string $order_id): PromiseInterface
+    public function cancelOrder(AgentContext|int|null $agent, int|string $order_id): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'cancel', ['order_id' => $order_id]);
+        return $this->queueVerb($agent, 'cancel', ['order_id' => $order_id]);
     }
 
-    public function deposit(?int $agent_id, string $resource, ?int $n = null): PromiseInterface
+    public function deposit(AgentContext|int|null $agent, string $resource, ?int $n = null): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'deposit', array_filter(['resource' => $resource, 'n' => $n], fn($v) => null !== $v));
+        return $this->queueVerb($agent, 'deposit', array_filter(['resource' => $resource, 'n' => $n], fn($v) => null !== $v));
     }
 
     /**
      * @param array<string, int> $give
      * @param array<string, int> $want
      */
-    public function trade(?int $agent_id, int $to, array $give, array $want): PromiseInterface
+    public function trade(AgentContext|int|null $agent, int $to, array $give, array $want): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'trade', ['to' => $to, 'give' => $give, 'want' => $want]);
+        return $this->queueVerb($agent, 'trade', ['to' => $to, 'give' => $give, 'want' => $want]);
     }
 
-    public function acceptTrade(?int $agent_id, int|string $trade_id): PromiseInterface
+    public function acceptTrade(AgentContext|int|null $agent, int|string $trade_id): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'accept', ['trade_id' => $trade_id]);
+        return $this->queueVerb($agent, 'accept', ['trade_id' => $trade_id]);
     }
 
     // Contracts & bounties.
     /** @param array<string, int> $want */
-    public function contract(?int $agent_id, mixed $reward, array $want, ?int $to = null, ?int $deadline_ticks = null): PromiseInterface
+    public function contract(AgentContext|int|null $agent, mixed $reward, array $want, ?int $to = null, ?int $deadline_ticks = null): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'contract', array_filter(
+        return $this->queueVerb($agent, 'contract', array_filter(
             ['reward' => $reward, 'want' => $want, 'to' => $to, 'deadline_ticks' => $deadline_ticks],
             fn($v) => null !== $v,
         ));
     }
 
-    public function fulfill(?int $agent_id, int|string $contract_id): PromiseInterface
+    public function fulfill(AgentContext|int|null $agent, int|string $contract_id): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'fulfill', ['contract_id' => $contract_id]);
+        return $this->queueVerb($agent, 'fulfill', ['contract_id' => $contract_id]);
     }
 
-    public function revoke(?int $agent_id, int|string $contract_id): PromiseInterface
+    public function revoke(AgentContext|int|null $agent, int|string $contract_id): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'revoke', ['contract_id' => $contract_id]);
+        return $this->queueVerb($agent, 'revoke', ['contract_id' => $contract_id]);
     }
 
-    public function bounty(?int $agent_id, int $target, mixed $reward, ?int $deadline_ticks = null): PromiseInterface
+    public function bounty(AgentContext|int|null $agent, int $target, mixed $reward, ?int $deadline_ticks = null): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'bounty', array_filter(
+        return $this->queueVerb($agent, 'bounty', array_filter(
             ['target' => $target, 'reward' => $reward, 'deadline_ticks' => $deadline_ticks],
             fn($v) => null !== $v,
         ));
     }
 
     // Medicine & combat.
-    public function heal(?int $agent_id, ?int $target = null, ?string $item = null): PromiseInterface
+    public function heal(AgentContext|int|null $agent, ?int $target = null, ?string $item = null): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'heal', array_filter(['target' => $target, 'item' => $item], fn($v) => null !== $v));
+        return $this->queueVerb($agent, 'heal', array_filter(['target' => $target, 'item' => $item], fn($v) => null !== $v));
     }
 
-    public function attack(?int $agent_id, int $target, ?string $weapon = null): PromiseInterface
+    public function attack(AgentContext|int|null $agent, int $target, ?string $weapon = null): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'attack', array_filter(['target' => $target, 'weapon' => $weapon], fn($v) => null !== $v));
+        return $this->queueVerb($agent, 'attack', array_filter(['target' => $target, 'weapon' => $weapon], fn($v) => null !== $v));
     }
 
-    public function detonate(?int $agent_id, int|string $bomb): PromiseInterface
+    public function detonate(AgentContext|int|null $agent, int|string $bomb): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'detonate', ['bomb' => $bomb]);
+        return $this->queueVerb($agent, 'detonate', ['bomb' => $bomb]);
     }
 
-    public function steal(?int $agent_id, int $from, string $resource, ?int $n = null): PromiseInterface
+    public function steal(AgentContext|int|null $agent, int $from, string $resource, ?int $n = null): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'steal', array_filter(
+        return $this->queueVerb($agent, 'steal', array_filter(
             ['from' => $from, 'resource' => $resource, 'n' => $n],
             fn($v) => null !== $v,
         ));
     }
 
-    public function collect(?int $agent_id, int|string $loot): PromiseInterface
+    public function collect(AgentContext|int|null $agent, int|string $loot): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'collect', ['loot' => $loot]);
+        return $this->queueVerb($agent, 'collect', ['loot' => $loot]);
     }
 
     // Diplomacy.
-    public function ally(?int $agent_id, int $to): PromiseInterface
+    public function ally(AgentContext|int|null $agent, int $to): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'ally', ['to' => $to]);
+        return $this->queueVerb($agent, 'ally', ['to' => $to]);
     }
 
-    public function acceptAlly(?int $agent_id, int $to): PromiseInterface
+    public function acceptAlly(AgentContext|int|null $agent, int $to): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'accept_ally', ['to' => $to]);
+        return $this->queueVerb($agent, 'accept_ally', ['to' => $to]);
     }
 
-    public function unally(?int $agent_id, int $to): PromiseInterface
+    public function unally(AgentContext|int|null $agent, int $to): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'unally', ['to' => $to]);
+        return $this->queueVerb($agent, 'unally', ['to' => $to]);
     }
 
-    public function declareWar(?int $agent_id, int $to): PromiseInterface
+    public function declareWar(AgentContext|int|null $agent, int $to): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'declare_war', ['to' => $to]);
+        return $this->queueVerb($agent, 'declare_war', ['to' => $to]);
     }
 
-    public function makePeace(?int $agent_id, int $to): PromiseInterface
+    public function makePeace(AgentContext|int|null $agent, int $to): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'make_peace', ['to' => $to]);
+        return $this->queueVerb($agent, 'make_peace', ['to' => $to]);
     }
 
     /** @param array<string, int> $give */
-    public function assist(?int $agent_id, int $to, array $give): PromiseInterface
+    public function assist(AgentContext|int|null $agent, int $to, array $give): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'assist', ['to' => $to, 'give' => $give]);
+        return $this->queueVerb($agent, 'assist', ['to' => $to, 'give' => $give]);
     }
 
     // Expansion era.
-    public function depart(?int $agent_id, string $dest): PromiseInterface
+    public function depart(AgentContext|int|null $agent, string $dest): PromiseInterface
     {
-        return $this->queueVerb($agent_id, 'depart', ['dest' => $dest]);
+        return $this->queueVerb($agent, 'depart', ['dest' => $dest]);
     }
 
     // --- Intent outcomes ------------------------------------------------------
@@ -624,5 +651,71 @@ class Commands
         $tail = $last ? "\nLast decision: **{$last['verb']}** — {$last['reason']}" : '';
 
         return resolve(self::message("### 🤖 Autoplay is {$status}{$tail}"));
+    }
+
+    // --- Per-user control panel ------------------------------------------------
+
+    /**
+     * Creates (or reopens) the Discord user's own linked agent and returns
+     * their control panel. Unlike {@see register()} this never touches the
+     * bot's default agent.
+     */
+    public function login(string $discord_user_id): PromiseInterface
+    {
+        if ($linked = $this->state->getDiscordUserAgent($discord_user_id)) {
+            return resolve($this->dashboard($discord_user_id, "Agent #{$linked['agent_id']} is ready."));
+        }
+
+        $name = 'user-' . $discord_user_id;
+
+        return $this->nha->registerAgentIdentity($name, NHA::DEFAULT_MATERIALS)->then(function (array $identity) use ($discord_user_id) {
+            $this->state->setDiscordUserAgent($discord_user_id, $identity['agent_id'], $identity['name'] ?? 'unknown', $identity['token']);
+
+            if (isset($identity['spawn'][0], $identity['spawn'][1])) {
+                $this->state->setAgentPosition($identity['agent_id'], (int) $identity['spawn'][0], (int) $identity['spawn'][1]);
+            }
+
+            return $this->dashboard($discord_user_id, "Registered agent #{$identity['agent_id']}. Your identity is saved.");
+        });
+    }
+
+    /** The Discord user's private control panel (synchronous — no API call). */
+    public function start(string $discord_user_id): MessageBuilder
+    {
+        $linked = $this->state->getDiscordUserAgent($discord_user_id);
+        $status = $linked
+            ? "Agent #{$linked['agent_id']} is ready."
+            : 'No agent is linked yet. Use **Login** to create one.';
+
+        return $this->dashboard($discord_user_id, $status);
+    }
+
+    /**
+     * Builds the per-user control panel. The buttons resolve the acting agent
+     * through {@see actor()} on each click, so a rotated token is always
+     * picked up.
+     */
+    public function dashboard(string $discord_user_id, string $status): MessageBuilder
+    {
+        $quick = fn(string $verb, array $args = []) => fn(Interaction $i) => $this
+            ->queueVerb($this->actor((string) $i->user->id), $verb, $args)
+            ->then(fn(MessageBuilder $b) => $i->updateMessage($b));
+
+        $login = Button::success()->setLabel('Login')->setListener(
+            fn(Interaction $i) => $this->login((string) $i->user->id)->then(fn(MessageBuilder $b) => $i->updateMessage($b)),
+            $this->nha,
+        );
+        $observe = Button::primary()->setLabel('Observe')->setListener(
+            fn(Interaction $i) => $this->observe($this->actor((string) $i->user->id))->then(fn(MessageBuilder $b) => $i->updateMessage($b)),
+            $this->nha,
+        );
+        $mine = Button::secondary()->setLabel('Mine')->setListener($quick('mine', ['n' => 1]), $this->nha);
+        $chop = Button::secondary()->setLabel('Chop')->setListener($quick('chop', ['n' => 1]), $this->nha);
+        $gather = Button::secondary()->setLabel('Gather')->setListener($quick('gather', ['n' => 1]), $this->nha);
+
+        return NHA::createBuilder()->addComponent(Container::new()->addComponents([
+            TextDisplay::new("### NHA Agent\n{$status}\n\nUse **Login** once. The buttons below queue one intent as your agent; **Observe** opens the live panel. More: `/observe`, `/move`, and the per-verb slash commands (add `agent: bot` to run one as the bot)."),
+            ActionRow::new()->addComponents([$login, $observe, $mine, $chop, $gather]),
+        ]));
     }
 }

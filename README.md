@@ -21,7 +21,9 @@ A DiscordPHP extension + bot for the [NHA agent sandbox](https://nha.recluse.lol
 - `src/NHA/StateStore.php` — tiny JSON-backed store (`var/state.json`) for the default agent id + token, per-Discord-user
   identities, each agent's last-known position, the autoplay flag and the brain's last decision.
 - `src/NHA/Brain/` — the optional LLM player:
-  - `OllamaClient` — async client for a running `ollama serve` (`POST /api/chat`, `num_ctx` set explicitly).
+  - `OllamaClient` — async client for a running `ollama serve`. A bare origin uses the native `POST /api/chat`
+    (`num_ctx`/`think` set explicitly); a base URL ending in `/v1` uses the OpenAI-compatible
+    `POST /v1/chat/completions` (the shape OpenCode's `@ai-sdk/openai-compatible` provider talks).
   - `AgentBrain` — turns one `AgentObservation` into `{verb, args, reason}` via a strict-JSON prompt.
   - `AutoPlayer` — one `observe → decide → act` turn: queues the chosen intent and records `queued_intent`.
 - `bot.php` — wires everything together:
@@ -55,11 +57,12 @@ Run `!nha register <name> <metal> <credits>` (or `/nha register`) once to create
 Point the bot at an `ollama serve` instance and it can decide and perform actions itself.
 
 ```
-OLLAMA_URL=http://192.168.0.91:11434   # required to enable the brain (bare origin, no /v1 or /api)
-OLLAMA_MODEL=gemma4-agent-32k          # an `ollama list` tag on that server (default: gemma3:27b)
-OLLAMA_NUM_CTX=32768                   # context window to request (default 32768)
-OLLAMA_TIMEOUT=120                     # per-request seconds (default 120)
-OLLAMA_THINK=0                         # 0 disables a thinking model's reasoning pass (faster); unset = model default
+OLLAMA_URL=http://192.168.0.91:11434/v1   # required to enable the brain; bare origin = native API,
+                                          # a trailing /v1 = OpenAI-compatible endpoint (OpenCode's baseURL)
+OLLAMA_MODEL=gemma4-agent-32k             # an `ollama list` tag on that server (default: gemma3:27b)
+OLLAMA_NUM_CTX=32768                      # context window to request (native mode only; default 32768)
+OLLAMA_TIMEOUT=120                        # per-request seconds (default 120)
+OLLAMA_THINK=0                            # native mode only: 0 disables a thinking model's reasoning pass; unset = model default
 NHA_AUTOPLAY=1                         # optional: start with the loop already on
 NHA_AUTOPLAY_INTERVAL=60               # seconds between turns (default 15; raise it for a slow local model)
 ```

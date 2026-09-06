@@ -16,6 +16,8 @@ class CommandsTest extends NHAUnitTestCase
 
     private string $statePath;
 
+    private StateStore $state;
+
     protected function setUp(): void
     {
         $this->statePath = sys_get_temp_dir() . '/nha-cmd-' . uniqid() . '/state.json';
@@ -47,10 +49,10 @@ class CommandsTest extends NHAUnitTestCase
         (new \ReflectionProperty(NHA::class, 'nha_http'))->setValue($nha, $http);
         $nha->setAgentToken('tok'); // bot.php does this at startup from the stored token
 
-        $state = new StateStore($this->statePath);
-        $state->setDefaultAgent(999, 'tok');
+        $this->state = new StateStore($this->statePath);
+        $this->state->setDefaultAgent(999, 'tok');
 
-        return new Commands($nha, $state);
+        return new Commands($nha, $this->state);
     }
 
     private static function render($builder): string
@@ -152,6 +154,53 @@ class CommandsTest extends NHAUnitTestCase
     {
         $this->assertSame(999, $this->commands()->resolveAgentId(null));
         $this->assertSame(7, $this->commands()->resolveAgentId(7));
+    }
+
+    public function testActorDefaultsToInvokingUsersLinkedAgent(): void
+    {
+        $commands = $this->commands();
+        $this->state->setDiscordUserAgent('42', 5, 'user-42', 'utok');
+
+        $actor = $commands->actor('42');
+
+        $this->assertSame(5, $actor->agentId);
+        $this->assertSame('utok', $actor->token);
+    }
+
+    public function testActorBotOverrideUsesDefaultAgentAndAmbientToken(): void
+    {
+        $actor = $this->commands()->actor('42', 'bot');
+
+        $this->assertSame(999, $actor->agentId);
+        $this->assertNull($actor->token, 'bot actor uses the ambient token, not a stored one');
+    }
+
+    public function testActorAcceptsNumericAgentOverride(): void
+    {
+        $actor = $this->commands()->actor('42', '77');
+
+        $this->assertSame(77, $actor->agentId);
+        $this->assertNull($actor->token);
+    }
+
+    public function testActorFallsBackToDefaultAgentWhenCallerHasNoLink(): void
+    {
+        $actor = $this->commands()->actor('nobody');
+
+        $this->assertSame(999, $actor->agentId);
+        $this->assertNull($actor->token);
+    }
+
+    public function testQueueVerbSendsTheActorsOwnTokenNotTheAmbientOne(): void
+    {
+        $commands = $this->commands();
+
+        $commands->queueVerb(new \NHA\AgentContext(5, 'utok'), 'mine', ['n' => 1]);
+
+        $this->assertSame(
+            ['agent' => 5, 'verb' => 'mine', 'args' => ['n' => 1], 'token' => 'utok'],
+            $this->calls[0][2],
+        );
     }
 
     public function testEveryBoardNameMapsToACall(): void

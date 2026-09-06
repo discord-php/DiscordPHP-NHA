@@ -94,6 +94,8 @@ if ($token = $state->getDefaultAgentToken()) {
 }
 
 // Optional LLM brain: only wired when OLLAMA_URL points at a running `ollama serve`.
+// A bare origin (http://host:11434) uses Ollama's native API; a URL ending in
+// /v1 (http://host:11434/v1, as in OpenCode's config) uses the OpenAI-compatible one.
 $autoPlayer = null;
 if ($ollama_url = getenv('OLLAMA_URL')) {
     $ollama_think = match (getenv('OLLAMA_THINK')) {
@@ -115,7 +117,6 @@ if ($ollama_url = getenv('OLLAMA_URL')) {
 }
 
 $commands = new Commands($nha, $state, $autoPlayer);
-$userCommands = new UserCommands($nha, $state);
 
 /**
  * Builds a container carrying a single line of text, used for quick
@@ -228,7 +229,7 @@ $nha_cmd->registerSubCommand('read', function (Message $message, array $args) us
         'id' => $rest[0] ?? null, 'body' => $rest[0] ?? null, 'resource' => $rest[0] ?? null,
         'x' => $rest[0] ?? null, 'y' => $rest[1] ?? null, 'limit' => $rest[2] ?? null,
     ]));
-}, ['description' => 'Read any board: ' . implode(', ', NHA\Commands::BOARDS) . '.', 'usage' => '<board> [arg|x] [y] [limit]']);
+}, ['description' => 'Read any board: ' . implode(', ', Commands::BOARDS) . '.', 'usage' => '<board> [arg|x] [y] [limit]']);
 
 $nha_cmd->registerSubCommand('agent', function (Message $message, array $args) use ($commands, $replyToMessage): void {
     $replyToMessage($message, $commands->agentInfo((int) ($args[0] ?? 0)));
@@ -306,8 +307,8 @@ foreach (['observe', 'say', 'act'] as $alias) {
 // handlers, registered lazily once the application/gateway are both ready.
 // -----------------------------------------------------------------------
 
-$registerSlashCommands = function (NHA $nha) use ($commands, $userCommands, $text, $replyToInteraction, $flattenOptions): void {
-    $nha->application->commands->freshen()->then(function (GlobalCommandRepository $existing) use ($nha, $commands, $userCommands, $text, $replyToInteraction, $flattenOptions): void {
+$registerSlashCommands = function (NHA $nha) use ($commands, $text, $replyToInteraction, $flattenOptions): void {
+    $nha->application->commands->freshen()->then(function (GlobalCommandRepository $existing) use ($nha, $commands, $text, $replyToInteraction, $flattenOptions): void {
         $opt = function (int $type, string $name, string $description, bool $required = false) use ($nha): Option {
             /** @var Option $option */
             $option = $nha->getFactory()->part(Option::class);
@@ -326,6 +327,15 @@ $registerSlashCommands = function (NHA $nha) use ($commands, $userCommands, $tex
         };
 
         $agentIdOpt = fn() => $opt(Option::INTEGER, 'agent_id', 'Agent id (defaults to your registered agent).');
+
+        // "Whose agent?" selector for the per-user commands: omit for your own,
+        // `bot` for the bot's default agent, or a numeric agent id.
+        $agentOpt = fn() => $opt(Option::STRING, 'agent', 'Whose agent: omit for yours, "bot", or an agent id.');
+
+        // Resolves the acting agent for a per-user interaction from its optional
+        // `agent` option, defaulting to the caller's own linked agent.
+        $actorFor = fn(Interaction $interaction, array $args): AgentContext
+            => $commands->actor((string) $interaction->user->id, $args['agent'] ?? null);
 
         $subCommands = [
             $sub('register', 'Register a new agent (becomes the default).', [
@@ -359,7 +369,7 @@ $registerSlashCommands = function (NHA $nha) use ($commands, $userCommands, $tex
             $sub('rules', 'Show the crafting rules codex.'),
             $sub('agent', 'Look up any agent\'s public info.', [$opt(Option::INTEGER, 'agent_id', 'Agent id to look up.', true)]),
             $sub('read', 'Read any world board.', [
-                $opt(Option::STRING, 'board', 'One of: ' . implode(', ', NHA\Commands::BOARDS), true),
+                $opt(Option::STRING, 'board', 'World board to read, e.g. world, market, map, contracts, arena (see /nha read).', true),
                 $opt(Option::STRING, 'arg', 'Board argument: agent id, body name, or resource.'),
                 $opt(Option::INTEGER, 'x', 'X (for the deposits board).'),
                 $opt(Option::INTEGER, 'y', 'Y (for the deposits board).'),
@@ -464,39 +474,39 @@ $registerSlashCommands = function (NHA $nha) use ($commands, $userCommands, $tex
 
         $createCommand('nha', 'Control your NHA (https://nha.recluse.lol) agent.', $subCommands);
 
-        $nha->listenCommand('start', function (Interaction $interaction) use ($userCommands, $nha, $text): PromiseInterface {
+        $nha->listenCommand('start', function (Interaction $interaction) use ($commands, $nha, $text): PromiseInterface {
             return $interaction->acknowledgeWithResponse(true)->then(
-                fn() => $userCommands->start((string) $interaction->user->id),
+                fn() => $commands->start((string) $interaction->user->id),
             )->then(
                 fn($builder) => $interaction->updateOriginalResponse($builder),
                 fn(\Throwable $e) => $interaction->updateOriginalResponse($nha::createBuilder()->addComponent($text("❌ {$e->getMessage()}"))),
             );
         });
 
-        $nha->listenCommand('login', function (Interaction $interaction) use ($userCommands, $nha, $text): PromiseInterface {
+        $nha->listenCommand('login', function (Interaction $interaction) use ($commands, $nha, $text): PromiseInterface {
             return $interaction->acknowledgeWithResponse(true)->then(
-                fn() => $userCommands->login((string) $interaction->user->id),
+                fn() => $commands->login((string) $interaction->user->id),
             )->then(
                 fn($builder) => $interaction->updateOriginalResponse($builder),
                 fn(\Throwable $e) => $interaction->updateOriginalResponse($nha::createBuilder()->addComponent($text("❌ {$e->getMessage()}"))),
             );
         });
 
-        $nha->listenCommand('observe', function (Interaction $interaction) use ($commands, $nha, $text, $flattenOptions): PromiseInterface {
+        $nha->listenCommand('observe', function (Interaction $interaction) use ($commands, $actorFor, $nha, $text, $flattenOptions): PromiseInterface {
             $args = $flattenOptions($interaction->data->options ?? []);
             return $interaction->acknowledgeWithResponse(true)->then(
-                fn() => $commands->observe((string) $interaction->user->id, $args['agent_id'] ?? null),
+                fn() => $commands->observe($actorFor($interaction, $args)),
             )->then(
                 fn($builder) => $interaction->updateOriginalResponse($builder),
                 fn(\Throwable $e) => $interaction->updateOriginalResponse($nha::createBuilder()->addComponent($text("❌ {$e->getMessage()}"))),
             );
         });
 
-        $nha->listenCommand('move', function (Interaction $interaction) use ($userCommands, $nha, $text, $flattenOptions): PromiseInterface {
+        $nha->listenCommand('move', function (Interaction $interaction) use ($commands, $actorFor, $nha, $text, $flattenOptions): PromiseInterface {
             $args = $flattenOptions($interaction->data->options ?? []);
 
             return $interaction->acknowledgeWithResponse(true)->then(
-                fn() => $userCommands->move((string) $interaction->user->id, (int) $args['dx'], (int) $args['dy']),
+                fn() => $commands->move($actorFor($interaction, $args), (int) $args['dx'], (int) $args['dy']),
             )->then(
                 fn($builder) => $interaction->updateOriginalResponse($builder),
                 fn(\Throwable $e) => $interaction->updateOriginalResponse($nha::createBuilder()->addComponent($text("❌ {$e->getMessage()}"))),
@@ -547,12 +557,12 @@ $registerSlashCommands = function (NHA $nha) use ($commands, $userCommands, $tex
         ];
 
         foreach ($playerActionCommands as $name => [$options, $toIntent]) {
-            $nha->listenCommand($name, function (Interaction $interaction) use ($userCommands, $nha, $text, $flattenOptions, $toIntent): PromiseInterface {
+            $nha->listenCommand($name, function (Interaction $interaction) use ($commands, $actorFor, $nha, $text, $flattenOptions, $toIntent): PromiseInterface {
                 $args = $flattenOptions($interaction->data->options ?? []);
                 [$verb, $intentArgs] = $toIntent($args);
 
                 return $interaction->acknowledgeWithResponse(true)->then(
-                    fn() => $userCommands->act((string) $interaction->user->id, $verb, $intentArgs),
+                    fn() => $commands->queueVerb($actorFor($interaction, $args), $verb, $intentArgs),
                 )->then(
                     fn($builder) => $interaction->updateOriginalResponse($builder),
                     fn(\Throwable $e) => $interaction->updateOriginalResponse($nha::createBuilder()->addComponent($text("❌ {$e->getMessage()}"))),
@@ -563,15 +573,17 @@ $registerSlashCommands = function (NHA $nha) use ($commands, $userCommands, $tex
         $userSlashCommands = [
             'start' => [[], 'Open your private NHA control panel.'],
             'login' => [[], 'Create or reopen your personal NHA agent.'],
-            'observe' => [[], 'Observe your personal NHA agent.'],
+            'observe' => [[$agentOpt()], 'Observe your (or, with `agent`, another) NHA agent.'],
             'move' => [[
                 $opt(Option::INTEGER, 'dx', 'Horizontal movement delta.', true),
                 $opt(Option::INTEGER, 'dy', 'Vertical movement delta.', true),
-            ], 'Queue movement for your personal NHA agent.'],
+                $agentOpt(),
+            ], 'Queue movement for your (or, with `agent`, another) NHA agent.'],
         ];
 
+        // Every player action also takes the `agent` selector; omitted = your own.
         foreach ($playerActionCommands as $name => [$options]) {
-            $userSlashCommands[$name] = [$options, "Queue {$name} for your personal NHA agent."];
+            $userSlashCommands[$name] = [[...$options, $agentOpt()], "Queue {$name} for your NHA agent (add `agent: bot` to run it as the bot)."];
         }
 
         foreach ($userSlashCommands as $name => [$options, $description]) {

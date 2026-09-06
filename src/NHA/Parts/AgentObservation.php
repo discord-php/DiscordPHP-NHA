@@ -175,9 +175,14 @@ class AgentObservation implements JsonSerializable
      * something to interact with (loot / artifact / elevator / asteroid / sky).
      * While downed, only chat is allowed, so the action rows are hidden.
      *
+     * `$token` is the acting agent's own NHA token. Pass it for a per-user
+     * agent (the `/start` / `/observe` flow) so the buttons submit intents with
+     * that token instead of the bot's ambient default-agent token; leave it
+     * null for the default agent, whose token is already configured on `$nha`.
+     *
      * Respects Discord's limits: ≤5 buttons per row, ≤5 rows per message.
      */
-    public function toContainer(NHA $nha): Container
+    public function toContainer(NHA $nha, ?string $token = null): Container
     {
         $position = $this->getPosition();
         $positionText = $position ? sprintf('`(%s, %s)`', $position['x'] ?? '?', $position['y'] ?? '?') : 'unknown';
@@ -222,32 +227,38 @@ class AgentObservation implements JsonSerializable
             }
         }
 
+        // Submit a verb for this agent. With a per-user token, go through
+        // intentWithToken(); otherwise fall back to the ambient-token wrapper.
+        $submit = ($token !== null && $token !== '')
+            ? fn(string $verb, array $args = []) => $nha->intentWithToken($this->agentId, $token, $verb, $args)
+            : fn(string $verb, array $args = []) => $nha->intent($this->agentId, $verb, $args);
+
         // After any quick-action, re-observe and refresh the message in place.
         $refresh = fn($interaction) => $nha->observe($this->agentId)->then(
-            fn(self $obs) => $interaction->updateMessage(NHA::createBuilder()->addComponent($obs->toContainer($nha))),
+            fn(self $obs) => $interaction->updateMessage(NHA::createBuilder()->addComponent($obs->toContainer($nha, $token))),
         );
         $act = fn(callable $verb) => fn($i) => $verb($i)->then(fn() => $refresh($i));
 
         $components = [TextDisplay::new(implode("\n", $lines)), Separator::new()];
 
         $components[] = ActionRow::new()->addComponents([
-            Button::secondary()->setLabel('⬆️')->setListener($act(fn($i) => $nha->move($this->agentId, 0, -1)), $nha),
-            Button::secondary()->setLabel('⬇️')->setListener($act(fn($i) => $nha->move($this->agentId, 0, 1)), $nha),
-            Button::secondary()->setLabel('⬅️')->setListener($act(fn($i) => $nha->move($this->agentId, -1, 0)), $nha),
-            Button::secondary()->setLabel('➡️')->setListener($act(fn($i) => $nha->move($this->agentId, 1, 0)), $nha),
+            Button::secondary()->setLabel('⬆️')->setListener($act(fn($i) => $submit('move', ['dx' => 0, 'dy' => -1])), $nha),
+            Button::secondary()->setLabel('⬇️')->setListener($act(fn($i) => $submit('move', ['dx' => 0, 'dy' => 1])), $nha),
+            Button::secondary()->setLabel('⬅️')->setListener($act(fn($i) => $submit('move', ['dx' => -1, 'dy' => 0])), $nha),
+            Button::secondary()->setLabel('➡️')->setListener($act(fn($i) => $submit('move', ['dx' => 1, 'dy' => 0])), $nha),
             Button::primary()->setLabel('🔄 Refresh')->setListener(fn($i) => $refresh($i), $nha),
         ]);
 
         if (! $this->isDowned()) {
             $components[] = ActionRow::new()->addComponents([
-                Button::secondary()->setLabel('⛏️ Mine')->setListener($act(fn($i) => $nha->mine($this->agentId)), $nha),
-                Button::secondary()->setLabel('🪓 Chop')->setListener($act(fn($i) => $nha->chop($this->agentId)), $nha),
-                Button::secondary()->setLabel('🌿 Gather')->setListener($act(fn($i) => $nha->gather($this->agentId)), $nha),
-                Button::secondary()->setLabel('🌱 Plant')->setListener($act(fn($i) => $nha->plantTree($this->agentId)), $nha),
-                Button::success()->setLabel('❤️ Heal')->setListener($act(fn($i) => $nha->heal($this->agentId)), $nha),
+                Button::secondary()->setLabel('⛏️ Mine')->setListener($act(fn($i) => $submit('mine', ['n' => 1])), $nha),
+                Button::secondary()->setLabel('🪓 Chop')->setListener($act(fn($i) => $submit('chop', ['n' => 1])), $nha),
+                Button::secondary()->setLabel('🌿 Gather')->setListener($act(fn($i) => $submit('gather', ['n' => 1])), $nha),
+                Button::secondary()->setLabel('🌱 Plant')->setListener($act(fn($i) => $submit('plant')), $nha),
+                Button::success()->setLabel('❤️ Heal')->setListener($act(fn($i) => $submit('heal')), $nha),
             ]);
 
-            if ($contextRow = $this->contextRow($nha, $act)) {
+            if ($contextRow = $this->contextRow($nha, $act, $submit)) {
                 $components[] = $contextRow;
             }
         }
@@ -279,30 +290,31 @@ class AgentObservation implements JsonSerializable
      * The third button row — only built when the world offers something to
      * interact with right here.
      *
-     * @param callable(callable): callable $act
+     * @param callable(callable): callable    $act    Wraps a listener so it refreshes the message after acting.
+     * @param callable(string, array=): mixed $submit Submits a verb for this agent (token-aware).
      */
-    private function contextRow(NHA $nha, callable $act): ?ActionRow
+    private function contextRow(NHA $nha, callable $act, callable $submit): ?ActionRow
     {
         $buttons = [];
 
         if ($this->count('artifacts')) {
-            $buttons[] = Button::secondary()->setLabel('✨ Attune')->setListener($act(fn($i) => $nha->attune($this->agentId)), $nha);
+            $buttons[] = Button::secondary()->setLabel('✨ Attune')->setListener($act(fn($i) => $submit('attune')), $nha);
         }
         if ($this->count('elevators')) {
-            $buttons[] = Button::secondary()->setLabel('🛗 Ride')->setListener($act(fn($i) => $nha->ride($this->agentId)), $nha);
+            $buttons[] = Button::secondary()->setLabel('🛗 Ride')->setListener($act(fn($i) => $submit('ride')), $nha);
         }
         if ($this->count('asteroids')) {
-            $buttons[] = Button::secondary()->setLabel('🔗 Dock')->setListener($act(fn($i) => $nha->dock($this->agentId)), $nha);
+            $buttons[] = Button::secondary()->setLabel('🔗 Dock')->setListener($act(fn($i) => $submit('dock')), $nha);
         }
         if ($this->get('in_space') || (int) ($this->get('altitude') ?? 0) > 0) {
-            $buttons[] = Button::secondary()->setLabel('🛬 Land')->setListener($act(fn($i) => $nha->land($this->agentId)), $nha);
+            $buttons[] = Button::secondary()->setLabel('🛬 Land')->setListener($act(fn($i) => $submit('land')), $nha);
         } elseif ($this->count('vehicles')) {
-            $buttons[] = Button::secondary()->setLabel('🛫 Launch')->setListener($act(fn($i) => $nha->launch($this->agentId)), $nha);
+            $buttons[] = Button::secondary()->setLabel('🛫 Launch')->setListener($act(fn($i) => $submit('launch')), $nha);
         }
         if ($loot = (array) ($this->get('loot') ?? [])) {
             $first = is_array($loot[0] ?? null) ? ($loot[0]['id'] ?? null) : ($loot[0] ?? null);
             if ($first !== null) {
-                $buttons[] = Button::secondary()->setLabel('📦 Collect')->setListener($act(fn($i) => $nha->collect($this->agentId, $first)), $nha);
+                $buttons[] = Button::secondary()->setLabel('📦 Collect')->setListener($act(fn($i) => $submit('collect', ['loot' => $first])), $nha);
             }
         }
 

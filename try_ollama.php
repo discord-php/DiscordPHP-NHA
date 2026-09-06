@@ -18,7 +18,8 @@ declare(strict_types=1);
  *   php try_ollama.php <agent_id>      # + run a real observe -> brain.decide()
  *
  * Reads OLLAMA_URL / OLLAMA_MODEL / OLLAMA_NUM_CTX / OLLAMA_TIMEOUT from .env
- * (or the environment). Does NOT submit any intent.
+ * (or the environment). OLLAMA_URL may be a bare origin (native /api/chat) or end
+ * in /v1 for the OpenAI-compatible endpoint. Does NOT submit any intent.
  */
 
 use NHA\Brain\AgentBrain;
@@ -45,15 +46,20 @@ if (is_file($envPath)) {
     }
 }
 
-$url = getenv('OLLAMA_URL') ?: exit("Set OLLAMA_URL in .env (e.g. http://gemma-host:11434)\n");
+$url = getenv('OLLAMA_URL') ?: exit("Set OLLAMA_URL in .env (e.g. http://gemma-host:11434 or http://gemma-host:11434/v1)\n");
 $model = getenv('OLLAMA_MODEL') ?: 'gemma3:27b';
 $numCtx = (int) (getenv('OLLAMA_NUM_CTX') ?: 32768);
 $timeout = (float) (getenv('OLLAMA_TIMEOUT') ?: 120);
+$think = match (getenv('OLLAMA_THINK')) {
+    '1', 'true' => true,
+    '0', 'false' => false,
+    default => null,
+};
 
-echo "→ {$url}  model={$model}  num_ctx={$numCtx}  timeout={$timeout}s\n\n";
+echo "→ {$url}  model={$model}  num_ctx={$numCtx}  timeout={$timeout}s  think=" . var_export($think, true) . "\n\n";
 
 $loop = Loop::get();
-$ollama = new OllamaClient($url, $model, null, $timeout, $numCtx, $loop);
+$ollama = new OllamaClient($url, $model, null, $timeout, $numCtx, $loop, $think);
 
 $t0 = microtime(true);
 try {
