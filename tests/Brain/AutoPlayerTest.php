@@ -35,7 +35,9 @@ class AutoPlayerTest extends NHAUnitTestCase
             ->onlyMethods(['get', 'post'])->getMock();
         $http->method('get')->willReturnCallback(fn($e) => resolve($observePayload));
         $http->method('post')->willReturnCallback(function ($e, $c = null) use ($intentReply) {
-            $this->posts[] = [(string) $e, $c];
+            // Normalise through the wire encoding: `args` is cast to an object
+            // (so an empty set serialises as `{}`), decode it back for asserts.
+            $this->posts[] = [(string) $e, json_decode(json_encode($c), true)];
 
             return resolve($intentReply);
         });

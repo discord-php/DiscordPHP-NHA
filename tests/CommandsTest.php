@@ -18,6 +18,9 @@ class CommandsTest extends NHAUnitTestCase
 
     private StateStore $state;
 
+    /** The last raw (pre-encode) POST body, for asserting on JSON shape. */
+    private mixed $lastPostBody = null;
+
     protected function setUp(): void
     {
         $this->statePath = sys_get_temp_dir() . '/nha-cmd-' . uniqid() . '/state.json';
@@ -40,7 +43,10 @@ class CommandsTest extends NHAUnitTestCase
             return resolve($getResponse);
         });
         $http->method('post')->willReturnCallback(function ($e, $c = null) use ($intentReply) {
-            $this->calls[] = ['post', (string) $e, $c];
+            $this->lastPostBody = $c;
+            // Normalise through the wire encoding so assertions see arrays, not
+            // the stdClass we cast `args` to (so `{}` is sent instead of `[]`).
+            $this->calls[] = ['post', (string) $e, json_decode(json_encode($c), true)];
 
             return resolve($intentReply);
         });
@@ -154,6 +160,16 @@ class CommandsTest extends NHAUnitTestCase
     {
         $this->assertSame(999, $this->commands()->resolveAgentId(null));
         $this->assertSame(7, $this->commands()->resolveAgentId(7));
+    }
+
+    public function testNoArgVerbEncodesArgsAsAnEmptyObjectNotArray(): void
+    {
+        $commands = $this->commands();
+        $commands->plant(null);
+
+        // The NHA API rejects `"args": []` with a 422 (it wants a dict).
+        $this->assertStringContainsString('"args":{}', json_encode($this->lastPostBody));
+        $this->assertStringNotContainsString('"args":[]', json_encode($this->lastPostBody));
     }
 
     public function testActorDefaultsToInvokingUsersLinkedAgent(): void

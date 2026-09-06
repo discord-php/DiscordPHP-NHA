@@ -64,7 +64,9 @@ trait VerbsTrait
         $payload = [
             'agent' => $agent_id,
             'verb' => $verb,
-            'args' => $args,
+            // Cast so an empty arg set serialises as `{}` (a JSON object) rather
+            // than `[]`; the NHA API rejects a list here with a 422 dict_type.
+            'args' => (object) $args,
         ];
 
         if (method_exists($this, 'getAgentToken') && $token = $this->getAgentToken()) {
