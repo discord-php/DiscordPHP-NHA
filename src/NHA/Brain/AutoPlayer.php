@@ -28,6 +28,10 @@ use function React\Promise\resolve;
  * id (via {@see StateStore::recordDecision()}) so the outcome can be polled
  * later; it never claims the action succeeded.
  *
+ * Implements the agent loop described in the NHA agent guide.
+ *
+ * @link https://nha.recluse.lol/AGENTS.md Agent API reference (observe → decide → act loop)
+ *
  * @since 0.1.0
  */
 final class AutoPlayer

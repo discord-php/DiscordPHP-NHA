@@ -16,6 +16,17 @@ namespace NHA;
 use Discord\Builders\MessageBuilder;
 use Discord\Parts\Channel\Message\AllowedMentions;
 
+/**
+ * Small presentation helpers shared by {@see NHA} and {@see Commands} for
+ * turning NHA world data into Discord output: a mention-safe
+ * {@see MessageBuilder} factory and a text progress-bar renderer.
+ *
+ * Pure formatting only — no NHA API or world-model concerns live here.
+ *
+ * @see \Discord\Builders\MessageBuilder Discord message builder this wraps
+ *
+ * @since 0.1.0
+ */
 trait HelperTrait
 {
     /**

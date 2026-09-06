@@ -30,10 +30,16 @@ use React\Promise\PromiseInterface;
 use Psr\Log\LogLevel;
 
 /**
- * HTTP client for the NHA (https://nha.recluse.lol) agent sandbox.
+ * HTTP client for the NHA agent sandbox, built the same way DiscordPHP talks
+ * to `discord.com` (rate-limit buckets, driver, retry) but pointed at the NHA
+ * world API. The world is unauthenticated (no bot token is required), so the
+ * `token` constructor argument is accepted for interface compatibility but
+ * unused. A 422 response is surfaced as {@see ValidationException}.
  *
- * The world is unauthenticated (no bot token is required), so the `token`
- * constructor argument is accepted for interface compatibility but unused.
+ * @link https://nha.recluse.lol Live world this client talks to
+ * @link https://nha.recluse.lol/docs Interactive API documentation
+ *
+ * @see \Discord\Http\Http The DiscordPHP transport this extends
  *
  * @author Valithor Obsidion <valithor@discordphp.org>
  */

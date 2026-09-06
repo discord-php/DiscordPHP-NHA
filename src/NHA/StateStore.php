@@ -17,9 +17,15 @@ use NHA\Parts\AgentObservation;
 
 /**
  * Tiny JSON-file backed store for data that must survive a bot restart: the
- * default agent id + token, the per-Discord-user identity map, and each agent's
- * last-known world position. Volatile per-tick world state (market, scene, feed,
- * …) is deliberately NOT stored here — it is re-fetched live every time.
+ * default agent id + token, the per-Discord-user identity map, each agent's
+ * last-known world position, the autoplay flag, the brain's last decision and
+ * the registered slash-command signatures. Volatile per-tick world state
+ * (market, scene, feed, …) is deliberately NOT stored here — it is re-fetched
+ * live every time. Writes are atomic (temp file + rename).
+ *
+ * No NHA API schema backs this; it is local bot state only. Attached to the
+ * client via {@see NHA::setStateStore()} so {@see NHA::observe()} can snapshot
+ * position for every caller.
  *
  * @since 0.1.0
  */

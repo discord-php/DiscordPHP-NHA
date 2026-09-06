@@ -30,7 +30,14 @@ use function React\Promise\reject;
 use function React\Promise\resolve;
 
 /**
- * Provides common functionality for all repositories.
+ * Shared implementation for every NHA read-only repository: it is DiscordPHP's
+ * `AbstractRepositoryTrait` ported so the collection is keyed and cached the
+ * same way, but backed by {@see \NHA\Http\Http} and NHA {@see \NHA\Http\Endpoint}s
+ * instead of the Discord API. Concrete repositories (see
+ * {@see AbstractRepository}) declare their endpoint map and Part class.
+ *
+ * @see \Discord\Repository\AbstractRepositoryTrait The upstream this is ported from
+ * @see \NHA\Repository\AbstractRepository The base class that consumes this trait
  *
  * @property NHA|Discord  $discord   The Discord client instance.
  * @property string       $discrim   The collection discriminator.
