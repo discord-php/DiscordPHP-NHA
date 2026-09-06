@@ -492,6 +492,16 @@ $registerSlashCommands = function (NHA $nha) use ($commands, $text, $replyToInte
             );
         });
 
+        $nha->listenCommand('help', function (Interaction $interaction) use ($commands, $nha, $text, $flattenOptions): PromiseInterface {
+            $args = $flattenOptions($interaction->data->options ?? []);
+            return $interaction->acknowledgeWithResponse(true)->then(
+                fn() => $commands->help($args['category'] ?? null),
+            )->then(
+                fn($builder) => $interaction->updateOriginalResponse($builder),
+                fn(\Throwable $e) => $interaction->updateOriginalResponse($nha::createBuilder()->addComponent($text("❌ {$e->getMessage()}"))),
+            );
+        });
+
         $nha->listenCommand('observe', function (Interaction $interaction) use ($commands, $actorFor, $nha, $text, $flattenOptions): PromiseInterface {
             $args = $flattenOptions($interaction->data->options ?? []);
             return $interaction->acknowledgeWithResponse(true)->then(
@@ -571,6 +581,9 @@ $registerSlashCommands = function (NHA $nha) use ($commands, $text, $replyToInte
         }
 
         $userSlashCommands = [
+            'help' => [[
+                $opt(Option::STRING, 'category', 'Topic (omit for the general guide): move, gather, craft, economy, combat, space, commands, …'),
+            ], 'How to play NHA — a categorised guide.'],
             'start' => [[], 'Open your private NHA control panel.'],
             'login' => [[], 'Create or reopen your personal NHA agent.'],
             'observe' => [[$agentOpt()], 'Observe your (or, with `agent`, another) NHA agent.'],

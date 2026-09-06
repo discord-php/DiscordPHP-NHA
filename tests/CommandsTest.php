@@ -162,6 +162,48 @@ class CommandsTest extends NHAUnitTestCase
         $this->assertSame(7, $this->commands()->resolveAgentId(7));
     }
 
+    public function testHelpDefaultsToTheGeneralGuideWithATopicMenu(): void
+    {
+        $out = self::render($this->commands()->help(null));
+
+        $this->assertStringContainsString('How to play', $out);
+        $this->assertStringContainsString('The loop', $out);
+        // The topic select menu is attached (component type 3 = string select).
+        $this->assertStringContainsString('"type":3', $out);
+        $this->assertStringContainsString('Command reference', $out, 'every category is offered in the menu');
+    }
+
+    public function testHelpRendersARequestedCategory(): void
+    {
+        $out = self::render($this->commands()->help('space'));
+
+        $this->assertStringContainsString('Expansion era', $out);
+        $this->assertStringContainsString('ion_thruster', $out);
+        $this->assertStringNotContainsString('The loop', $out, 'it should not fall back to the general guide');
+    }
+
+    public function testResolveHelpKeyFuzzyMatchesAndFallsBackToGeneral(): void
+    {
+        $commands = $this->commands();
+
+        $this->assertSame('general', $commands->resolveHelpKey(null));
+        $this->assertSame('general', $commands->resolveHelpKey('   '));
+        $this->assertSame('combat', $commands->resolveHelpKey('combat'));
+        $this->assertSame('economy', $commands->resolveHelpKey('econ'));
+        $this->assertSame('gather', $commands->resolveHelpKey('Harvesting'));
+        $this->assertSame('general', $commands->resolveHelpKey('nonsense'));
+    }
+
+    public function testEveryHelpCategoryRenders(): void
+    {
+        $commands = $this->commands();
+
+        foreach (Commands::HELP as $slug => [, $title]) {
+            $out = self::render($commands->help($slug));
+            $this->assertStringContainsString($title, $out, "help('{$slug}') should render its own section");
+        }
+    }
+
     public function testNoArgVerbEncodesArgsAsAnEmptyObjectNotArray(): void
     {
         $commands = $this->commands();
