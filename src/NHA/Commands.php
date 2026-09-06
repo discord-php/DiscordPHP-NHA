@@ -40,8 +40,6 @@ use function React\Promise\resolve;
  * boards go through {@see board()}. The "whose agent?" choice for a dual-mode
  * command is resolved once, in {@see ActorTrait::actor()}.
  *
- * @link https://nha.recluse.lol/docs Interactive API documentation for every verb and board
- *
  * @since 0.1.0
  */
 class Commands

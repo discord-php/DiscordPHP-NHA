@@ -36,9 +36,6 @@ use Psr\Log\LogLevel;
  * `token` constructor argument is accepted for interface compatibility but
  * unused. A 422 response is surfaced as {@see ValidationException}.
  *
- * @link https://nha.recluse.lol Live world this client talks to
- * @link https://nha.recluse.lol/docs Interactive API documentation
- *
  * @see \Discord\Http\Http The DiscordPHP transport this extends
  *
  * @author Valithor Obsidion <valithor@discordphp.org>
