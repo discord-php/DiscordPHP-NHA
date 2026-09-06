@@ -25,12 +25,15 @@ namespace NHA\Parts;
  * @link https://nha.recluse.lol/docs#/agent/intent_status_intent__intent_id__get Endpoint reference
  * @link https://nha.recluse.lol/openapi.json #/components/schemas/IntentStatusOut
  *
- * @property int         $id      Queued intent id.
- * @property int         $agent   Agent the intent belongs to.
- * @property string      $verb    The submitted verb.
- * @property string      $status  `pending` | `applied` | `rejected`.
- * @property string|null $result  Human-readable outcome, or null while pending.
- * @property int|null    $created Tick the intent was created on.
+ * @property int         $id     Queued intent id.
+ * @property int         $agent  Agent the intent belongs to.
+ * @property string      $verb   The submitted verb.
+ * @property string      $status `pending` | `applied` | `rejected`.
+ * @property string|null $result Human-readable outcome, or null while pending.
+ *
+ * Note: the API field `created` (the tick the intent was queued on) collides
+ * with DiscordPHP's `Part::$created` bool — read it via `$part['created']` or
+ * `$part->getRawAttributes()['created']`, not `$part->created`.
  *
  * @since 0.1.0
  */

@@ -83,10 +83,24 @@ trait VerbsTrait
         return $this->intent($agent_id, 'move', ['dx' => $dx, 'dy' => $dy]);
     }
 
-    /** Mines the deposit under the agent, up to `n` units. @link https://nha.recluse.lol/docs#/agent/submit_intent_intent_post */
-    public function mine(int $agent_id, int $n = 1): PromiseInterface
+    /** Walks toward absolute cell `(x, y)` (the `move{x,y}` form). @link https://nha.recluse.lol/docs#/agent/submit_intent_intent_post */
+    public function moveTo(int $agent_id, int $x, int $y): PromiseInterface
     {
-        return $this->intent($agent_id, 'mine', ['n' => $n]);
+        return $this->intent($agent_id, 'move', ['x' => $x, 'y' => $y]);
+    }
+
+    /**
+     * Mines the nearest mineral within 8 cells, up to `n` units, optionally
+     * restricted to one `resource`.
+     *
+     * @link https://nha.recluse.lol/docs#/agent/submit_intent_intent_post
+     */
+    public function mine(int $agent_id, int $n = 1, ?string $resource = null): PromiseInterface
+    {
+        return $this->intent($agent_id, 'mine', array_filter([
+            'n' => $n,
+            'resource' => $resource,
+        ], fn($v) => null !== $v));
     }
 
     /** Chops the tree/plant under the agent, up to `n` units. @link https://nha.recluse.lol/docs#/agent/submit_intent_intent_post */
@@ -110,34 +124,61 @@ trait VerbsTrait
     // --- Craft & build ----------------------------------------------------------
     // @link https://nha.recluse.lol/AGENTS.md verbs: combine, build, finalize, deploy, construct
 
-    /** Combines `ingredients` into a (possibly novel) item `name`. @link https://nha.recluse.lol/rules */
-    public function combine(int $agent_id, array $ingredients, string $name): PromiseInterface
-    {
-        return $this->intent($agent_id, 'combine', ['ingredients' => $ingredients, 'name' => $name]);
-    }
-
-    /** Builds vehicle `part` from the `with` materials. @link https://nha.recluse.lol/docs#/agent/submit_intent_intent_post */
-    public function build(int $agent_id, string $part, array $with): PromiseInterface
-    {
-        return $this->intent($agent_id, 'build', ['part' => $part, 'with' => $with]);
-    }
-
-    /** Finalises a fully-built vehicle called `name`. @link https://nha.recluse.lol/docs#/agent/submit_intent_intent_post */
-    public function finalize(int $agent_id, string $name): PromiseInterface
-    {
-        return $this->intent($agent_id, 'finalize', ['name' => $name]);
-    }
-
     /**
-     * Constructs a structure (`construct`). Also the Expansion-era verb for
-     * colony / terraforming contributions — shape-specific gates live in the
-     * live rules.
+     * Combines `ingredients` (a `{resource: qty}` map) by their physics tags:
+     * a known recipe crafts up to `n` copies, an unknown mixture is escrowed to
+     * the Inventors' Guild. `name` is an optional label for a novel item.
      *
      * @link https://nha.recluse.lol/rules
      */
-    public function construct(int $agent_id, string $shape, mixed $size, mixed $height, mixed $color): PromiseInterface
+    public function combine(int $agent_id, array $ingredients, ?string $name = null, ?int $n = null): PromiseInterface
     {
-        return $this->intent($agent_id, 'construct', ['shape' => $shape, 'size' => $size, 'height' => $height, 'color' => $color]);
+        return $this->intent($agent_id, 'combine', array_filter([
+            'ingredients' => $ingredients,
+            'name' => $name,
+            'n' => $n,
+        ], fn($v) => null !== $v));
+    }
+
+    /** Builds one vehicle `part`, optionally with up to 3 `with` upgrade items. @link https://nha.recluse.lol/docs#/agent/submit_intent_intent_post */
+    public function build(int $agent_id, string $part, array $with = []): PromiseInterface
+    {
+        return $this->intent($agent_id, 'build', array_filter([
+            'part' => $part,
+            'with' => $with ?: null,
+        ], fn($v) => null !== $v));
+    }
+
+    /** Assembles all loose parts into one finished vehicle (optionally named `name`). @link https://nha.recluse.lol/docs#/agent/submit_intent_intent_post */
+    public function finalize(int $agent_id, ?string $name = null): PromiseInterface
+    {
+        return $this->intent($agent_id, 'finalize', null === $name ? [] : ['name' => $name]);
+    }
+
+    /**
+     * Places a structure. `$shape` is one of the `construct` shape allowlist
+     * (`box`/`cylinder`/`sphere`/`cone`/`pyramid`/`elevator`/`station`/
+     * `ziggurat`/`monument`/`road`/`city`/`colony`/`terraform`/`extractor`);
+     * `$args` carries the shape-specific keys (`size`/`height`/`color`,
+     * `module`, `kind`, `body`, `stage`, `w`/`h`, …). Gates live in the rules.
+     *
+     * @link https://nha.recluse.lol/rules
+     *
+     * @param array<string, mixed> $args
+     */
+    public function construct(int $agent_id, string $shape, array $args = []): PromiseInterface
+    {
+        return $this->intent($agent_id, 'construct', ['shape' => $shape] + $args);
+    }
+
+    /** Bankrolls a Station `module` with `credits` (space era; a pure credit sink). @link https://nha.recluse.lol/docs#/world/station_ep_station_get */
+    public function invest(int $agent_id, string $module, int $credits, ?string $resource = null): PromiseInterface
+    {
+        return $this->intent($agent_id, 'invest', array_filter([
+            'module' => $module,
+            'credits' => $credits,
+            'resource' => $resource,
+        ], fn($v) => null !== $v));
     }
 
     /** Mounts the vehicle at the agent's tile. @link https://nha.recluse.lol/docs#/agent/submit_intent_intent_post */
@@ -183,18 +224,18 @@ trait VerbsTrait
     // @link https://nha.recluse.lol/AGENTS.md verbs: depart, land_body, distress
 
     /**
-     * Departs Earth orbit for another solar-system body during an open transfer
-     * window (verb `depart`). The ship must have the delta-v, heat/acid
-     * protection and landing gear the destination requires — check the latest
-     * observation first. Argument shape follows the live rules.
+     * Commits a ship to an interplanetary transfer (verb `depart`, arg `dest`).
+     * Needs a flying ship with an `ion_thruster` + fuel, launched from Earth
+     * orbit while the destination's window is open; Mars/Venus also need a
+     * `heat_shield` in hold (+`acid_skin` for Venus). Pass `'earth'` to return.
      *
      * @link https://nha.recluse.lol/rules
      *
-     * @param string $body Destination body, e.g. phobos/deimos/mars/venus.
+     * @param string $dest One of `deimos`/`phobos`/`mars`/`venus`, or `earth` to come home.
      */
-    public function depart(int $agent_id, string $body): PromiseInterface
+    public function depart(int $agent_id, string $dest): PromiseInterface
     {
-        return $this->intent($agent_id, 'depart', ['body' => $body]);
+        return $this->intent($agent_id, 'depart', ['dest' => $dest]);
     }
 
     /** Lands on the body the agent has travelled to (verb `land_body`). @link https://nha.recluse.lol/rules */
@@ -302,19 +343,36 @@ trait VerbsTrait
 
     // --- Heal ----------------------------------------------------------------------
 
-    /** Heals self, or `target` when given (alliance-gated). @link https://nha.recluse.lol/docs#/agent/submit_intent_intent_post */
-    public function heal(int $agent_id, ?int $target = null): PromiseInterface
+    /**
+     * Applies a medicine to self, or to ally `target` within 6 cells (a
+     * `medkit` revives a downed ally). `item` picks a specific medicine
+     * (`salve`/`stimpack`/`medkit`/`antidote`); omit to let the engine choose.
+     *
+     * @link https://nha.recluse.lol/docs#/agent/submit_intent_intent_post
+     */
+    public function heal(int $agent_id, ?int $target = null, ?string $item = null): PromiseInterface
     {
-        return $this->intent($agent_id, 'heal', null === $target ? [] : ['target' => $target]);
+        return $this->intent($agent_id, 'heal', array_filter([
+            'target' => $target,
+            'item' => $item,
+        ], fn($v) => null !== $v));
     }
 
     // --- Combat ------------------------------------------------------------------
     // @link https://nha.recluse.lol/AGENTS.md verbs: attack, arm, detonate, steal, collect
 
-    /** Attacks `target` with `weapon`. @link https://nha.recluse.lol/docs#/agent/submit_intent_intent_post */
-    public function attack(int $agent_id, string $weapon, int $target): PromiseInterface
+    /**
+     * Fires a ranged weapon at `target`. `weapon` is optional — the engine
+     * picks a held weapon when it is omitted.
+     *
+     * @link https://nha.recluse.lol/docs#/agent/submit_intent_intent_post
+     */
+    public function attack(int $agent_id, int $target, ?string $weapon = null): PromiseInterface
     {
-        return $this->intent($agent_id, 'attack', ['weapon' => $weapon, 'target' => $target]);
+        return $this->intent($agent_id, 'attack', array_filter([
+            'target' => $target,
+            'weapon' => $weapon,
+        ], fn($v) => null !== $v));
     }
 
     /** Arms a carried bomb. @link https://nha.recluse.lol/docs#/agent/submit_intent_intent_post */
@@ -329,10 +387,16 @@ trait VerbsTrait
         return $this->intent($agent_id, 'detonate', ['bomb' => $bomb]);
     }
 
-    /** Steals `n` of `resource` from agent `from`. @link https://nha.recluse.lol/docs#/agent/submit_intent_intent_post */
-    public function steal(int $agent_id, int $from, string $resource, int $n): PromiseInterface
+    /** Steals `n` of `resource` from adjacent agent `from` (credits can't be stolen). @link https://nha.recluse.lol/docs#/agent/submit_intent_intent_post */
+    public function steal(int $agent_id, int $from, string $resource, int $n = 1): PromiseInterface
     {
         return $this->intent($agent_id, 'steal', ['from' => $from, 'resource' => $resource, 'n' => $n]);
+    }
+
+    /** Steals a loose `part` off adjacent agent `from` (the `steal{from,part}` form). @link https://nha.recluse.lol/docs#/agent/submit_intent_intent_post */
+    public function stealPart(int $agent_id, int $from, string $part): PromiseInterface
+    {
+        return $this->intent($agent_id, 'steal', ['from' => $from, 'part' => $part]);
     }
 
     /** Collects a dropped `loot` pile. @link https://nha.recluse.lol/docs#/agent/submit_intent_intent_post */

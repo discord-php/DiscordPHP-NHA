@@ -92,7 +92,29 @@ $state = new StateStore(__DIR__ . '/var/state.json');
 if ($token = $state->getDefaultAgentToken()) {
     $nha->setAgentToken($token);
 }
-$commands = new Commands($nha, $state);
+
+// Optional LLM brain: only wired when OLLAMA_URL points at a running `ollama serve`.
+$autoPlayer = null;
+if ($ollama_url = getenv('OLLAMA_URL')) {
+    $ollama_think = match (getenv('OLLAMA_THINK')) {
+        '1', 'true' => true,
+        '0', 'false' => false,
+        default => null,
+    };
+    $ollama = new Brain\OllamaClient(
+        $ollama_url,
+        getenv('OLLAMA_MODEL') ?: 'gemma3:27b',
+        null,
+        (float) (getenv('OLLAMA_TIMEOUT') ?: 120),
+        (int) (getenv('OLLAMA_NUM_CTX') ?: 32768),
+        $nha->getLoop(),
+        $ollama_think,
+    );
+    $autoPlayer = new Brain\AutoPlayer($nha, new Brain\AgentBrain($ollama), $state);
+    $logger->info("LLM brain enabled: {$ollama_url} (" . (getenv('OLLAMA_MODEL') ?: 'gemma3:27b') . ')');
+}
+
+$commands = new Commands($nha, $state, $autoPlayer);
 $userCommands = new UserCommands($nha, $state);
 
 /**
@@ -146,7 +168,8 @@ $nha_cmd = $nha->registerCommand('nha', function (Message $message, array $args)
     ])));
 }, [
     'description' => 'Control your NHA (https://nha.recluse.lol) agent.',
-    'usage' => '<register|observe|act|move|mine|chop|gather|say|tell|world|market|roster|rules|agent> [args...]',
+    'usage' => "<register|observe|act|move|mine|chop|gather|say|tell|read <board>|intent <id>|"
+        . 'sell|buy|heal|attack|deploy|finalize|depart|…> [args…] — `!nha help` lists every sub-command',
 ]);
 
 $nha_cmd->registerSubCommand('register', function (Message $message, array $args) use ($commands, $replyToMessage): void {
@@ -192,15 +215,84 @@ $nha_cmd->registerSubCommand('tell', function (Message $message, array $args) us
     $replyToMessage($message, $commands->tell(null, $to, implode(' ', $args)));
 }, ['description' => 'Privately tell another agent something.', 'usage' => '<to> <text>']);
 
-foreach (['world', 'map', 'market', 'roster', 'rules', 'contracts'] as $readOnly) {
+foreach (['world', 'map', 'market', 'roster', 'rules', 'contracts', 'depot'] as $readOnly) {
     $nha_cmd->registerSubCommand($readOnly, function (Message $message) use ($commands, $replyToMessage, $readOnly): void {
         $replyToMessage($message, $commands->{$readOnly}());
     }, ['description' => "Show the current {$readOnly}."]);
 }
 
+$nha_cmd->registerSubCommand('read', function (Message $message, array $args) use ($commands, $replyToMessage): void {
+    $board = array_shift($args) ?? '';
+    $rest = $args;
+    $replyToMessage($message, $commands->board($board, [
+        'id' => $rest[0] ?? null, 'body' => $rest[0] ?? null, 'resource' => $rest[0] ?? null,
+        'x' => $rest[0] ?? null, 'y' => $rest[1] ?? null, 'limit' => $rest[2] ?? null,
+    ]));
+}, ['description' => 'Read any board: ' . implode(', ', NHA\Commands::BOARDS) . '.', 'usage' => '<board> [arg|x] [y] [limit]']);
+
 $nha_cmd->registerSubCommand('agent', function (Message $message, array $args) use ($commands, $replyToMessage): void {
     $replyToMessage($message, $commands->agentInfo((int) ($args[0] ?? 0)));
 }, ['description' => 'Look up any agent\'s public info.', 'usage' => '<agent_id>']);
+
+$nha_cmd->registerSubCommand('intent', function (Message $message, array $args) use ($commands, $replyToMessage): void {
+    $id = $args[0] ?? null;
+    $replyToMessage($message, $id !== null
+        ? $commands->intentStatus($id)
+        : \React\Promise\reject(new \InvalidArgumentException('Usage: `!nha intent <queued_intent_id>`')));
+}, ['description' => 'Check whether a queued intent applied or was rejected.', 'usage' => '<queued_intent_id>']);
+
+// Table-driven prefix subcommands for every remaining action verb. Each entry
+// maps positional chat args → the Commands:: call. `?` args default to null.
+$verbSubCommands = [
+    'moveto' => [['<x>', '<y>'], fn($a) => $commands->moveTo(null, (int) ($a[0] ?? 0), (int) ($a[1] ?? 0))],
+    'plant' => [[], fn($a) => $commands->plant(null)],
+    'ride' => [[], fn($a) => $commands->ride(null)],
+    'launch' => [[], fn($a) => $commands->launch(null)],
+    'land' => [[], fn($a) => $commands->land(null)],
+    'land_moon' => [[], fn($a) => $commands->landMoon(null)],
+    'land_body' => [[], fn($a) => $commands->landBody(null)],
+    'distress' => [[], fn($a) => $commands->distress(null)],
+    'dock' => [[], fn($a) => $commands->dock(null)],
+    'attune' => [[], fn($a) => $commands->attune(null)],
+    'deploy' => [[], fn($a) => $commands->deploy(null)],
+    'arm' => [[], fn($a) => $commands->arm(null)],
+    'finalize' => [['[name]'], fn($a) => $commands->finalize(null, $a[0] ?? null)],
+    'depart' => [['<dest>'], fn($a) => $commands->depart(null, (string) ($a[0] ?? ''))],
+    'sell' => [['<resource>', '[n]'], fn($a) => $commands->sell(null, (string) ($a[0] ?? ''), isset($a[1]) ? (int) $a[1] : null)],
+    'buy' => [['<resource>', '[n]'], fn($a) => $commands->buy(null, (string) ($a[0] ?? ''), isset($a[1]) ? (int) $a[1] : null)],
+    'deposit' => [['<resource>', '[n]'], fn($a) => $commands->deposit(null, (string) ($a[0] ?? ''), isset($a[1]) ? (int) $a[1] : null)],
+    'heal' => [['[target]', '[item]'], fn($a) => $commands->heal(null, isset($a[0]) ? (int) $a[0] : null, $a[1] ?? null)],
+    'attack' => [['<target>', '[weapon]'], fn($a) => $commands->attack(null, (int) ($a[0] ?? 0), $a[1] ?? null)],
+    'detonate' => [['<bomb>'], fn($a) => $commands->detonate(null, $a[0] ?? '')],
+    'steal' => [['<from>', '<resource>', '[n]'], fn($a) => $commands->steal(null, (int) ($a[0] ?? 0), (string) ($a[1] ?? ''), isset($a[2]) ? (int) $a[2] : null)],
+    'collect' => [['<loot>'], fn($a) => $commands->collect(null, $a[0] ?? '')],
+    'ally' => [['<to>'], fn($a) => $commands->ally(null, (int) ($a[0] ?? 0))],
+    'accept_ally' => [['<to>'], fn($a) => $commands->acceptAlly(null, (int) ($a[0] ?? 0))],
+    'unally' => [['<to>'], fn($a) => $commands->unally(null, (int) ($a[0] ?? 0))],
+    'declare_war' => [['<to>'], fn($a) => $commands->declareWar(null, (int) ($a[0] ?? 0))],
+    'make_peace' => [['<to>'], fn($a) => $commands->makePeace(null, (int) ($a[0] ?? 0))],
+    'cancel' => [['<order_id>'], fn($a) => $commands->cancelOrder(null, $a[0] ?? '')],
+    'fulfill' => [['<contract_id>'], fn($a) => $commands->fulfill(null, $a[0] ?? '')],
+    'revoke' => [['<contract_id>'], fn($a) => $commands->revoke(null, $a[0] ?? '')],
+];
+foreach ($verbSubCommands as $verbName => [$argHints, $handler]) {
+    $nha_cmd->registerSubCommand($verbName, function (Message $message, array $args) use ($replyToMessage, $handler): void {
+        $replyToMessage($message, $handler($args));
+    }, ['description' => "Queue the `{$verbName}` action.", 'usage' => implode(' ', $argHints)]);
+}
+
+$nha_cmd->registerSubCommand('think', function (Message $message, array $args) use ($commands, $replyToMessage): void {
+    $replyToMessage($message, $commands->think(isset($args[0]) ? (int) $args[0] : null));
+}, ['description' => 'Ask the LLM what to do next and queue it.', 'usage' => '[agent_id]']);
+
+$nha_cmd->registerSubCommand('autoplay', function (Message $message, array $args) use ($commands, $replyToMessage): void {
+    $enabled = match (strtolower($args[0] ?? '')) {
+        'on', 'start', '1', 'true' => true,
+        'off', 'stop', '0', 'false' => false,
+        default => null,
+    };
+    $replyToMessage($message, $commands->autoplay($enabled));
+}, ['description' => 'Turn the autonomous LLM play loop on/off (or show status).', 'usage' => '[on|off]']);
 
 // Standalone top-level aliases for the most common actions.
 foreach (['observe', 'say', 'act'] as $alias) {
@@ -262,11 +354,47 @@ $registerSlashCommands = function (NHA $nha) use ($commands, $userCommands, $tex
                 $agentIdOpt(),
             ]),
             $sub('world', 'Show the current world state.'),
-            $sub('market', 'Show the current market.'),
-            $sub('roster', 'Show the agent roster.'),
-            $sub('rules', 'Show the world rules.'),
-            $sub('contracts', 'Show the open contracts board.'),
+            $sub('market', 'Show the agent market order book.'),
+            $sub('depot', 'Show the fixed depot buy/sell prices.'),
+            $sub('rules', 'Show the crafting rules codex.'),
             $sub('agent', 'Look up any agent\'s public info.', [$opt(Option::INTEGER, 'agent_id', 'Agent id to look up.', true)]),
+            $sub('read', 'Read any world board.', [
+                $opt(Option::STRING, 'board', 'One of: ' . implode(', ', NHA\Commands::BOARDS), true),
+                $opt(Option::STRING, 'arg', 'Board argument: agent id, body name, or resource.'),
+                $opt(Option::INTEGER, 'x', 'X (for the deposits board).'),
+                $opt(Option::INTEGER, 'y', 'Y (for the deposits board).'),
+                $opt(Option::INTEGER, 'limit', 'Row limit, where the board supports it.'),
+            ]),
+            $sub('intent', 'Check whether a queued intent applied or was rejected.', [
+                $opt(Option::STRING, 'id', 'The queued_intent id from an action confirmation.', true),
+            ]),
+            $sub('sell', 'Sell a resource to the depot.', [
+                $opt(Option::STRING, 'resource', 'Resource to sell.', true),
+                $opt(Option::INTEGER, 'n', 'Amount (default 1).'),
+                $agentIdOpt(),
+            ]),
+            $sub('buy', 'Buy a resource from the depot.', [
+                $opt(Option::STRING, 'resource', 'Resource to buy.', true),
+                $opt(Option::INTEGER, 'n', 'Amount (default 1).'),
+                $agentIdOpt(),
+            ]),
+            $sub('heal', 'Apply a medicine to yourself or an ally.', [
+                $opt(Option::INTEGER, 'target', 'Ally to heal (omit to heal yourself).'),
+                $opt(Option::STRING, 'item', 'salve / stimpack / medkit / antidote.'),
+                $agentIdOpt(),
+            ]),
+            $sub('attack', 'Fire a ranged weapon at a target.', [
+                $opt(Option::INTEGER, 'target', 'Target agent id.', true),
+                $opt(Option::STRING, 'weapon', 'kinetic_gun / energy_weapon (optional).'),
+                $agentIdOpt(),
+            ]),
+            $sub('deploy', 'Send a finalized vehicle off to roam and mine.', [$agentIdOpt()]),
+            $sub('finalize', 'Assemble your loose parts into one vehicle.', [
+                $opt(Option::STRING, 'name', 'Name for the vehicle (optional).'),
+                $agentIdOpt(),
+            ]),
+            $sub('think', 'Ask the LLM what to do next and queue it.', [$agentIdOpt()]),
+            $sub('autoplay', 'Turn the autonomous LLM play loop on/off.', [$opt(Option::STRING, 'state', 'on or off (omit to show status).')]),
         ];
 
         $dispatch = function (string $sub, array $a) use ($commands): PromiseInterface {
@@ -281,12 +409,27 @@ $registerSlashCommands = function (NHA $nha) use ($commands, $userCommands, $tex
                 'say' => $commands->say($a['agent_id'] ?? null, $a['text']),
                 'tell' => $commands->tell($a['agent_id'] ?? null, (int) $a['to'], $a['text']),
                 'world' => $commands->world(),
-                'map' => $commands->map(),
                 'market' => $commands->market(),
-                'roster' => $commands->roster(),
+                'depot' => $commands->depot(),
                 'rules' => $commands->rules(),
-                'contracts' => $commands->contracts(),
                 'agent' => $commands->agentInfo((int) $a['agent_id']),
+                'read' => $commands->board((string) ($a['board'] ?? ''), [
+                    'id' => $a['arg'] ?? null, 'body' => $a['arg'] ?? null, 'resource' => $a['arg'] ?? null,
+                    'x' => $a['x'] ?? null, 'y' => $a['y'] ?? null, 'limit' => $a['limit'] ?? null,
+                ]),
+                'intent' => $commands->intentStatus((string) ($a['id'] ?? '')),
+                'sell' => $commands->sell($a['agent_id'] ?? null, (string) ($a['resource'] ?? ''), $a['n'] ?? null),
+                'buy' => $commands->buy($a['agent_id'] ?? null, (string) ($a['resource'] ?? ''), $a['n'] ?? null),
+                'heal' => $commands->heal($a['agent_id'] ?? null, isset($a['target']) ? (int) $a['target'] : null, $a['item'] ?? null),
+                'attack' => $commands->attack($a['agent_id'] ?? null, (int) ($a['target'] ?? 0), $a['weapon'] ?? null),
+                'deploy' => $commands->deploy($a['agent_id'] ?? null),
+                'finalize' => $commands->finalize($a['agent_id'] ?? null, $a['name'] ?? null),
+                'think' => $commands->think($a['agent_id'] ?? null),
+                'autoplay' => $commands->autoplay(match (strtolower($a['state'] ?? '')) {
+                    'on' => true,
+                    'off' => false,
+                    default => null,
+                }),
                 default => \React\Promise\reject(new \InvalidArgumentException("Unknown sub-command `{$sub}`.")),
             };
         };
@@ -375,6 +518,32 @@ $registerSlashCommands = function (NHA $nha) use ($commands, $userCommands, $tex
                 $opt(Option::INTEGER, 'to', 'Target agent id.', true),
                 $opt(Option::STRING, 'text', 'Private message.', true),
             ], fn(array $args) => ['tell', ['to' => (int) $args['to'], 'text' => $args['text']]]],
+
+            // Space & flight.
+            'deploy' => [[], fn(array $args) => ['deploy', []]],
+            'finalize' => [[ $opt(Option::STRING, 'name', 'Vehicle name (optional).') ], fn(array $args) => ['finalize', array_filter(['name' => $args['name'] ?? null], fn($v) => null !== $v)]],
+            'arm' => [[], fn(array $args) => ['arm', []]],
+            'land_moon' => [[], fn(array $args) => ['land_moon', []]],
+            'land_body' => [[], fn(array $args) => ['land_body', []]],
+            'distress' => [[], fn(array $args) => ['distress', []]],
+            'depart' => [[ $opt(Option::STRING, 'dest', 'deimos/phobos/mars/venus/earth.', true) ], fn(array $args) => ['depart', ['dest' => $args['dest']]]],
+
+            // Economy.
+            'sell' => [[ $opt(Option::STRING, 'resource', 'Resource to sell.', true), $opt(Option::INTEGER, 'n', 'Amount (default 1).') ], fn(array $args) => ['sell', ['resource' => $args['resource'], 'n' => (int) ($args['n'] ?? 1)]]],
+            'buy' => [[ $opt(Option::STRING, 'resource', 'Resource to buy.', true), $opt(Option::INTEGER, 'n', 'Amount (default 1).') ], fn(array $args) => ['buy', ['resource' => $args['resource'], 'n' => (int) ($args['n'] ?? 1)]]],
+
+            // Medicine & combat.
+            'heal' => [[ $opt(Option::INTEGER, 'target', 'Ally to heal (omit for self).'), $opt(Option::STRING, 'item', 'salve/stimpack/medkit/antidote.') ], fn(array $args) => ['heal', array_filter(['target' => isset($args['target']) ? (int) $args['target'] : null, 'item' => $args['item'] ?? null], fn($v) => null !== $v)]],
+            'attack' => [[ $opt(Option::INTEGER, 'target', 'Target agent id.', true), $opt(Option::STRING, 'weapon', 'kinetic_gun/energy_weapon (optional).') ], fn(array $args) => ['attack', array_filter(['target' => (int) $args['target'], 'weapon' => $args['weapon'] ?? null], fn($v) => null !== $v)]],
+            'steal' => [[ $opt(Option::INTEGER, 'from', 'Adjacent agent id.', true), $opt(Option::STRING, 'resource', 'Resource to lift.', true), $opt(Option::INTEGER, 'n', 'Amount (default 1).') ], fn(array $args) => ['steal', ['from' => (int) $args['from'], 'resource' => $args['resource'], 'n' => (int) ($args['n'] ?? 1)]]],
+            'collect' => [[ $opt(Option::STRING, 'loot', 'Loot pile id.', true) ], fn(array $args) => ['collect', ['loot' => $args['loot']]]],
+
+            // Diplomacy.
+            'ally' => [[ $opt(Option::INTEGER, 'to', 'Agent id.', true) ], fn(array $args) => ['ally', ['to' => (int) $args['to']]]],
+            'accept_ally' => [[ $opt(Option::INTEGER, 'to', 'Agent id.', true) ], fn(array $args) => ['accept_ally', ['to' => (int) $args['to']]]],
+            'unally' => [[ $opt(Option::INTEGER, 'to', 'Agent id.', true) ], fn(array $args) => ['unally', ['to' => (int) $args['to']]]],
+            'declare_war' => [[ $opt(Option::INTEGER, 'to', 'Agent id.', true) ], fn(array $args) => ['declare_war', ['to' => (int) $args['to']]]],
+            'make_peace' => [[ $opt(Option::INTEGER, 'to', 'Agent id.', true) ], fn(array $args) => ['make_peace', ['to' => (int) $args['to']]]],
         ];
 
         foreach ($playerActionCommands as $name => [$options, $toIntent]) {
@@ -465,6 +634,53 @@ if ($channel_id) {
         if ($agent_id = $state->getDefaultAgent()) {
             $nha->say($agent_id, $message->content);
         }
+    });
+}
+
+// -----------------------------------------------------------------------
+// Autonomous LLM play loop: while `!nha autoplay on`, periodically ask the
+// brain for the default agent's next move and queue it. Overlapping runs are
+// skipped ($autoplay_busy) since an LLM reply is slower than the interval.
+// -----------------------------------------------------------------------
+
+if ($autoPlayer) {
+    if (getenv('NHA_AUTOPLAY') === '1') {
+        $state->setAutoplay(true);
+    }
+
+    $autoplay_interval = (float) (getenv('NHA_AUTOPLAY_INTERVAL') ?: 15);
+    $autoplay_busy = false;
+
+    Loop::get()->addPeriodicTimer($autoplay_interval, function () use ($nha, $state, $autoPlayer, $channel_id, &$autoplay_busy): void {
+        if ($autoplay_busy || ! $state->isAutoplayEnabled()) {
+            return;
+        }
+
+        $agent_id = $state->getDefaultAgent();
+        if (! $agent_id) {
+            return;
+        }
+
+        $autoplay_busy = true;
+        $done = function () use (&$autoplay_busy): void {
+            $autoplay_busy = false;
+        };
+
+        $autoPlayer->step($agent_id, (string) ($state->getDefaultAgentToken() ?? ''))->then(
+            function (string $line) use ($nha, $channel_id, $done): void {
+                $nha->logger->info("[autoplay] {$line}");
+                if ($channel_id) {
+                    $nha->getChannel($channel_id)?->sendMessage(
+                        NHA::createBuilder()->addComponent(Container::new()->addComponents([TextDisplay::new($line)])),
+                    );
+                }
+                $done();
+            },
+            function (\Throwable $e) use ($nha, $done): void {
+                $nha->logger->warning("[autoplay] {$e->getMessage()}");
+                $done();
+            },
+        );
     });
 }
 

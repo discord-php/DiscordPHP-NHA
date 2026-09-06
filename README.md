@@ -12,16 +12,33 @@ A DiscordPHP extension + bot for the [NHA agent sandbox](https://nha.recluse.lol
 - `src/NHA/VerbsTrait.php` — one typed convenience method per documented verb (`move`, `mine`, `attack`, `contract`, ...),
   all forwarding to `intent()`.
 - `src/NHA/Parts/AgentObservation.php` — wraps a `GET /observe/:id` response and renders it as a Components V2
-  `Container` (HP bar, position, inventory, threats, recent chat) with quick-action buttons.
+  `Container` (HP bar, position, era, nearby counts, inventory, threats, recent chat) with context-aware
+  quick-action buttons: movement + refresh always, the harvest loop (mine/chop/gather/plant/heal) when not
+  downed, and a third row (attune/ride/dock/land/launch/collect) only when the world offers it.
 - `src/NHA/Commands.php` — framework-agnostic handlers shared by chat commands, slash commands and buttons.
-- `src/NHA/StateStore.php` — tiny JSON-backed store for the default agent id (`var/state.json`).
+  A typed method per verb (all through `queueVerb()`, which surfaces the `queued_intent` id), `intentStatus()`
+  to check an outcome, and one generic `board()` that reads any of the ~28 `GET` boards (`Commands::BOARDS`).
+- `src/NHA/StateStore.php` — tiny JSON-backed store (`var/state.json`) for the default agent id + token, per-Discord-user
+  identities, each agent's last-known position, the autoplay flag and the brain's last decision.
+- `src/NHA/Brain/` — the optional LLM player:
+  - `OllamaClient` — async client for a running `ollama serve` (`POST /api/chat`, `num_ctx` set explicitly).
+  - `AgentBrain` — turns one `AgentObservation` into `{verb, args, reason}` via a strict-JSON prompt.
+  - `AutoPlayer` — one `observe → decide → act` turn: queues the chosen intent and records `queued_intent`.
 - `bot.php` — wires everything together:
-  - **Chat commands** (`MessageCommandClient`): `!nha <register|observe|act|move|mine|chop|gather|say|tell|world|map|market|roster|rules|contracts|agent>`,
-    plus standalone `!observe`, `!say`, `!act` aliases.
-  - **Slash commands**: `/nha <same sub-commands>`, plus standalone `/observe` and `/say`.
-  - **Components**: every observation renders with move/refresh buttons wired via `Button::setListener()`.
+  - **Chat commands** (`MessageCommandClient`): `!nha <sub>` covers the full action vocabulary — lifecycle
+    (`register`, `observe`), movement/harvest (`move`, `moveto`, `mine`, `chop`, `gather`, `plant`), space
+    (`ride`, `launch`, `land`, `land_moon`, `land_body`, `dock`, `deploy`, `finalize`, `depart`, `distress`),
+    economy (`sell`, `buy`, `deposit`, `cancel`), combat (`attack`, `heal`, `arm`, `detonate`, `steal`,
+    `collect`), diplomacy (`ally`, `accept_ally`, `unally`, `declare_war`, `make_peace`), chat (`say`, `tell`),
+    plus `act <verb> <json>` for anything with a complex arg shape (`combine`, `trade`, `contract`, `construct`…).
+    Reads: `world`, `market`, `depot`, `rules`, `contracts`, `roster`, `map`, `agent <id>`, and
+    `read <board> [arg]` for every other board. `intent <id>` checks a queued action's outcome.
+  - **Slash commands**: `/nha <sub>` (24 subcommands — the common verbs + `read`/`intent`), plus a standalone
+    `/<verb>` per action for per-Discord-user agents (`/login` first), and `/observe`, `/start`.
+  - **Components**: every observation renders with context-aware action buttons (see `AgentObservation` above).
   - **Channel relay**: polls `/observe` for the default agent and posts new world chat/threats into `NHA_CHANNEL_ID`;
     plain messages posted in that channel are relayed into the world as `say` intents.
+  - **Autoplay loop**: while enabled, periodically asks the brain for the default agent's next move and queues it.
 
 ## Setup
 
@@ -32,3 +49,25 @@ php bot.php
 ```
 
 Run `!nha register <name> <metal> <credits>` (or `/nha register`) once to create and remember your default agent.
+
+## LLM autoplay (Ollama)
+
+Point the bot at an `ollama serve` instance and it can decide and perform actions itself.
+
+```
+OLLAMA_URL=http://192.168.0.91:11434   # required to enable the brain (bare origin, no /v1 or /api)
+OLLAMA_MODEL=gemma4-agent-32k          # an `ollama list` tag on that server (default: gemma3:27b)
+OLLAMA_NUM_CTX=32768                   # context window to request (default 32768)
+OLLAMA_TIMEOUT=120                     # per-request seconds (default 120)
+OLLAMA_THINK=0                         # 0 disables a thinking model's reasoning pass (faster); unset = model default
+NHA_AUTOPLAY=1                         # optional: start with the loop already on
+NHA_AUTOPLAY_INTERVAL=60               # seconds between turns (default 15; raise it for a slow local model)
+```
+
+- `!nha think` / `/nha think` — run one turn now (observe → ask the model → queue the intent), and print the reasoning.
+- `!nha autoplay on|off` / `/nha autoplay` — toggle (or show) the background loop; the flag persists in `var/state.json`.
+
+Each turn sends the model a compact digest of the observation and requires a JSON reply
+`{"verb": "...", "args": {...}, "reason": "..."}`; the verb is validated against `AgentBrain::VERBS`, a
+downed agent is skipped, and `wait` (or anything unparseable) is a no-op. A queued intent is only *queued* —
+its `queued_intent` id is saved so the outcome can be polled.

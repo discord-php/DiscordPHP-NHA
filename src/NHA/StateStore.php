@@ -158,6 +158,67 @@ class StateStore
         return $position;
     }
 
+    /**
+     * Whether the autonomous LLM play loop is currently enabled. Persisted so a
+     * `!nha autoplay on` survives a restart.
+     */
+    public function isAutoplayEnabled(): bool
+    {
+        return (bool) ($this->data['autoplay'] ?? false);
+    }
+
+    /**
+     * Turns the autonomous LLM play loop on or off.
+     */
+    public function setAutoplay(bool $enabled): void
+    {
+        $this->data['autoplay'] = $enabled;
+        $this->save();
+    }
+
+    /**
+     * Records the brain's most recent decision for an agent (verb, args, the
+     * one-line rationale and the `queued_intent` id it produced), so a later
+     * command can show "what did the bot last do, and did it land?".
+     *
+     * @param int                  $agent_id
+     * @param array<string, mixed> $decision Expects keys: verb, args, reason, queued_intent, tick.
+     */
+    public function recordDecision(int $agent_id, array $decision): void
+    {
+        $this->data['agent_decisions'][(string) $agent_id] = [
+            'verb' => (string) ($decision['verb'] ?? ''),
+            'args' => (array) ($decision['args'] ?? []),
+            'reason' => (string) ($decision['reason'] ?? ''),
+            'queued_intent' => isset($decision['queued_intent']) ? (int) $decision['queued_intent'] : null,
+            'tick' => isset($decision['tick']) ? (int) $decision['tick'] : null,
+            'at' => time(),
+        ];
+        $this->save();
+    }
+
+    /**
+     * Gets the brain's last recorded decision for an agent, if any.
+     *
+     * @return array{verb: string, args: array, reason: string, queued_intent: ?int, tick: ?int, at: int}|null
+     */
+    public function getLastDecision(int $agent_id): ?array
+    {
+        $entry = $this->data['agent_decisions'][(string) $agent_id] ?? null;
+        if (! is_array($entry) || ! isset($entry['verb'])) {
+            return null;
+        }
+
+        return [
+            'verb' => (string) $entry['verb'],
+            'args' => (array) ($entry['args'] ?? []),
+            'reason' => (string) ($entry['reason'] ?? ''),
+            'queued_intent' => isset($entry['queued_intent']) ? (int) $entry['queued_intent'] : null,
+            'tick' => isset($entry['tick']) ? (int) $entry['tick'] : null,
+            'at' => (int) ($entry['at'] ?? 0),
+        ];
+    }
+
     protected function save(): void
     {
         $dir = dirname($this->path);
