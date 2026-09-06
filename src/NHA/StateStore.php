@@ -33,6 +33,12 @@ class StateStore
 {
     protected array $data;
 
+    /**
+     * Loads the store from `$path` (an empty state when the file is missing)
+     * and sweeps any `.tmp` file left behind by a crash mid-{@see save()}.
+     *
+     * @param string $path Absolute path to the JSON state file.
+     */
     public function __construct(protected readonly string $path)
     {
         $this->data = is_file($path) ? (array) json_decode(file_get_contents($path), true) : [];
@@ -43,6 +49,7 @@ class StateStore
         }
     }
 
+    /** The stored default agent id, or null when none has been registered. */
     public function getDefaultAgent(): ?int
     {
         return isset($this->data['default_agent']) ? (int) $this->data['default_agent'] : null;
@@ -249,6 +256,11 @@ class StateStore
         $this->save();
     }
 
+    /**
+     * Atomically persists the current state: writes a sibling temp file then
+     * renames it over the target, so a crash (or SIGTERM) mid-write can never
+     * leave a truncated file. Silently no-ops if the temp write fails.
+     */
     protected function save(): void
     {
         $dir = dirname($this->path);

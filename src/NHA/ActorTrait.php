@@ -64,6 +64,9 @@ trait ActorTrait
             : 'No default agent is configured. Register one with `/nha register` first.');
     }
 
+    /**
+     * The bot's default agent id, or a {@see \RuntimeException} when none is set.
+     */
     private function requireDefaultAgent(): int
     {
         return $this->state->getDefaultAgent()

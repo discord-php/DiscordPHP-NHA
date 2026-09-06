@@ -117,6 +117,12 @@ class NHA extends MessageCommandClient
      */
     protected string $agentToken = '';
 
+    /**
+     * @param array $options DiscordPHP client options, plus:
+     *                       - `nha_token`: the NHA action token for the default agent (kept out of the parent);
+     *                       - `socket_options`: passed to the Guzzle HTTP driver.
+     *                       A Guzzle driver is used for NHA calls because react/socket stalls on the live host's TLS.
+     */
     public function __construct(array $options = [])
     {
         $this->agentToken = (string) ($options['nha_token'] ?? '');

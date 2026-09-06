@@ -36,6 +36,12 @@ use function React\Promise\resolve;
  */
 final class AutoPlayer
 {
+    /**
+     * @param NHA        $nha   The NHA client used to observe and submit intents.
+     * @param AgentBrain $brain Turns an observation into a `{verb, args, reason}` decision.
+     * @param StateStore $state Durable store; also attached to `$nha` here so a standalone
+     *                          player still records position on every observe.
+     */
     public function __construct(
         private readonly NHA $nha,
         private readonly AgentBrain $brain,

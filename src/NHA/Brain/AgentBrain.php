@@ -66,6 +66,9 @@ final class AgentBrain
         'wait' => 'no args — do nothing this tick',
     ];
 
+    /**
+     * @param OllamaClient $ollama The LLM client prompted for each decision.
+     */
     public function __construct(private readonly OllamaClient $ollama) {}
 
     /**
@@ -202,6 +205,10 @@ final class AgentBrain
         return implode("\n", $lines);
     }
 
+    /**
+     * The fixed system prompt: the rules of engagement plus the verb catalogue
+     * built from {@see VERBS}, sent once at the head of every decision request.
+     */
     private static function systemPrompt(): string
     {
         $catalogue = implode("\n", array_map(

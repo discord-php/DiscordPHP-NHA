@@ -757,6 +757,14 @@ trait AbstractRepositoryTrait
         }
     }
 
+    /**
+     * Exposes a small allow-list of otherwise-protected properties (`discrim`,
+     * `cache`) for read access; any other key returns null.
+     *
+     * @param string $key Property name.
+     *
+     * @return mixed
+     */
     public function __get(string $key)
     {
         if (in_array($key, ['discrim', 'cache'])) {

@@ -41,6 +41,10 @@ class AgentObservation implements JsonSerializable
     /** Raw, decoded JSON body as returned by the world. */
     public readonly array $raw;
 
+    /**
+     * @param int   $agentId The agent this observation belongs to.
+     * @param array $raw     The decoded `GET /observe/:id` body, kept verbatim.
+     */
     public function __construct(public readonly int $agentId, array $raw)
     {
         $this->raw = $raw;
@@ -70,11 +74,13 @@ class AgentObservation implements JsonSerializable
         return $value;
     }
 
+    /** Current HP (`hp`, falling back to `health`), or null when absent. */
     public function getHp(): ?float
     {
         return $this->get('hp') ?? $this->get('health');
     }
 
+    /** Maximum HP (`max_hp`/`hp_max`), defaulting to 100. */
     public function getMaxHp(): float
     {
         return (float) ($this->get('max_hp') ?? $this->get('hp_max') ?? 100);
@@ -115,36 +121,43 @@ class AgentObservation implements JsonSerializable
         return null;
     }
 
+    /** The agent's inventory as a `{resource: qty}` map (empty when absent). */
     public function getInventory(): array
     {
         return (array) ($this->get('inventory') ?? []);
     }
 
+    /** The agent's vision radius (`vision`/`sight_radius`), or null when absent. */
     public function getVision(): mixed
     {
         return $this->get('vision') ?? $this->get('sight_radius');
     }
 
+    /** Recent world/chat messages visible to the agent (empty when absent). */
     public function getMessages(): array
     {
         return (array) ($this->get('messages') ?? []);
     }
 
+    /** Recent alerts/threats against the agent (`alerts`/`threats`/`threat_alerts`). */
     public function getThreats(): array
     {
         return (array) ($this->get('alerts') ?? $this->get('threats') ?? $this->get('threat_alerts') ?? []);
     }
 
+    /** Supply contracts visible to the agent (empty when absent). */
     public function getContracts(): array
     {
         return (array) ($this->get('contracts') ?? []);
     }
 
+    /** Bounty offers visible to the agent (empty when absent). */
     public function getBounties(): array
     {
         return (array) ($this->get('bounties') ?? []);
     }
 
+    /** Other agents near this one (`nearby_agents`, falling back to `nearby.agents`/`agents`). */
     public function getNearbyAgents(): array
     {
         return (array) ($this->get('nearby_agents') ?? $this->get('nearby.agents') ?? $this->get('agents') ?? []);
@@ -321,6 +334,11 @@ class AgentObservation implements JsonSerializable
         return $buttons ? ActionRow::new()->addComponents(array_slice($buttons, 0, 5)) : null;
     }
 
+    /**
+     * @inheritDoc
+     *
+     * Returns the raw observation payload unchanged.
+     */
     public function jsonSerialize(): array
     {
         return $this->raw;

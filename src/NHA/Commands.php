@@ -58,6 +58,11 @@ class Commands
         'expansion', 'colony', 'terraform', 'guild', 'arena',
     ];
 
+    /**
+     * @param NHA             $nha        The NHA client used for every world call.
+     * @param StateStore      $state      Durable store; also attached to `$nha` here so `observe()` snapshots position.
+     * @param AutoPlayer|null $autoPlayer The LLM player, present only when `OLLAMA_URL` is configured (enables `think()`/`autoplay()`).
+     */
     public function __construct(
         protected readonly NHA $nha,
         protected readonly StateStore $state,
@@ -94,11 +99,13 @@ class Commands
             : AgentContext::bot($this->resolveAgentId($agent));
     }
 
+    /** Wraps `$text` in a Components V2 {@see Container} holding a single Text Display. */
     protected static function textContainer(string $text): Container
     {
         return Container::new()->addComponents([TextDisplay::new($text)]);
     }
 
+    /** Builds a mention-safe {@see MessageBuilder} carrying `$text` as one text container. */
     protected static function message(string $text): MessageBuilder
     {
         return NHA::createBuilder()->addComponent(self::textContainer($text));
@@ -120,6 +127,18 @@ class Commands
 
     // --- Agent lifecycle --------------------------------------------------
 
+    /**
+     * Registers a brand-new agent and makes it the bot's default. When
+     * `$provider_id` (a Discord user id) is given the new identity is also
+     * linked to that user; a user who already has an agent is rejected.
+     *
+     * @param string|null $name        Agent name; defaults to `user-<provider_id>`.
+     * @param int|null    $metal       Starting metal (null → default materials).
+     * @param int|null    $credits     Starting credits (null → default materials).
+     * @param string|null $provider_id Discord user id to link the agent to, or null.
+     *
+     * @return PromiseInterface<MessageBuilder>
+     */
     public function register(?string $name, ?int $metal = 40, ?int $credits = 150, ?string $provider_id = null): PromiseInterface
     {
         if ($provider_id !== null && ($existing = $this->state->getDiscordUserAgent($provider_id))) {
@@ -155,6 +174,13 @@ class Commands
         });
     }
 
+    /**
+     * Observes the world for the given agent and renders the result as a
+     * Components V2 panel. The context's token flows into the panel so its
+     * quick-action buttons act as whoever ran the observe.
+     *
+     * @return PromiseInterface<MessageBuilder>
+     */
     public function observe(AgentContext|int|null $agent = null): PromiseInterface
     {
         $ctx = $this->context($agent);
@@ -211,16 +237,19 @@ class Commands
         return $this->queueVerb($agent, $verb, $args ?? []);
     }
 
+    /** Queues a `move` intent stepping the agent by the `(dx, dy)` delta. @see \NHA\VerbsTrait::move() */
     public function move(AgentContext|int|null $agent, int $dx, int $dy): PromiseInterface
     {
         return $this->queueVerb($agent, 'move', ['dx' => $dx, 'dy' => $dy]);
     }
 
+    /** Queues a `move` intent walking the agent toward absolute cell `(x, y)`. @see \NHA\VerbsTrait::moveTo() */
     public function moveTo(AgentContext|int|null $agent, int $x, int $y): PromiseInterface
     {
         return $this->queueVerb($agent, 'move', ['x' => $x, 'y' => $y]);
     }
 
+    /** Queues a `mine` intent for up to `$n` units (default 1), optionally of one `$resource`. @see \NHA\VerbsTrait::mine() */
     public function mine(AgentContext|int|null $agent, ?int $n = null, ?string $resource = null): PromiseInterface
     {
         return $this->queueVerb($agent, 'mine', array_filter(
@@ -229,83 +258,108 @@ class Commands
         ));
     }
 
+    /** Queues a `chop` intent for up to `$n` units (default 1). @see \NHA\VerbsTrait::chop() */
     public function chop(AgentContext|int|null $agent, ?int $n = null): PromiseInterface
     {
         return $this->queueVerb($agent, 'chop', ['n' => $n ?? 1]);
     }
 
+    /** Queues a `gather` intent for up to `$n` units (default 1). @see \NHA\VerbsTrait::gather() */
     public function gather(AgentContext|int|null $agent, ?int $n = null): PromiseInterface
     {
         return $this->queueVerb($agent, 'gather', ['n' => $n ?? 1]);
     }
 
+    /** Queues a `say` intent broadcasting `$text` to world chat. @see \NHA\VerbsTrait::say() */
     public function say(AgentContext|int|null $agent, string $text): PromiseInterface
     {
         return $this->queueVerb($agent, 'say', ['text' => $text]);
     }
 
+    /** Queues a `tell` intent sending `$text` privately to agent `$to`. @see \NHA\VerbsTrait::tell() */
     public function tell(AgentContext|int|null $agent, int $to, string $text): PromiseInterface
     {
         return $this->queueVerb($agent, 'tell', ['to' => $to, 'text' => $text]);
     }
 
-    // No-arg verbs: `verb => label` — every one just queues that verb.
+    // No-arg verbs: every one just queues that verb for the agent.
+
+    /** Queues a `plant` intent (spend 1 wood to grow a tree at the agent's cell). */
     public function plant(AgentContext|int|null $agent): PromiseInterface
     {
         return $this->queueVerb($agent, 'plant');
     }
 
+    /** Queues a `ride` intent (mount the vehicle at the agent's tile). */
     public function ride(AgentContext|int|null $agent): PromiseInterface
     {
         return $this->queueVerb($agent, 'ride');
     }
 
+    /** Queues a `launch` intent (climb into the air / to space). */
     public function launch(AgentContext|int|null $agent): PromiseInterface
     {
         return $this->queueVerb($agent, 'launch');
     }
 
+    /** Queues a `land` intent (descend to the surface). */
     public function land(AgentContext|int|null $agent): PromiseInterface
     {
         return $this->queueVerb($agent, 'land');
     }
 
+    /** Queues a `land_moon` intent (land on the Moon surface). */
     public function landMoon(AgentContext|int|null $agent): PromiseInterface
     {
         return $this->queueVerb($agent, 'land_moon');
     }
 
+    /** Queues a `dock` intent (latch an asteroid / the orbital station). */
     public function dock(AgentContext|int|null $agent): PromiseInterface
     {
         return $this->queueVerb($agent, 'dock');
     }
 
+    /** Queues an `attune` intent (bond with a nearby ancient artifact). */
     public function attune(AgentContext|int|null $agent): PromiseInterface
     {
         return $this->queueVerb($agent, 'attune');
     }
 
+    /** Queues a `deploy` intent (send a finalized vehicle off to roam). */
     public function deploy(AgentContext|int|null $agent): PromiseInterface
     {
         return $this->queueVerb($agent, 'deploy');
     }
 
+    /** Queues an `arm` intent (plant a 3-tick bomb fuse). */
     public function arm(AgentContext|int|null $agent): PromiseInterface
     {
         return $this->queueVerb($agent, 'arm');
     }
 
+    /** Queues a `land_body` intent (descend from orbit onto the travelled-to body). */
     public function landBody(AgentContext|int|null $agent): PromiseInterface
     {
         return $this->queueVerb($agent, 'land_body');
     }
 
+    /** Queues a `distress` intent (emergency recall of a stranded off-world agent). */
     public function distress(AgentContext|int|null $agent): PromiseInterface
     {
         return $this->queueVerb($agent, 'distress');
     }
 
     // Craft & build.
+
+    /**
+     * Queues a `combine` intent mixing `$ingredients` (a `{resource: qty}` map);
+     * an unknown mix is escrowed to the Inventors' Guild under optional `$name`.
+     *
+     * @param array<string, int> $ingredients
+     *
+     * @see \NHA\VerbsTrait::combine()
+     */
     public function combine(AgentContext|int|null $agent, array $ingredients, ?string $name = null, ?int $n = null): PromiseInterface
     {
         return $this->queueVerb($agent, 'combine', array_filter(
@@ -314,6 +368,14 @@ class Commands
         ));
     }
 
+    /**
+     * Queues a `build` intent crafting vehicle `$part`, optionally with up to
+     * three `$with` upgrade items.
+     *
+     * @param string[] $with
+     *
+     * @see \NHA\VerbsTrait::build()
+     */
     public function build(AgentContext|int|null $agent, string $part, array $with = []): PromiseInterface
     {
         return $this->queueVerb($agent, 'build', array_filter(
@@ -322,17 +384,25 @@ class Commands
         ));
     }
 
+    /** Queues a `finalize` intent assembling the agent's loose parts into one vehicle. @see \NHA\VerbsTrait::finalize() */
     public function finalize(AgentContext|int|null $agent, ?string $name = null): PromiseInterface
     {
         return $this->queueVerb($agent, 'finalize', null === $name ? [] : ['name' => $name]);
     }
 
-    /** @param array<string, mixed> $args Shape-specific keys (size/height/color, module, kind, body, stage, w, h). */
+    /**
+     * Queues a `construct` intent placing a structure of the given `$shape`.
+     *
+     * @param array<string, mixed> $args Shape-specific keys (size/height/color, module, kind, body, stage, w, h).
+     *
+     * @see \NHA\VerbsTrait::construct()
+     */
     public function construct(AgentContext|int|null $agent, string $shape, array $args = []): PromiseInterface
     {
         return $this->queueVerb($agent, 'construct', ['shape' => $shape] + $args);
     }
 
+    /** Queues an `invest` intent bankrolling Station `$module` with `$credits`. @see \NHA\VerbsTrait::invest() */
     public function invest(AgentContext|int|null $agent, string $module, int $credits, ?string $resource = null): PromiseInterface
     {
         return $this->queueVerb($agent, 'invest', array_filter(
@@ -342,47 +412,65 @@ class Commands
     }
 
     // Economy.
+
+    /** Queues a `sell` intent selling `$n` of `$resource` to the depot. @see \NHA\VerbsTrait::sell() */
     public function sell(AgentContext|int|null $agent, string $resource, ?int $n = null): PromiseInterface
     {
         return $this->queueVerb($agent, 'sell', array_filter(['resource' => $resource, 'n' => $n], fn($v) => null !== $v));
     }
 
+    /** Queues a `buy` intent buying `$n` of `$resource` from the depot. @see \NHA\VerbsTrait::buy() */
     public function buy(AgentContext|int|null $agent, string $resource, ?int $n = null): PromiseInterface
     {
         return $this->queueVerb($agent, 'buy', array_filter(['resource' => $resource, 'n' => $n], fn($v) => null !== $v));
     }
 
+    /** Queues an `order` intent posting a `$side` (buy|sell) market order for `$qty` of `$resource` at `$price`. @see \NHA\VerbsTrait::order() */
     public function order(AgentContext|int|null $agent, string $side, string $resource, int $qty, float $price): PromiseInterface
     {
         return $this->queueVerb($agent, 'order', ['side' => $side, 'resource' => $resource, 'qty' => $qty, 'price' => $price]);
     }
 
+    /** Queues a `cancel` intent removing one of the agent's open market orders. @see \NHA\VerbsTrait::cancelOrder() */
     public function cancelOrder(AgentContext|int|null $agent, int|string $order_id): PromiseInterface
     {
         return $this->queueVerb($agent, 'cancel', ['order_id' => $order_id]);
     }
 
+    /** Queues a `deposit` intent stashing `$n` of `$resource` into escrow storage. @see \NHA\VerbsTrait::deposit() */
     public function deposit(AgentContext|int|null $agent, string $resource, ?int $n = null): PromiseInterface
     {
         return $this->queueVerb($agent, 'deposit', array_filter(['resource' => $resource, 'n' => $n], fn($v) => null !== $v));
     }
 
     /**
+     * Queues a `trade` intent offering `$give` to agent `$to` in return for `$want`.
+     *
      * @param array<string, int> $give
      * @param array<string, int> $want
+     *
+     * @see \NHA\VerbsTrait::trade()
      */
     public function trade(AgentContext|int|null $agent, int $to, array $give, array $want): PromiseInterface
     {
         return $this->queueVerb($agent, 'trade', ['to' => $to, 'give' => $give, 'want' => $want]);
     }
 
+    /** Queues an `accept` intent accepting an incoming peer-to-peer trade. @see \NHA\VerbsTrait::acceptTrade() */
     public function acceptTrade(AgentContext|int|null $agent, int|string $trade_id): PromiseInterface
     {
         return $this->queueVerb($agent, 'accept', ['trade_id' => $trade_id]);
     }
 
     // Contracts & bounties.
-    /** @param array<string, int> $want */
+
+    /**
+     * Queues a `contract` intent posting a supply job offering `$reward` for `$want`.
+     *
+     * @param array<string, int> $want
+     *
+     * @see \NHA\VerbsTrait::contract()
+     */
     public function contract(AgentContext|int|null $agent, mixed $reward, array $want, ?int $to = null, ?int $deadline_ticks = null): PromiseInterface
     {
         return $this->queueVerb($agent, 'contract', array_filter(
@@ -391,16 +479,19 @@ class Commands
         ));
     }
 
+    /** Queues a `fulfill` intent delivering against an open supply contract. @see \NHA\VerbsTrait::fulfill() */
     public function fulfill(AgentContext|int|null $agent, int|string $contract_id): PromiseInterface
     {
         return $this->queueVerb($agent, 'fulfill', ['contract_id' => $contract_id]);
     }
 
+    /** Queues a `revoke` intent withdrawing one of the agent's own open contracts. @see \NHA\VerbsTrait::revoke() */
     public function revoke(AgentContext|int|null $agent, int|string $contract_id): PromiseInterface
     {
         return $this->queueVerb($agent, 'revoke', ['contract_id' => $contract_id]);
     }
 
+    /** Queues a `bounty` intent placing a kill bounty of `$reward` on `$target`. @see \NHA\VerbsTrait::bounty() */
     public function bounty(AgentContext|int|null $agent, int $target, mixed $reward, ?int $deadline_ticks = null): PromiseInterface
     {
         return $this->queueVerb($agent, 'bounty', array_filter(
@@ -410,21 +501,26 @@ class Commands
     }
 
     // Medicine & combat.
+
+    /** Queues a `heal` intent applying `$item` medicine to self or ally `$target`. @see \NHA\VerbsTrait::heal() */
     public function heal(AgentContext|int|null $agent, ?int $target = null, ?string $item = null): PromiseInterface
     {
         return $this->queueVerb($agent, 'heal', array_filter(['target' => $target, 'item' => $item], fn($v) => null !== $v));
     }
 
+    /** Queues an `attack` intent firing `$weapon` (optional) at agent `$target`. @see \NHA\VerbsTrait::attack() */
     public function attack(AgentContext|int|null $agent, int $target, ?string $weapon = null): PromiseInterface
     {
         return $this->queueVerb($agent, 'attack', array_filter(['target' => $target, 'weapon' => $weapon], fn($v) => null !== $v));
     }
 
+    /** Queues a `detonate` intent triggering an armed `$bomb`. @see \NHA\VerbsTrait::detonate() */
     public function detonate(AgentContext|int|null $agent, int|string $bomb): PromiseInterface
     {
         return $this->queueVerb($agent, 'detonate', ['bomb' => $bomb]);
     }
 
+    /** Queues a `steal` intent lifting `$n` of `$resource` from adjacent agent `$from`. @see \NHA\VerbsTrait::steal() */
     public function steal(AgentContext|int|null $agent, int $from, string $resource, ?int $n = null): PromiseInterface
     {
         return $this->queueVerb($agent, 'steal', array_filter(
@@ -433,44 +529,59 @@ class Commands
         ));
     }
 
+    /** Queues a `collect` intent picking up a dropped `$loot` pile. @see \NHA\VerbsTrait::collect() */
     public function collect(AgentContext|int|null $agent, int|string $loot): PromiseInterface
     {
         return $this->queueVerb($agent, 'collect', ['loot' => $loot]);
     }
 
     // Diplomacy.
+
+    /** Queues an `ally` intent proposing an alliance to `$to`. @see \NHA\VerbsTrait::ally() */
     public function ally(AgentContext|int|null $agent, int $to): PromiseInterface
     {
         return $this->queueVerb($agent, 'ally', ['to' => $to]);
     }
 
+    /** Queues an `accept_ally` intent accepting an alliance proposal from `$to`. @see \NHA\VerbsTrait::acceptAlly() */
     public function acceptAlly(AgentContext|int|null $agent, int $to): PromiseInterface
     {
         return $this->queueVerb($agent, 'accept_ally', ['to' => $to]);
     }
 
+    /** Queues an `unally` intent dissolving the alliance with `$to`. @see \NHA\VerbsTrait::unally() */
     public function unally(AgentContext|int|null $agent, int $to): PromiseInterface
     {
         return $this->queueVerb($agent, 'unally', ['to' => $to]);
     }
 
+    /** Queues a `declare_war` intent declaring war on `$to`. @see \NHA\VerbsTrait::declareWar() */
     public function declareWar(AgentContext|int|null $agent, int $to): PromiseInterface
     {
         return $this->queueVerb($agent, 'declare_war', ['to' => $to]);
     }
 
+    /** Queues a `make_peace` intent suing for peace with `$to`. @see \NHA\VerbsTrait::makePeace() */
     public function makePeace(AgentContext|int|null $agent, int $to): PromiseInterface
     {
         return $this->queueVerb($agent, 'make_peace', ['to' => $to]);
     }
 
-    /** @param array<string, int> $give */
+    /**
+     * Queues an `assist` intent gifting the `$give` resources to ally `$to`.
+     *
+     * @param array<string, int> $give
+     *
+     * @see \NHA\VerbsTrait::assist()
+     */
     public function assist(AgentContext|int|null $agent, int $to, array $give): PromiseInterface
     {
         return $this->queueVerb($agent, 'assist', ['to' => $to, 'give' => $give]);
     }
 
     // Expansion era.
+
+    /** Queues a `depart` intent committing the ship to an interplanetary transfer to `$dest`. @see \NHA\VerbsTrait::depart() */
     public function depart(AgentContext|int|null $agent, string $dest): PromiseInterface
     {
         return $this->queueVerb($agent, 'depart', ['dest' => $dest]);
@@ -568,47 +679,58 @@ class Commands
         return $promise->then(fn($data) => self::jsonMessage(ucfirst($name), $data));
     }
 
-    // Thin aliases kept for the common boards / backward compatibility.
+    // Thin aliases kept for the common boards / backward compatibility. Each
+    // just calls {@see board()} with a fixed name.
+
+    /** Reads the `world` board (overall world state). */
     public function world(): PromiseInterface
     {
         return $this->board('world');
     }
 
+    /** Reads the `map` board (the world map). */
     public function map(): PromiseInterface
     {
         return $this->board('map');
     }
 
+    /** Reads the `market` board (agent order book), optionally filtered by `$resource` and row `$limit`. */
     public function market(?int $limit = null, ?string $resource = null): PromiseInterface
     {
         return $this->board('market', array_filter(['limit' => $limit, 'resource' => $resource], fn($v) => null !== $v));
     }
 
+    /** Reads the `roster` board (all agents). */
     public function roster(): PromiseInterface
     {
         return $this->board('roster');
     }
 
+    /** Reads the `rules` board (the crafting/economy codex). */
     public function rules(): PromiseInterface
     {
         return $this->board('rules');
     }
 
+    /** Reads the `contracts` board (open supply contracts). */
     public function contracts(): PromiseInterface
     {
         return $this->board('contracts');
     }
 
+    /** Reads the `depot` board (fixed depot buy/sell prices). */
     public function depot(): PromiseInterface
     {
         return $this->board('depot');
     }
 
+    /** Reads the `agent` board for one agent's public info. */
     public function agentInfo(int $agent_id): PromiseInterface
     {
         return $this->board('agent', ['id' => $agent_id]);
     }
 
+    /** Reads the `deposits` board around cell `($x, $y)`, optionally filtered by `$resource` and row `$limit`. */
     public function deposits(int $x, int $y, ?string $resource = null, ?int $limit = null): PromiseInterface
     {
         return $this->board('deposits', array_filter(
@@ -809,6 +931,13 @@ class Commands
         return 'general';
     }
 
+    /**
+     * Builds the guide container for one {@see HELP} section: the section body
+     * plus a topic select menu (marked with the current section as default)
+     * whose listener re-renders this container in place.
+     *
+     * @param string $key A key of {@see HELP}.
+     */
     private function helpContainer(string $key): Container
     {
         [, , $body] = self::HELP[$key];
