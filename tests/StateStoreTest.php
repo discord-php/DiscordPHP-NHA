@@ -165,4 +165,26 @@ class StateStoreTest extends NHAUnitTestCase
 
         $this->assertNull($store->getAgentPosition(1));
     }
+
+    public function testCommandSignaturesDefaultToEmptyAndPersist(): void
+    {
+        $store = new StateStore($this->path);
+        $this->assertSame([], $store->getCommandSignatures());
+
+        $store->setCommandSignature('mine', 'abc123');
+        $store->setCommandSignature('chop', 'def456');
+
+        $reloaded = new StateStore($this->path);
+        $this->assertSame(['mine' => 'abc123', 'chop' => 'def456'], $reloaded->getCommandSignatures());
+    }
+
+    public function testSaveIsAtomicAndLeavesNoTempFile(): void
+    {
+        $store = new StateStore($this->path);
+        $store->setCommandSignature('nha', 'sig');
+
+        $this->assertFileExists($this->path);
+        $this->assertJson(file_get_contents($this->path));
+        $this->assertSame([], glob(dirname($this->path) . '/*.tmp'), 'the temp file is renamed away, not left behind');
+    }
 }

@@ -30,6 +30,11 @@ class StateStore
     public function __construct(protected readonly string $path)
     {
         $this->data = is_file($path) ? (array) json_decode(file_get_contents($path), true) : [];
+
+        // Sweep any temp file orphaned by a previous crash mid-{@see save()}.
+        foreach (glob($path . '.*.tmp') ?: [] as $stale) {
+            @unlink($stale);
+        }
     }
 
     public function getDefaultAgent(): ?int
@@ -219,6 +224,25 @@ class StateStore
         ];
     }
 
+    /**
+     * The signature of the last successfully registered slash command by name.
+     * Used to decide whether a command's definition changed since the last boot
+     * and needs pushing to Discord (a rate-limited write).
+     *
+     * @return array<string, string> `command name => sha1(definition)`
+     */
+    public function getCommandSignatures(): array
+    {
+        return array_map('strval', (array) ($this->data['command_signatures'] ?? []));
+    }
+
+    /** Records that `$name` was registered with definition signature `$hash`. */
+    public function setCommandSignature(string $name, string $hash): void
+    {
+        $this->data['command_signatures'][$name] = $hash;
+        $this->save();
+    }
+
     protected function save(): void
     {
         $dir = dirname($this->path);
@@ -226,6 +250,12 @@ class StateStore
             mkdir($dir, 0o777, true);
         }
 
-        file_put_contents($this->path, json_encode($this->data, JSON_PRETTY_PRINT));
+        // Write to a sibling temp file then rename, so a crash (or a SIGTERM
+        // mid-write) can never leave a truncated / half-written state file.
+        $tmp = $this->path . '.' . getmypid() . '.tmp';
+        if (file_put_contents($tmp, json_encode($this->data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)) === false) {
+            return;
+        }
+        @rename($tmp, $this->path);
     }
 }

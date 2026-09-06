@@ -17,6 +17,7 @@ use Discord\Builders\CommandBuilder;
 use Discord\Builders\Components\Container;
 use Discord\Builders\Components\TextDisplay;
 use Discord\Parts\Channel\Message;
+use Discord\Parts\Interactions\Command\Choice;
 use Discord\Parts\Interactions\Command\Command;
 use Discord\Parts\Interactions\Command\Option;
 use Discord\Parts\Interactions\Interaction;
@@ -307,12 +308,35 @@ foreach (['observe', 'say', 'act'] as $alias) {
 // handlers, registered lazily once the application/gateway are both ready.
 // -----------------------------------------------------------------------
 
-$registerSlashCommands = function (NHA $nha) use ($commands, $text, $replyToInteraction, $flattenOptions): void {
-    $nha->application->commands->freshen()->then(function (GlobalCommandRepository $existing) use ($nha, $commands, $text, $replyToInteraction, $flattenOptions): void {
-        $opt = function (int $type, string $name, string $description, bool $required = false) use ($nha): Option {
+$registerSlashCommands = function (NHA $nha) use ($commands, $state, $text, $replyToInteraction, $flattenOptions): void {
+    $nha->application->commands->freshen()->then(function (GlobalCommandRepository $existing) use ($nha, $commands, $state, $text, $replyToInteraction, $flattenOptions): void {
+        /**
+         * Builds a slash-command option. `$constraints` narrows what Discord
+         * will accept before the interaction ever reaches the bot:
+         *   - `choices`  list (value = label) or [label => value] map, ≤25
+         *   - `min`/`max` value bounds for INTEGER/NUMBER, length bounds for STRING
+         */
+        $opt = function (int $type, string $name, string $description, bool $required = false, array $constraints = []) use ($nha): Option {
             /** @var Option $option */
             $option = $nha->getFactory()->part(Option::class);
             $option->setType($type)->setName($name)->setDescription($description)->setRequired($required);
+
+            if (array_key_exists('min', $constraints)) {
+                $type === Option::STRING
+                    ? $option->setMinLength((int) $constraints['min'])
+                    : $option->setMinValue($constraints['min']);
+            }
+            if (array_key_exists('max', $constraints)) {
+                $type === Option::STRING
+                    ? $option->setMaxLength((int) $constraints['max'])
+                    : $option->setMaxValue($constraints['max']);
+            }
+            foreach ($constraints['choices'] ?? [] as $label => $value) {
+                $option->addChoice($nha->getFactory()->part(Choice::class, [
+                    'name' => is_int($label) ? (string) $value : $label,
+                    'value' => $value,
+                ]));
+            }
 
             return $option;
         };
@@ -326,11 +350,20 @@ $registerSlashCommands = function (NHA $nha) use ($commands, $text, $replyToInte
             return $subOption;
         };
 
-        $agentIdOpt = fn() => $opt(Option::INTEGER, 'agent_id', 'Agent id (defaults to your registered agent).');
+        // Constrained value sets the server expects verbatim.
+        $WEAPONS = ['kinetic_gun', 'energy_weapon'];
+        $MEDICINES = ['salve', 'stimpack', 'medkit', 'antidote'];
+        $DESTINATIONS = ['deimos', 'phobos', 'mars', 'venus', 'earth'];
+        // `board` choices: the readable boards minus the 3 with dedicated paths
+        // (healthz is a health check; agents/agent are covered by /nha agent),
+        // capped at Discord's 25-choice limit.
+        $BOARDS = array_slice(array_values(array_diff(Commands::BOARDS, ['healthz', 'agents', 'agent'])), 0, 25);
+
+        $agentIdOpt = fn() => $opt(Option::INTEGER, 'agent_id', 'Agent id (defaults to your registered agent).', false, ['min' => 1]);
 
         // "Whose agent?" selector for the per-user commands: omit for your own,
         // `bot` for the bot's default agent, or a numeric agent id.
-        $agentOpt = fn() => $opt(Option::STRING, 'agent', 'Whose agent: omit for yours, "bot", or an agent id.');
+        $agentOpt = fn() => $opt(Option::STRING, 'agent', 'Whose agent: omit for yours, "bot", or an agent id.', false, ['min' => 1]);
 
         // Resolves the acting agent for a per-user interaction from its optional
         // `agent` option, defaulting to the caller's own linked agent.
@@ -339,13 +372,13 @@ $registerSlashCommands = function (NHA $nha) use ($commands, $text, $replyToInte
 
         $subCommands = [
             $sub('register', 'Register a new agent (becomes the default).', [
-                $opt(Option::STRING, 'name', 'Agent name.'),
-                $opt(Option::INTEGER, 'metal', 'Starting metal.'),
-                $opt(Option::INTEGER, 'credits', 'Starting credits.'),
+                $opt(Option::STRING, 'name', 'Agent name (1-24 characters).', false, ['min' => 1, 'max' => 24]),
+                $opt(Option::INTEGER, 'metal', 'Starting metal.', false, ['min' => 0]),
+                $opt(Option::INTEGER, 'credits', 'Starting credits.', false, ['min' => 0]),
             ]),
             $sub('observe', 'Observe the world from your agent\'s perspective.', [$agentIdOpt()]),
             $sub('act', 'Send any raw verb + JSON args intent.', [
-                $opt(Option::STRING, 'verb', 'Verb to perform, e.g. attack, trade, contract.', true),
+                $opt(Option::STRING, 'verb', 'Verb to perform, e.g. attack, trade, contract.', true, ['min' => 1]),
                 $opt(Option::STRING, 'args', 'JSON object of args, e.g. {"dx":1,"dy":0}.'),
                 $agentIdOpt(),
             ]),
@@ -354,57 +387,57 @@ $registerSlashCommands = function (NHA $nha) use ($commands, $text, $replyToInte
                 $opt(Option::INTEGER, 'dy', 'Delta Y.', true),
                 $agentIdOpt(),
             ]),
-            $sub('mine', 'Mine nearby minerals.', [$opt(Option::INTEGER, 'n', 'Amount to mine.'), $agentIdOpt()]),
-            $sub('chop', 'Chop nearby trees.', [$opt(Option::INTEGER, 'n', 'Amount to chop.'), $agentIdOpt()]),
-            $sub('gather', 'Forage the nearest plant.', [$opt(Option::INTEGER, 'n', 'Amount to gather.'), $agentIdOpt()]),
-            $sub('say', 'Say something in the world chat.', [$opt(Option::STRING, 'text', 'Message text.', true), $agentIdOpt()]),
+            $sub('mine', 'Mine nearby minerals.', [$opt(Option::INTEGER, 'n', 'Amount to mine (>=1).', false, ['min' => 1]), $agentIdOpt()]),
+            $sub('chop', 'Chop nearby trees.', [$opt(Option::INTEGER, 'n', 'Amount to chop (>=1).', false, ['min' => 1]), $agentIdOpt()]),
+            $sub('gather', 'Forage the nearest plant.', [$opt(Option::INTEGER, 'n', 'Amount to gather (>=1).', false, ['min' => 1]), $agentIdOpt()]),
+            $sub('say', 'Say something in the world chat.', [$opt(Option::STRING, 'text', 'Message text.', true, ['min' => 1, 'max' => 280]), $agentIdOpt()]),
             $sub('tell', 'Privately tell another agent something.', [
-                $opt(Option::INTEGER, 'to', 'Target agent id.', true),
-                $opt(Option::STRING, 'text', 'Message text.', true),
+                $opt(Option::INTEGER, 'to', 'Target agent id.', true, ['min' => 1]),
+                $opt(Option::STRING, 'text', 'Message text.', true, ['min' => 1, 'max' => 280]),
                 $agentIdOpt(),
             ]),
             $sub('world', 'Show the current world state.'),
             $sub('market', 'Show the agent market order book.'),
             $sub('depot', 'Show the fixed depot buy/sell prices.'),
             $sub('rules', 'Show the crafting rules codex.'),
-            $sub('agent', 'Look up any agent\'s public info.', [$opt(Option::INTEGER, 'agent_id', 'Agent id to look up.', true)]),
+            $sub('agent', 'Look up any agent\'s public info.', [$opt(Option::INTEGER, 'agent_id', 'Agent id to look up.', true, ['min' => 1])]),
             $sub('read', 'Read any world board.', [
-                $opt(Option::STRING, 'board', 'World board to read, e.g. world, market, map, contracts, arena (see /nha read).', true),
+                $opt(Option::STRING, 'board', 'World board to read.', true, ['choices' => $BOARDS]),
                 $opt(Option::STRING, 'arg', 'Board argument: agent id, body name, or resource.'),
-                $opt(Option::INTEGER, 'x', 'X (for the deposits board).'),
-                $opt(Option::INTEGER, 'y', 'Y (for the deposits board).'),
-                $opt(Option::INTEGER, 'limit', 'Row limit, where the board supports it.'),
+                $opt(Option::INTEGER, 'x', 'X (for the deposits board).', false, ['min' => 0]),
+                $opt(Option::INTEGER, 'y', 'Y (for the deposits board).', false, ['min' => 0]),
+                $opt(Option::INTEGER, 'limit', 'Row limit, where the board supports it.', false, ['min' => 1]),
             ]),
             $sub('intent', 'Check whether a queued intent applied or was rejected.', [
-                $opt(Option::STRING, 'id', 'The queued_intent id from an action confirmation.', true),
+                $opt(Option::INTEGER, 'id', 'The queued_intent id from an action confirmation.', true, ['min' => 1]),
             ]),
             $sub('sell', 'Sell a resource to the depot.', [
-                $opt(Option::STRING, 'resource', 'Resource to sell.', true),
-                $opt(Option::INTEGER, 'n', 'Amount (default 1).'),
+                $opt(Option::STRING, 'resource', 'Resource to sell.', true, ['min' => 1]),
+                $opt(Option::INTEGER, 'n', 'Amount (default 1).', false, ['min' => 1]),
                 $agentIdOpt(),
             ]),
             $sub('buy', 'Buy a resource from the depot.', [
-                $opt(Option::STRING, 'resource', 'Resource to buy.', true),
-                $opt(Option::INTEGER, 'n', 'Amount (default 1).'),
+                $opt(Option::STRING, 'resource', 'Resource to buy.', true, ['min' => 1]),
+                $opt(Option::INTEGER, 'n', 'Amount (default 1).', false, ['min' => 1]),
                 $agentIdOpt(),
             ]),
             $sub('heal', 'Apply a medicine to yourself or an ally.', [
-                $opt(Option::INTEGER, 'target', 'Ally to heal (omit to heal yourself).'),
-                $opt(Option::STRING, 'item', 'salve / stimpack / medkit / antidote.'),
+                $opt(Option::INTEGER, 'target', 'Ally to heal (omit to heal yourself).', false, ['min' => 1]),
+                $opt(Option::STRING, 'item', 'Which medicine (engine picks one if omitted).', false, ['choices' => $MEDICINES]),
                 $agentIdOpt(),
             ]),
             $sub('attack', 'Fire a ranged weapon at a target.', [
-                $opt(Option::INTEGER, 'target', 'Target agent id.', true),
-                $opt(Option::STRING, 'weapon', 'kinetic_gun / energy_weapon (optional).'),
+                $opt(Option::INTEGER, 'target', 'Target agent id.', true, ['min' => 1]),
+                $opt(Option::STRING, 'weapon', 'Which weapon (engine picks one if omitted).', false, ['choices' => $WEAPONS]),
                 $agentIdOpt(),
             ]),
             $sub('deploy', 'Send a finalized vehicle off to roam and mine.', [$agentIdOpt()]),
             $sub('finalize', 'Assemble your loose parts into one vehicle.', [
-                $opt(Option::STRING, 'name', 'Name for the vehicle (optional).'),
+                $opt(Option::STRING, 'name', 'Name for the vehicle (optional).', false, ['min' => 1, 'max' => 24]),
                 $agentIdOpt(),
             ]),
             $sub('think', 'Ask the LLM what to do next and queue it.', [$agentIdOpt()]),
-            $sub('autoplay', 'Turn the autonomous LLM play loop on/off.', [$opt(Option::STRING, 'state', 'on or off (omit to show status).')]),
+            $sub('autoplay', 'Turn the autonomous LLM play loop on/off.', [$opt(Option::STRING, 'state', 'on or off (omit to show status).', false, ['choices' => ['on', 'off']])]),
         ];
 
         $dispatch = function (string $sub, array $a) use ($commands): PromiseInterface {
@@ -452,23 +485,42 @@ $registerSlashCommands = function (NHA $nha) use ($commands, $text, $replyToInte
         });
 
         /**
-         * Creates a global command if it isn't already registered, logging the attempt
-         * and its outcome so a failed/rejected save() is never silently missing.
+         * Registers a global chat command. Creates it when missing, and PATCHes
+         * it when its definition (name + description + options, including every
+         * choice/min/max) has changed since the last successful registration —
+         * tracked by a signature in `var/state.json` so an unchanged boot makes
+         * zero (rate-limited) writes. Every attempt and outcome is logged.
          */
-        $createCommand = function (string $name, string $description, array $options = []) use ($nha, $existing): void {
-            if ($existing->get('name', $name)) {
-                return;
-            }
-
-            $nha->logger->debug("[GLOBAL APPLICATION COMMAND] Creating `{$name}` command...");
+        $signatures = $state->getCommandSignatures();
+        $createCommand = function (string $name, string $description, array $options = []) use ($nha, $state, $existing, $signatures): void {
             $builder = CommandBuilder::new()->setName($name)->setType(Command::CHAT_INPUT)->setDescription($description);
             foreach ($options as $option) {
                 $builder->addOption($option);
             }
 
-            $builder->create($existing)->save("{$name} initial creation")->then(
-                fn() => $nha->logger->info("[GLOBAL APPLICATION COMMAND] Created `{$name}` command."),
-                fn(\Throwable $e) => $nha->logger->error("[GLOBAL APPLICATION COMMAND] Failed to create `{$name}` command: {$e->getMessage()}"),
+            $definition = $builder->jsonSerialize();
+            $hash = sha1(json_encode($definition));
+            $current = $existing->get('name', $name);
+
+            if ($current !== null && ($signatures[$name] ?? null) === $hash) {
+                return; // already registered with this exact definition
+            }
+
+            $nha->logger->debug('[GLOBAL APPLICATION COMMAND] ' . ($current === null ? 'Creating' : 'Updating') . " `{$name}` command...");
+
+            if ($current !== null) {
+                $current->fill($definition);
+                $save = $current->save("{$name} definition update");
+            } else {
+                $save = $builder->create($existing)->save("{$name} initial creation");
+            }
+
+            $save->then(
+                function () use ($nha, $state, $name, $hash, $current): void {
+                    $state->setCommandSignature($name, $hash);
+                    $nha->logger->info('[GLOBAL APPLICATION COMMAND] ' . ($current === null ? 'Created' : 'Updated') . " `{$name}` command.");
+                },
+                fn(\Throwable $e) => $nha->logger->error("[GLOBAL APPLICATION COMMAND] Failed to register `{$name}` command: {$e->getMessage()}"),
             );
         };
 
@@ -523,47 +575,51 @@ $registerSlashCommands = function (NHA $nha) use ($commands, $text, $replyToInte
             );
         });
 
+        $countOpt = fn(string $desc) => $opt(Option::INTEGER, 'n', $desc, false, ['min' => 1]);
+        $idOpt = fn(string $name, string $desc, bool $required = true) => $opt(Option::INTEGER, $name, $desc, $required, ['min' => 1]);
+        $msgOpt = fn(string $desc) => $opt(Option::STRING, 'text', $desc, true, ['min' => 1, 'max' => 280]);
+
         $playerActionCommands = [
-            'mine' => [[ $opt(Option::INTEGER, 'n', 'Amount to mine.') ], fn(array $args) => ['mine', ['n' => (int) ($args['n'] ?? 1)]]],
-            'chop' => [[ $opt(Option::INTEGER, 'n', 'Amount to chop.') ], fn(array $args) => ['chop', ['n' => (int) ($args['n'] ?? 1)]]],
-            'gather' => [[ $opt(Option::INTEGER, 'n', 'Amount to gather.') ], fn(array $args) => ['gather', ['n' => (int) ($args['n'] ?? 1)]]],
+            'mine' => [[ $countOpt('Amount to mine (>=1).') ], fn(array $args) => ['mine', ['n' => (int) ($args['n'] ?? 1)]]],
+            'chop' => [[ $countOpt('Amount to chop (>=1).') ], fn(array $args) => ['chop', ['n' => (int) ($args['n'] ?? 1)]]],
+            'gather' => [[ $countOpt('Amount to gather (>=1).') ], fn(array $args) => ['gather', ['n' => (int) ($args['n'] ?? 1)]]],
             'plant' => [[], fn(array $args) => ['plant', []]],
             'ride' => [[], fn(array $args) => ['ride', []]],
             'launch' => [[], fn(array $args) => ['launch', []]],
             'land' => [[], fn(array $args) => ['land', []]],
             'dock' => [[], fn(array $args) => ['dock', []]],
             'attune' => [[], fn(array $args) => ['attune', []]],
-            'say' => [[ $opt(Option::STRING, 'text', 'World chat message.', true) ], fn(array $args) => ['say', ['text' => $args['text']]]],
+            'say' => [[ $msgOpt('World chat message.') ], fn(array $args) => ['say', ['text' => $args['text']]]],
             'tell' => [[
-                $opt(Option::INTEGER, 'to', 'Target agent id.', true),
-                $opt(Option::STRING, 'text', 'Private message.', true),
+                $idOpt('to', 'Target agent id.'),
+                $msgOpt('Private message.'),
             ], fn(array $args) => ['tell', ['to' => (int) $args['to'], 'text' => $args['text']]]],
 
             // Space & flight.
             'deploy' => [[], fn(array $args) => ['deploy', []]],
-            'finalize' => [[ $opt(Option::STRING, 'name', 'Vehicle name (optional).') ], fn(array $args) => ['finalize', array_filter(['name' => $args['name'] ?? null], fn($v) => null !== $v)]],
+            'finalize' => [[ $opt(Option::STRING, 'name', 'Vehicle name (optional).', false, ['min' => 1, 'max' => 24]) ], fn(array $args) => ['finalize', array_filter(['name' => $args['name'] ?? null], fn($v) => null !== $v)]],
             'arm' => [[], fn(array $args) => ['arm', []]],
             'land_moon' => [[], fn(array $args) => ['land_moon', []]],
             'land_body' => [[], fn(array $args) => ['land_body', []]],
             'distress' => [[], fn(array $args) => ['distress', []]],
-            'depart' => [[ $opt(Option::STRING, 'dest', 'deimos/phobos/mars/venus/earth.', true) ], fn(array $args) => ['depart', ['dest' => $args['dest']]]],
+            'depart' => [[ $opt(Option::STRING, 'dest', 'Destination body.', true, ['choices' => $DESTINATIONS]) ], fn(array $args) => ['depart', ['dest' => $args['dest']]]],
 
             // Economy.
-            'sell' => [[ $opt(Option::STRING, 'resource', 'Resource to sell.', true), $opt(Option::INTEGER, 'n', 'Amount (default 1).') ], fn(array $args) => ['sell', ['resource' => $args['resource'], 'n' => (int) ($args['n'] ?? 1)]]],
-            'buy' => [[ $opt(Option::STRING, 'resource', 'Resource to buy.', true), $opt(Option::INTEGER, 'n', 'Amount (default 1).') ], fn(array $args) => ['buy', ['resource' => $args['resource'], 'n' => (int) ($args['n'] ?? 1)]]],
+            'sell' => [[ $opt(Option::STRING, 'resource', 'Resource to sell.', true, ['min' => 1]), $countOpt('Amount (default 1).') ], fn(array $args) => ['sell', ['resource' => $args['resource'], 'n' => (int) ($args['n'] ?? 1)]]],
+            'buy' => [[ $opt(Option::STRING, 'resource', 'Resource to buy.', true, ['min' => 1]), $countOpt('Amount (default 1).') ], fn(array $args) => ['buy', ['resource' => $args['resource'], 'n' => (int) ($args['n'] ?? 1)]]],
 
             // Medicine & combat.
-            'heal' => [[ $opt(Option::INTEGER, 'target', 'Ally to heal (omit for self).'), $opt(Option::STRING, 'item', 'salve/stimpack/medkit/antidote.') ], fn(array $args) => ['heal', array_filter(['target' => isset($args['target']) ? (int) $args['target'] : null, 'item' => $args['item'] ?? null], fn($v) => null !== $v)]],
-            'attack' => [[ $opt(Option::INTEGER, 'target', 'Target agent id.', true), $opt(Option::STRING, 'weapon', 'kinetic_gun/energy_weapon (optional).') ], fn(array $args) => ['attack', array_filter(['target' => (int) $args['target'], 'weapon' => $args['weapon'] ?? null], fn($v) => null !== $v)]],
-            'steal' => [[ $opt(Option::INTEGER, 'from', 'Adjacent agent id.', true), $opt(Option::STRING, 'resource', 'Resource to lift.', true), $opt(Option::INTEGER, 'n', 'Amount (default 1).') ], fn(array $args) => ['steal', ['from' => (int) $args['from'], 'resource' => $args['resource'], 'n' => (int) ($args['n'] ?? 1)]]],
-            'collect' => [[ $opt(Option::STRING, 'loot', 'Loot pile id.', true) ], fn(array $args) => ['collect', ['loot' => $args['loot']]]],
+            'heal' => [[ $idOpt('target', 'Ally to heal (omit for self).', false), $opt(Option::STRING, 'item', 'Which medicine (engine picks one if omitted).', false, ['choices' => $MEDICINES]) ], fn(array $args) => ['heal', array_filter(['target' => isset($args['target']) ? (int) $args['target'] : null, 'item' => $args['item'] ?? null], fn($v) => null !== $v)]],
+            'attack' => [[ $idOpt('target', 'Target agent id.'), $opt(Option::STRING, 'weapon', 'Which weapon (engine picks one if omitted).', false, ['choices' => $WEAPONS]) ], fn(array $args) => ['attack', array_filter(['target' => (int) $args['target'], 'weapon' => $args['weapon'] ?? null], fn($v) => null !== $v)]],
+            'steal' => [[ $idOpt('from', 'Adjacent agent id.'), $opt(Option::STRING, 'resource', 'Resource to lift.', true, ['min' => 1]), $countOpt('Amount (default 1).') ], fn(array $args) => ['steal', ['from' => (int) $args['from'], 'resource' => $args['resource'], 'n' => (int) ($args['n'] ?? 1)]]],
+            'collect' => [[ $opt(Option::STRING, 'loot', 'Loot pile id.', true, ['min' => 1]) ], fn(array $args) => ['collect', ['loot' => $args['loot']]]],
 
             // Diplomacy.
-            'ally' => [[ $opt(Option::INTEGER, 'to', 'Agent id.', true) ], fn(array $args) => ['ally', ['to' => (int) $args['to']]]],
-            'accept_ally' => [[ $opt(Option::INTEGER, 'to', 'Agent id.', true) ], fn(array $args) => ['accept_ally', ['to' => (int) $args['to']]]],
-            'unally' => [[ $opt(Option::INTEGER, 'to', 'Agent id.', true) ], fn(array $args) => ['unally', ['to' => (int) $args['to']]]],
-            'declare_war' => [[ $opt(Option::INTEGER, 'to', 'Agent id.', true) ], fn(array $args) => ['declare_war', ['to' => (int) $args['to']]]],
-            'make_peace' => [[ $opt(Option::INTEGER, 'to', 'Agent id.', true) ], fn(array $args) => ['make_peace', ['to' => (int) $args['to']]]],
+            'ally' => [[ $idOpt('to', 'Agent id.') ], fn(array $args) => ['ally', ['to' => (int) $args['to']]]],
+            'accept_ally' => [[ $idOpt('to', 'Agent id.') ], fn(array $args) => ['accept_ally', ['to' => (int) $args['to']]]],
+            'unally' => [[ $idOpt('to', 'Agent id.') ], fn(array $args) => ['unally', ['to' => (int) $args['to']]]],
+            'declare_war' => [[ $idOpt('to', 'Agent id.') ], fn(array $args) => ['declare_war', ['to' => (int) $args['to']]]],
+            'make_peace' => [[ $idOpt('to', 'Agent id.') ], fn(array $args) => ['make_peace', ['to' => (int) $args['to']]]],
         ];
 
         foreach ($playerActionCommands as $name => [$options, $toIntent]) {
@@ -582,7 +638,7 @@ $registerSlashCommands = function (NHA $nha) use ($commands, $text, $replyToInte
 
         $userSlashCommands = [
             'help' => [[
-                $opt(Option::STRING, 'category', 'Topic (omit for the general guide): move, gather, craft, economy, combat, space, commands, …'),
+                $opt(Option::STRING, 'category', 'Topic (omit for the general guide).', false, ['choices' => array_keys(Commands::HELP)]),
             ], 'How to play NHA — a categorised guide.'],
             'start' => [[], 'Open your private NHA control panel.'],
             'login' => [[], 'Create or reopen your personal NHA agent.'],
