@@ -6,6 +6,9 @@ use NHA\Parts\AgentObservation;
 
 class AgentObservationTest extends NHATestCase
 {
+    /**
+     * @covers \NHA\Parts\AgentObservation
+     */
     public function testGetReadsNestedDotSeparatedPath(): void
     {
         $obs = new AgentObservation(1, ['nearby' => ['agents' => [1, 2, 3]]]);
@@ -13,6 +16,9 @@ class AgentObservationTest extends NHATestCase
         $this->assertSame([1, 2, 3], $obs->get('nearby.agents'));
     }
 
+    /**
+     * @covers \NHA\Parts\AgentObservation
+     */
     public function testGetReturnsDefaultWhenMissing(): void
     {
         $obs = new AgentObservation(1, []);
@@ -21,6 +27,9 @@ class AgentObservationTest extends NHATestCase
         $this->assertNull($obs->get('missing.path'));
     }
 
+    /**
+     * @covers \NHA\Parts\AgentObservation
+     */
     public function testGetHpFallsBackToHealthKey(): void
     {
         $obs = new AgentObservation(1, ['health' => 55]);
@@ -28,6 +37,9 @@ class AgentObservationTest extends NHATestCase
         $this->assertSame(55.0, $obs->getHp());
     }
 
+    /**
+     * @covers \NHA\Parts\AgentObservation
+     */
     public function testGetMaxHpDefaultsTo100(): void
     {
         $obs = new AgentObservation(1, []);
@@ -35,6 +47,9 @@ class AgentObservationTest extends NHATestCase
         $this->assertSame(100.0, $obs->getMaxHp());
     }
 
+    /**
+     * @covers \NHA\Parts\AgentObservation
+     */
     public function testGetPositionFallsBackToPosKey(): void
     {
         $obs = new AgentObservation(1, ['pos' => ['x' => 3, 'y' => 4]]);
@@ -42,6 +57,9 @@ class AgentObservationTest extends NHATestCase
         $this->assertSame(['x' => 3, 'y' => 4], $obs->getPosition());
     }
 
+    /**
+     * @covers \NHA\Parts\AgentObservation
+     */
     public function testGetPositionNormalisesPositionalPair(): void
     {
         // GET /observe/:id returns `position` as a `[x, y]` pair.
@@ -50,6 +68,9 @@ class AgentObservationTest extends NHATestCase
         $this->assertSame(['x' => 30, 'y' => 118], $obs->getPosition());
     }
 
+    /**
+     * @covers \NHA\Parts\AgentObservation
+     */
     public function testGetPositionAcceptsObjectShape(): void
     {
         $obs = new AgentObservation(1, ['position' => ['x' => 5, 'y' => 6]]);
@@ -57,6 +78,9 @@ class AgentObservationTest extends NHATestCase
         $this->assertSame(['x' => 5, 'y' => 6], $obs->getPosition());
     }
 
+    /**
+     * @covers \NHA\Parts\AgentObservation
+     */
     public function testGetPositionFallsBackToFlatScalars(): void
     {
         $obs = new AgentObservation(1, ['x' => 7, 'y' => 8]);
@@ -64,11 +88,17 @@ class AgentObservationTest extends NHATestCase
         $this->assertSame(['x' => 7, 'y' => 8], $obs->getPosition());
     }
 
+    /**
+     * @covers \NHA\Parts\AgentObservation
+     */
     public function testGetPositionIsNullWhenAbsent(): void
     {
         $this->assertNull((new AgentObservation(1, []))->getPosition());
     }
 
+    /**
+     * @covers \NHA\Parts\AgentObservation
+     */
     public function testGetNearbyAgentsReadsObservePayloadKey(): void
     {
         $obs = new AgentObservation(1, ['nearby_agents' => [['id' => 2, 'x' => 3, 'y' => 4]]]);
@@ -76,6 +106,9 @@ class AgentObservationTest extends NHATestCase
         $this->assertSame([['id' => 2, 'x' => 3, 'y' => 4]], $obs->getNearbyAgents());
     }
 
+    /**
+     * @covers \NHA\Parts\AgentObservation
+     */
     public function testGetThreatsReadsAlertsKey(): void
     {
         $obs = new AgentObservation(1, ['alerts' => ['incoming']]);
@@ -83,6 +116,9 @@ class AgentObservationTest extends NHATestCase
         $this->assertSame(['incoming'], $obs->getThreats());
     }
 
+    /**
+     * @covers \NHA\Parts\AgentObservation
+     */
     public function testGetInventoryDefaultsToEmptyArray(): void
     {
         $obs = new AgentObservation(1, []);
@@ -90,6 +126,9 @@ class AgentObservationTest extends NHATestCase
         $this->assertSame([], $obs->getInventory());
     }
 
+    /**
+     * @covers \NHA\Parts\AgentObservation
+     */
     public function testGetThreatsFallsBackToThreatAlertsKey(): void
     {
         $obs = new AgentObservation(1, ['threat_alerts' => ['a']]);
@@ -97,6 +136,9 @@ class AgentObservationTest extends NHATestCase
         $this->assertSame(['a'], $obs->getThreats());
     }
 
+    /**
+     * @covers \NHA\Parts\AgentObservation
+     */
     public function testGetMessagesDefaultsToEmptyArray(): void
     {
         $obs = new AgentObservation(1, []);
@@ -104,6 +146,9 @@ class AgentObservationTest extends NHATestCase
         $this->assertSame([], $obs->getMessages());
     }
 
+    /**
+     * @covers \NHA\Parts\AgentObservation
+     */
     public function testJsonSerializeReturnsRawPayload(): void
     {
         $obs = new AgentObservation(1, ['hp' => 10]);
@@ -117,6 +162,8 @@ class AgentObservationTest extends NHATestCase
      * a single row of `DepositsOut.deposits`, not the envelope.
      *
      * @link https://nha.recluse.lol/openapi.json
+     *
+     * @coversNothing schema-drift guard, not a unit under test
      */
     public function testPartsMatchOpenApiSchemaKeys(): void
     {
@@ -164,6 +211,9 @@ class AgentObservationTest extends NHATestCase
         }
     }
 
+    /**
+     * @covers \NHA\Parts\Deposits
+     */
     public function testDepositsPartModelsOneRow(): void
     {
         $reflection = new ReflectionClass(\NHA\Parts\Deposits::class);
@@ -173,6 +223,9 @@ class AgentObservationTest extends NHATestCase
         $this->assertSame(['amount', 'dist', 'id', 'resource', 'x', 'y'], $actual);
     }
 
+    /**
+     * @covers \NHA\Parts\Out
+     */
     public function testOutBaseKeepsUndeclaredKeysAndSerialisesLosslessly(): void
     {
         $part = (new ReflectionClass(\NHA\Parts\World::class))->newInstanceWithoutConstructor();

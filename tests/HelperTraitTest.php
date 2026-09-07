@@ -14,6 +14,9 @@ class HelperTraitTest extends NHAUnitTestCase
         };
     }
 
+    /**
+     * @covers \NHA\HelperTrait
+     */
     public function testCreateBuilderReturnsMessageBuilder(): void
     {
         $builder = $this->subject()::createBuilder();
@@ -21,6 +24,9 @@ class HelperTraitTest extends NHAUnitTestCase
         $this->assertInstanceOf(MessageBuilder::class, $builder);
     }
 
+    /**
+     * @covers \NHA\HelperTrait
+     */
     public function testBarRendersFullBarWhenCurrentEqualsMax(): void
     {
         $result = $this->subject()::bar(10, 10, 10);
@@ -28,6 +34,9 @@ class HelperTraitTest extends NHAUnitTestCase
         $this->assertSame(str_repeat('█', 10) . ' (10/10)', $result);
     }
 
+    /**
+     * @covers \NHA\HelperTrait
+     */
     public function testBarRendersEmptyBarWhenCurrentIsZero(): void
     {
         $result = $this->subject()::bar(0, 10, 10);
@@ -35,6 +44,9 @@ class HelperTraitTest extends NHAUnitTestCase
         $this->assertSame(str_repeat('░', 10) . ' (0/10)', $result);
     }
 
+    /**
+     * @covers \NHA\HelperTrait
+     */
     public function testBarClampsCurrentAboveMax(): void
     {
         $result = $this->subject()::bar(15, 10, 4);
@@ -42,6 +54,9 @@ class HelperTraitTest extends NHAUnitTestCase
         $this->assertSame(str_repeat('█', 4) . ' (15/10)', $result);
     }
 
+    /**
+     * @covers \NHA\HelperTrait
+     */
     public function testBarTreatsNonPositiveMaxAsOne(): void
     {
         $result = $this->subject()::bar(0, 0, 4);

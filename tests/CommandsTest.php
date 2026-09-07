@@ -66,6 +66,9 @@ class CommandsTest extends NHAUnitTestCase
         return json_encode($builder->jsonSerialize());
     }
 
+    /**
+     * @covers \NHA\Commands
+     */
     public function testQueueVerbSurfacesQueuedIntentId(): void
     {
         $commands = $this->commands();
@@ -83,6 +86,9 @@ class CommandsTest extends NHAUnitTestCase
         $this->assertStringContainsString('intent 42', $out, 'confirmation must expose the queued_intent id');
     }
 
+    /**
+     * @covers \NHA\Commands
+     */
     public function testIntentStatusRendersOutcome(): void
     {
         $commands = $this->commands(['id' => 42, 'agent' => 999, 'verb' => 'mine', 'status' => 'applied', 'result' => 'mined 3 iron', 'created' => 987654]);
@@ -100,6 +106,9 @@ class CommandsTest extends NHAUnitTestCase
         $this->assertStringNotContainsString('tick 1)', $out);
     }
 
+    /**
+     * @covers \NHA\Commands
+     */
     public function testBoardDepotHitsTheDepotEndpoint(): void
     {
         $commands = $this->commands(['prices' => ['iron' => ['buy' => 2, 'sell' => 1]]]);
@@ -110,6 +119,9 @@ class CommandsTest extends NHAUnitTestCase
         $this->assertStringContainsString('depot', $this->calls[0][1]);
     }
 
+    /**
+     * @covers \NHA\Commands
+     */
     public function testBoardRejectsUnknownName(): void
     {
         $commands = $this->commands();
@@ -123,6 +135,9 @@ class CommandsTest extends NHAUnitTestCase
         $this->assertStringContainsString('nonsense', $err->getMessage());
     }
 
+    /**
+     * @covers \NHA\Commands
+     */
     public function testDepartSendsDestArg(): void
     {
         $commands = $this->commands();
@@ -131,6 +146,9 @@ class CommandsTest extends NHAUnitTestCase
         $this->assertSame(['agent' => 999, 'verb' => 'depart', 'args' => ['dest' => 'venus'], 'token' => 'tok'], $this->calls[0][2]);
     }
 
+    /**
+     * @covers \NHA\Commands
+     */
     public function testSellBuildsResourceAndAmount(): void
     {
         $commands = $this->commands();
@@ -140,6 +158,9 @@ class CommandsTest extends NHAUnitTestCase
         $this->assertSame(['resource' => 'iron', 'n' => 5], $this->calls[0][2]['args']);
     }
 
+    /**
+     * @covers \NHA\Commands
+     */
     public function testAttackOmitsWeaponWhenNull(): void
     {
         $commands = $this->commands();
@@ -148,6 +169,9 @@ class CommandsTest extends NHAUnitTestCase
         $this->assertSame(['target' => 7], $this->calls[0][2]['args']);
     }
 
+    /**
+     * @covers \NHA\Commands
+     */
     public function testConstructMergesShape(): void
     {
         $commands = $this->commands();
@@ -156,12 +180,18 @@ class CommandsTest extends NHAUnitTestCase
         $this->assertSame(['shape' => 'box', 'size' => 8, 'height' => 40], $this->calls[0][2]['args']);
     }
 
+    /**
+     * @covers \NHA\Commands
+     */
     public function testResolveAgentIdFallsBackToDefault(): void
     {
         $this->assertSame(999, $this->commands()->resolveAgentId(null));
         $this->assertSame(7, $this->commands()->resolveAgentId(7));
     }
 
+    /**
+     * @covers \NHA\Commands
+     */
     public function testHelpDefaultsToTheGeneralGuideWithATopicMenu(): void
     {
         $out = self::render($this->commands()->help(null));
@@ -173,6 +203,9 @@ class CommandsTest extends NHAUnitTestCase
         $this->assertStringContainsString('Command reference', $out, 'every category is offered in the menu');
     }
 
+    /**
+     * @covers \NHA\Commands
+     */
     public function testHelpRendersARequestedCategory(): void
     {
         $out = self::render($this->commands()->help('space'));
@@ -182,6 +215,9 @@ class CommandsTest extends NHAUnitTestCase
         $this->assertStringNotContainsString('The loop', $out, 'it should not fall back to the general guide');
     }
 
+    /**
+     * @covers \NHA\Commands
+     */
     public function testResolveHelpKeyFuzzyMatchesAndFallsBackToGeneral(): void
     {
         $commands = $this->commands();
@@ -194,6 +230,9 @@ class CommandsTest extends NHAUnitTestCase
         $this->assertSame('general', $commands->resolveHelpKey('nonsense'));
     }
 
+    /**
+     * @covers \NHA\Commands
+     */
     public function testEveryHelpCategoryRenders(): void
     {
         $commands = $this->commands();
@@ -204,6 +243,9 @@ class CommandsTest extends NHAUnitTestCase
         }
     }
 
+    /**
+     * @covers \NHA\Commands
+     */
     public function testNoArgVerbEncodesArgsAsAnEmptyObjectNotArray(): void
     {
         $commands = $this->commands();
@@ -214,6 +256,11 @@ class CommandsTest extends NHAUnitTestCase
         $this->assertStringNotContainsString('"args":[]', json_encode($this->lastPostBody));
     }
 
+    /**
+     * @covers \NHA\Commands
+     * @covers \NHA\ActorTrait
+     * @covers \NHA\AgentContext
+     */
     public function testActorDefaultsToInvokingUsersLinkedAgent(): void
     {
         $commands = $this->commands();
@@ -225,6 +272,11 @@ class CommandsTest extends NHAUnitTestCase
         $this->assertSame('utok', $actor->token);
     }
 
+    /**
+     * @covers \NHA\Commands
+     * @covers \NHA\ActorTrait
+     * @covers \NHA\AgentContext
+     */
     public function testActorBotOverrideUsesDefaultAgentAndAmbientToken(): void
     {
         $actor = $this->commands()->actor('42', 'bot');
@@ -233,6 +285,11 @@ class CommandsTest extends NHAUnitTestCase
         $this->assertNull($actor->token, 'bot actor uses the ambient token, not a stored one');
     }
 
+    /**
+     * @covers \NHA\Commands
+     * @covers \NHA\ActorTrait
+     * @covers \NHA\AgentContext
+     */
     public function testActorAcceptsNumericAgentOverride(): void
     {
         $actor = $this->commands()->actor('42', '77');
@@ -241,6 +298,11 @@ class CommandsTest extends NHAUnitTestCase
         $this->assertNull($actor->token);
     }
 
+    /**
+     * @covers \NHA\Commands
+     * @covers \NHA\ActorTrait
+     * @covers \NHA\AgentContext
+     */
     public function testActorFallsBackToDefaultAgentWhenCallerHasNoLink(): void
     {
         $actor = $this->commands()->actor('nobody');
@@ -249,6 +311,11 @@ class CommandsTest extends NHAUnitTestCase
         $this->assertNull($actor->token);
     }
 
+    /**
+     * @covers \NHA\Commands
+     * @covers \NHA\ActorTrait
+     * @covers \NHA\AgentContext
+     */
     public function testQueueVerbSendsTheActorsOwnTokenNotTheAmbientOne(): void
     {
         $commands = $this->commands();
@@ -261,6 +328,9 @@ class CommandsTest extends NHAUnitTestCase
         );
     }
 
+    /**
+     * @covers \NHA\Commands
+     */
     public function testEveryBoardNameMapsToACall(): void
     {
         foreach (Commands::BOARDS as $board) {
@@ -287,6 +357,10 @@ class CommandsTest extends NHAUnitTestCase
         return (string) (json_decode(json_encode($this->lastPostBody), true)['name'] ?? '');
     }
 
+    /**
+     * @covers \NHA\Commands
+     * @covers \NHA\NHA
+     */
     public function testRegisterNeverProducesABareUserDashName(): void
     {
         // The original bug: /nha register with no `name` option and no provider
@@ -298,6 +372,10 @@ class CommandsTest extends NHAUnitTestCase
         $this->assertMatchesRegularExpression('/^agent-[0-9a-f]{8}$/', $name);
     }
 
+    /**
+     * @covers \NHA\Commands
+     * @covers \NHA\NHA
+     */
     public function testRegisterTreatsAnEmptyOrBlankNameAsUnset(): void
     {
         foreach (['', '   '] as $blank) {
@@ -306,6 +384,10 @@ class CommandsTest extends NHAUnitTestCase
         }
     }
 
+    /**
+     * @covers \NHA\Commands
+     * @covers \NHA\NHA
+     */
     public function testRegisterWithAProviderIdNamesTheAgentAfterTheUser(): void
     {
         $name = $this->registeredName($this->commands([], ['agent_id' => 5003, 'token' => 't']), null, '116927250145869826');
@@ -313,6 +395,10 @@ class CommandsTest extends NHAUnitTestCase
         $this->assertSame('user-116927250145869826', $name);
     }
 
+    /**
+     * @covers \NHA\Commands
+     * @covers \NHA\NHA
+     */
     public function testRegisterClampsNameToTwentyFourCharacters(): void
     {
         $name = $this->registeredName($this->commands([], ['agent_id' => 5004, 'token' => 't']), str_repeat('x', 60), null);

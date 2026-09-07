@@ -29,6 +29,9 @@ class VerbsTraitTest extends NHAUnitTestCase
         };
     }
 
+    /**
+     * @covers \NHA\VerbsTrait
+     */
     public function testMoveForwardsDeltaAsArgs(): void
     {
         $subject = $this->subject();
@@ -39,6 +42,9 @@ class VerbsTraitTest extends NHAUnitTestCase
         $this->assertSame(['dx' => 2, 'dy' => -3], $subject->args);
     }
 
+    /**
+     * @covers \NHA\VerbsTrait
+     */
     public function testSayForwardsText(): void
     {
         $subject = $this->subject();
@@ -48,6 +54,9 @@ class VerbsTraitTest extends NHAUnitTestCase
         $this->assertSame(['text' => 'hello'], $subject->args);
     }
 
+    /**
+     * @covers \NHA\VerbsTrait
+     */
     public function testContractOmitsNullOptionalArgs(): void
     {
         $subject = $this->subject();
@@ -57,6 +66,9 @@ class VerbsTraitTest extends NHAUnitTestCase
         $this->assertSame(['reward' => 10, 'want' => ['wood' => 5]], $subject->args);
     }
 
+    /**
+     * @covers \NHA\VerbsTrait
+     */
     public function testHealWithoutTargetSendsNoArgs(): void
     {
         $subject = $this->subject();
@@ -66,6 +78,9 @@ class VerbsTraitTest extends NHAUnitTestCase
         $this->assertSame([], $subject->args);
     }
 
+    /**
+     * @covers \NHA\VerbsTrait
+     */
     public function testHealWithTargetSendsTargetArg(): void
     {
         $subject = $this->subject();
@@ -74,6 +89,9 @@ class VerbsTraitTest extends NHAUnitTestCase
         $this->assertSame(['target' => 2], $subject->args);
     }
 
+    /**
+     * @covers \NHA\VerbsTrait
+     */
     public function testHealWithItemSendsItemArg(): void
     {
         $subject = $this->subject();
@@ -82,6 +100,9 @@ class VerbsTraitTest extends NHAUnitTestCase
         $this->assertSame(['item' => 'medkit'], $subject->args);
     }
 
+    /**
+     * @covers \NHA\VerbsTrait
+     */
     public function testDepartSendsDestNotBody(): void
     {
         $subject = $this->subject();
@@ -91,6 +112,9 @@ class VerbsTraitTest extends NHAUnitTestCase
         $this->assertSame(['dest' => 'mars'], $subject->args);
     }
 
+    /**
+     * @covers \NHA\VerbsTrait
+     */
     public function testInvestForwardsModuleAndCredits(): void
     {
         $subject = $this->subject();
@@ -100,6 +124,9 @@ class VerbsTraitTest extends NHAUnitTestCase
         $this->assertSame(['module' => 'truss', 'credits' => 500], $subject->args);
     }
 
+    /**
+     * @covers \NHA\VerbsTrait
+     */
     public function testMineWithResourceIncludesIt(): void
     {
         $subject = $this->subject();
@@ -108,6 +135,9 @@ class VerbsTraitTest extends NHAUnitTestCase
         $this->assertSame(['n' => 3, 'resource' => 'iron'], $subject->args);
     }
 
+    /**
+     * @covers \NHA\VerbsTrait
+     */
     public function testMineWithoutResourceOmitsIt(): void
     {
         $subject = $this->subject();
@@ -116,6 +146,9 @@ class VerbsTraitTest extends NHAUnitTestCase
         $this->assertSame(['n' => 2], $subject->args);
     }
 
+    /**
+     * @covers \NHA\VerbsTrait
+     */
     public function testAttackTargetOnly(): void
     {
         $subject = $this->subject();
@@ -125,6 +158,9 @@ class VerbsTraitTest extends NHAUnitTestCase
         $this->assertSame(['target' => 7], $subject->args);
     }
 
+    /**
+     * @covers \NHA\VerbsTrait
+     */
     public function testAttackWithWeapon(): void
     {
         $subject = $this->subject();
@@ -133,6 +169,9 @@ class VerbsTraitTest extends NHAUnitTestCase
         $this->assertSame(['target' => 7, 'weapon' => 'kinetic_gun'], $subject->args);
     }
 
+    /**
+     * @covers \NHA\VerbsTrait
+     */
     public function testConstructMergesShapeWithArgs(): void
     {
         $subject = $this->subject();
@@ -142,6 +181,9 @@ class VerbsTraitTest extends NHAUnitTestCase
         $this->assertSame(['shape' => 'station', 'module' => 'truss'], $subject->args);
     }
 
+    /**
+     * @covers \NHA\VerbsTrait
+     */
     public function testCombineOptionalNameOmittedWhenNull(): void
     {
         $subject = $this->subject();
@@ -151,6 +193,9 @@ class VerbsTraitTest extends NHAUnitTestCase
         $this->assertSame(['ingredients' => ['silicon' => 1, 'copper' => 1]], $subject->args);
     }
 
+    /**
+     * @covers \NHA\VerbsTrait
+     */
     public function testFinalizeWithoutNameSendsNoArgs(): void
     {
         $subject = $this->subject();
@@ -160,6 +205,9 @@ class VerbsTraitTest extends NHAUnitTestCase
         $this->assertSame([], $subject->args);
     }
 
+    /**
+     * @covers \NHA\VerbsTrait
+     */
     public function testMoveToSendsAbsoluteCoords(): void
     {
         $subject = $this->subject();
@@ -169,6 +217,9 @@ class VerbsTraitTest extends NHAUnitTestCase
         $this->assertSame(['x' => 30, 'y' => 118], $subject->args);
     }
 
+    /**
+     * @covers \NHA\VerbsTrait
+     */
     public function testStealPartUsesPartArg(): void
     {
         $subject = $this->subject();

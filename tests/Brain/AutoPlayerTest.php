@@ -55,6 +55,9 @@ class AutoPlayerTest extends NHAUnitTestCase
         )));
     }
 
+    /**
+     * @covers \NHA\Brain\AutoPlayer
+     */
     public function testStepObservesDecidesAndQueuesTheIntent(): void
     {
         $nha = $this->nhaWith(['tick' => 42, 'position' => [30, 118], 'downed_until' => 0]);
@@ -84,6 +87,9 @@ class AutoPlayerTest extends NHAUnitTestCase
         $this->assertSame(42, $decision['tick']);
     }
 
+    /**
+     * @covers \NHA\Brain\AutoPlayer
+     */
     public function testStepSkipsWhenDowned(): void
     {
         $nha = $this->nhaWith(['tick' => 42, 'downed_until' => 99, 'position' => [1, 1]]);
@@ -98,6 +104,9 @@ class AutoPlayerTest extends NHAUnitTestCase
         $this->assertStringContainsString('downed', strtolower($line));
     }
 
+    /**
+     * @covers \NHA\Brain\AutoPlayer
+     */
     public function testStepDoesNothingWhenBrainWaits(): void
     {
         $nha = $this->nhaWith(['tick' => 42, 'downed_until' => 0]);
@@ -112,6 +121,9 @@ class AutoPlayerTest extends NHAUnitTestCase
         $this->assertStringContainsString('wait', strtolower($line));
     }
 
+    /**
+     * @covers \NHA\Brain\AutoPlayer
+     */
     public function testStepFallsBackToClientTokenWhenNoneGiven(): void
     {
         $nha = $this->nhaWith(['tick' => 1, 'downed_until' => 0]);
@@ -123,6 +135,10 @@ class AutoPlayerTest extends NHAUnitTestCase
         $this->assertSame('client-tok', $this->posts[0][1]['token']);
     }
 
+    /**
+     * @covers \NHA\Brain\AutoPlayer
+     * @covers \NHA\StateStore
+     */
     public function testStepWithALeaseSkipsWhenAnotherDriverHoldsIt(): void
     {
         $state = new StateStore($this->statePath);
@@ -141,6 +157,10 @@ class AutoPlayerTest extends NHAUnitTestCase
         $this->assertStringContainsString('autoplay.php:999', (string) $line);
     }
 
+    /**
+     * @covers \NHA\Brain\AutoPlayer
+     * @covers \NHA\StateStore
+     */
     public function testStepWithALeaseRunsWhenItCanTakeTheLease(): void
     {
         $nha = $this->nhaWith(['tick' => 1, 'downed_until' => 0]);
@@ -151,6 +171,10 @@ class AutoPlayerTest extends NHAUnitTestCase
         $this->assertNotSame([], $this->posts, 'the turn runs and queues an intent');
     }
 
+    /**
+     * @covers \NHA\Brain\AutoPlayer
+     * @covers \NHA\StateStore
+     */
     public function testAOneOffStepIsNeverLeaseGated(): void
     {
         $state = new StateStore($this->statePath);

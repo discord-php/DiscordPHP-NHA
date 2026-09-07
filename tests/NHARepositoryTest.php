@@ -44,6 +44,10 @@ class NHARepositoryTest extends NHAUnitTestCase
         return $nha;
     }
 
+    /**
+     * @covers \NHA\Repository\WorldRepository
+     * @covers \NHA\Repository\AbstractRepositoryTrait
+     */
     public function testGetWorld()
     {
         $nha = $this->withHttpResponse([
@@ -62,6 +66,10 @@ class NHARepositoryTest extends NHAUnitTestCase
         $this->assertInstanceOf(\NHA\Parts\World::class, $world);
     }
 
+    /**
+     * @covers \NHA\Repository\DepositsRepository
+     * @covers \NHA\Repository\AbstractRepositoryTrait
+     */
     public function testGetDeposits()
     {
         $nha = $this->withHttpResponse((object) [
@@ -87,6 +95,10 @@ class NHARepositoryTest extends NHAUnitTestCase
         $this->assertInstanceOf(\NHA\Parts\Deposits::class, $deposits[0]);
     }
 
+    /**
+     * @covers \NHA\NHA
+     * @covers \NHA\StateStore
+     */
     public function testObserveWritesPositionThroughToAttachedStateStore()
     {
         $nha = $this->withHttpResponse(['position' => [30, 118], 'tick' => 1099632, 'hp' => 100]);
@@ -105,6 +117,9 @@ class NHARepositoryTest extends NHAUnitTestCase
         @rmdir(dirname($path));
     }
 
+    /**
+     * @covers \NHA\NHA
+     */
     public function testObserveWithoutStateStoreDoesNotError()
     {
         $nha = $this->withHttpResponse(['position' => [1, 2]]);

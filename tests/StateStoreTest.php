@@ -24,6 +24,9 @@ class StateStoreTest extends NHAUnitTestCase
         }
     }
 
+    /**
+     * @covers \NHA\StateStore
+     */
     public function testDefaultAgentIsNullWhenNoFileExists(): void
     {
         $store = new StateStore($this->path);
@@ -31,6 +34,9 @@ class StateStoreTest extends NHAUnitTestCase
         $this->assertNull($store->getDefaultAgent());
     }
 
+    /**
+     * @covers \NHA\StateStore
+     */
     public function testSetDefaultAgentPersistsToDisk(): void
     {
         $store = new StateStore($this->path);
@@ -41,6 +47,9 @@ class StateStoreTest extends NHAUnitTestCase
         $this->assertSame(['default_agent' => 42], json_decode(file_get_contents($this->path), true));
     }
 
+    /**
+     * @covers \NHA\StateStore
+     */
     public function testStateIsReloadedFromExistingFile(): void
     {
         $store = new StateStore($this->path);
@@ -51,6 +60,9 @@ class StateStoreTest extends NHAUnitTestCase
         $this->assertSame(7, $reloaded->getDefaultAgent());
     }
 
+    /**
+     * @covers \NHA\StateStore
+     */
     public function testSetDefaultAgentOverwritesPreviousValue(): void
     {
         $store = new StateStore($this->path);
@@ -60,6 +72,9 @@ class StateStoreTest extends NHAUnitTestCase
         $this->assertSame(2, $store->getDefaultAgent());
     }
 
+    /**
+     * @covers \NHA\StateStore
+     */
     public function testDefaultAgentTokenIsNullWhenNotSet(): void
     {
         $store = new StateStore($this->path);
@@ -68,6 +83,9 @@ class StateStoreTest extends NHAUnitTestCase
         $this->assertNull($store->getDefaultAgentToken());
     }
 
+    /**
+     * @covers \NHA\StateStore
+     */
     public function testSetDefaultAgentPersistsToken(): void
     {
         $store = new StateStore($this->path);
@@ -80,6 +98,9 @@ class StateStoreTest extends NHAUnitTestCase
         $this->assertSame('secret-token', $reloaded->getDefaultAgentToken());
     }
 
+    /**
+     * @covers \NHA\StateStore
+     */
     public function testSetDefaultAgentWithoutTokenKeepsPreviousToken(): void
     {
         $store = new StateStore($this->path);
@@ -90,6 +111,9 @@ class StateStoreTest extends NHAUnitTestCase
         $this->assertSame('secret-token', $store->getDefaultAgentToken());
     }
 
+    /**
+     * @covers \NHA\StateStore
+     */
     public function testDiscordUserAgentPersistsToDisk(): void
     {
         $store = new StateStore($this->path);
@@ -105,6 +129,9 @@ class StateStoreTest extends NHAUnitTestCase
         $this->assertNull($reloaded->getDiscordUserAgent('456'));
     }
 
+    /**
+     * @covers \NHA\StateStore
+     */
     public function testAgentPositionIsNullWhenNeverRecorded(): void
     {
         $store = new StateStore($this->path);
@@ -112,6 +139,9 @@ class StateStoreTest extends NHAUnitTestCase
         $this->assertNull($store->getAgentPosition(142287));
     }
 
+    /**
+     * @covers \NHA\StateStore
+     */
     public function testAgentPositionPersistsAndReloads(): void
     {
         $store = new StateStore($this->path);
@@ -128,6 +158,9 @@ class StateStoreTest extends NHAUnitTestCase
         $this->assertSame(118, $reloaded->getAgentPosition(142287)['y']);
     }
 
+    /**
+     * @covers \NHA\StateStore
+     */
     public function testAgentPositionUpdateOverwritesAndDoesNotTouchIdentity(): void
     {
         $store = new StateStore($this->path);
@@ -139,6 +172,9 @@ class StateStoreTest extends NHAUnitTestCase
         $this->assertSame(142287, $store->getDiscordUserAgent('116927250145869826')['agent_id']);
     }
 
+    /**
+     * @covers \NHA\StateStore
+     */
     public function testAgentPositionTickIsOptional(): void
     {
         $store = new StateStore($this->path);
@@ -147,6 +183,9 @@ class StateStoreTest extends NHAUnitTestCase
         $this->assertArrayNotHasKey('tick', $store->getAgentPosition(9));
     }
 
+    /**
+     * @covers \NHA\StateStore
+     */
     public function testRecordObservationSnapshotsPositionAndTick(): void
     {
         $store = new StateStore($this->path);
@@ -158,6 +197,9 @@ class StateStoreTest extends NHAUnitTestCase
         $this->assertSame(1099632, $position['tick']);
     }
 
+    /**
+     * @covers \NHA\StateStore
+     */
     public function testRecordObservationIsNoOpWithoutPosition(): void
     {
         $store = new StateStore($this->path);
@@ -166,6 +208,9 @@ class StateStoreTest extends NHAUnitTestCase
         $this->assertNull($store->getAgentPosition(1));
     }
 
+    /**
+     * @covers \NHA\StateStore
+     */
     public function testCommandSignaturesDefaultToEmptyAndPersist(): void
     {
         $store = new StateStore($this->path);
@@ -178,6 +223,9 @@ class StateStoreTest extends NHAUnitTestCase
         $this->assertSame(['mine' => 'abc123', 'chop' => 'def456'], $reloaded->getCommandSignatures());
     }
 
+    /**
+     * @covers \NHA\StateStore
+     */
     public function testSaveIsAtomicAndLeavesNoTempFile(): void
     {
         $store = new StateStore($this->path);
@@ -188,6 +236,9 @@ class StateStoreTest extends NHAUnitTestCase
         $this->assertSame([], glob(dirname($this->path) . '/*.tmp'), 'the temp file is renamed away, not left behind');
     }
 
+    /**
+     * @covers \NHA\StateStore
+     */
     public function testAutoplayLeaseIsHeldByOneDriverAtATime(): void
     {
         $store = new StateStore($this->path);
@@ -203,6 +254,9 @@ class StateStoreTest extends NHAUnitTestCase
         $this->assertTrue($store->acquireAutoplayLease('autoplay.php:2', 45), 'the lease is free again after release');
     }
 
+    /**
+     * @covers \NHA\StateStore
+     */
     public function testAutoplayLeaseExpires(): void
     {
         $store = new StateStore($this->path);
@@ -218,6 +272,9 @@ class StateStoreTest extends NHAUnitTestCase
         $this->assertTrue($reloaded->acquireAutoplayLease('autoplay.php:2', 45), 'and can be taken over');
     }
 
+    /**
+     * @covers \NHA\StateStore
+     */
     public function testReleaseOnlyAffectsYourOwnLease(): void
     {
         $store = new StateStore($this->path);

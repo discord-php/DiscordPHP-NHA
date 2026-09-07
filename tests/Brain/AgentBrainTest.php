@@ -21,6 +21,9 @@ class AgentBrainTest extends NHAUnitTestCase
         return new AgentBrain($ollama);
     }
 
+    /**
+     * @covers \NHA\Brain\AgentBrain
+     */
     public function testParseDecisionAcceptsPlainJson(): void
     {
         $d = AgentBrain::parseDecision('{"verb":"move","args":{"dx":1,"dy":0},"reason":"head to wood"}');
@@ -30,6 +33,9 @@ class AgentBrainTest extends NHAUnitTestCase
         $this->assertSame('head to wood', $d['reason']);
     }
 
+    /**
+     * @covers \NHA\Brain\AgentBrain
+     */
     public function testParseDecisionStripsCodeFence(): void
     {
         $d = AgentBrain::parseDecision("```json\n{\"verb\":\"mine\",\"args\":{\"n\":3}}\n```");
@@ -38,6 +44,9 @@ class AgentBrainTest extends NHAUnitTestCase
         $this->assertSame(['n' => 3], $d['args']);
     }
 
+    /**
+     * @covers \NHA\Brain\AgentBrain
+     */
     public function testParseDecisionExtractsJsonFromProse(): void
     {
         $d = AgentBrain::parseDecision('Sure! I think you should {"verb":"gather","args":{"n":1}} because loot is near.');
@@ -45,6 +54,9 @@ class AgentBrainTest extends NHAUnitTestCase
         $this->assertSame('gather', $d['verb']);
     }
 
+    /**
+     * @covers \NHA\Brain\AgentBrain
+     */
     public function testParseDecisionReturnsNullForWaitOrUnknownOrGarbage(): void
     {
         $this->assertNull(AgentBrain::parseDecision('{"verb":"wait"}'));
@@ -53,6 +65,9 @@ class AgentBrainTest extends NHAUnitTestCase
         $this->assertNull(AgentBrain::parseDecision('{"reason":"no verb"}'));
     }
 
+    /**
+     * @covers \NHA\Brain\AgentBrain
+     */
     public function testParseDecisionDefaultsMissingArgsToEmptyArray(): void
     {
         $d = AgentBrain::parseDecision('{"verb":"launch"}');
@@ -62,6 +77,9 @@ class AgentBrainTest extends NHAUnitTestCase
         $this->assertSame('', $d['reason']);
     }
 
+    /**
+     * @covers \NHA\Brain\AgentBrain
+     */
     public function testSummarizeIncludesKeyFacts(): void
     {
         $obs = new AgentObservation(142287, [
@@ -89,6 +107,9 @@ class AgentBrainTest extends NHAUnitTestCase
         $this->assertStringContainsString('JSON only', $summary);
     }
 
+    /**
+     * @covers \NHA\Brain\AgentBrain
+     */
     public function testSummarizeHandlesObjectNestedPayload(): void
     {
         // The real NHA HTTP client decodes to stdClass, not arrays.
@@ -115,6 +136,9 @@ class AgentBrainTest extends NHAUnitTestCase
         $this->assertStringContainsString('[Barbarian] hi', $summary);
     }
 
+    /**
+     * @covers \NHA\Brain\AgentBrain
+     */
     public function testDecideResolvesValidatedDecision(): void
     {
         $brain = $this->brainReturning('{"verb":"mine","args":{"n":2},"reason":"wood underfoot"}');
@@ -127,6 +151,9 @@ class AgentBrainTest extends NHAUnitTestCase
         $this->assertSame(['verb' => 'mine', 'args' => ['n' => 2], 'reason' => 'wood underfoot'], $decision);
     }
 
+    /**
+     * @covers \NHA\Brain\AgentBrain
+     */
     public function testDecideResolvesNullWhenModelSaysWait(): void
     {
         $brain = $this->brainReturning('{"verb":"wait","reason":"nothing to do"}');

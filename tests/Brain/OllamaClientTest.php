@@ -27,6 +27,9 @@ class OllamaClientTest extends NHAUnitTestCase
         );
     }
 
+    /**
+     * @covers \NHA\Brain\OllamaClient
+     */
     public function testChatPostsToApiChatWithModelContextAndMessages(): void
     {
         $client = $this->client(json_encode(['message' => ['role' => 'assistant', 'content' => '{"verb":"wait"}'], 'done' => true]));
@@ -50,6 +53,9 @@ class OllamaClientTest extends NHAUnitTestCase
         $this->assertSame('{"verb":"wait"}', $result);
     }
 
+    /**
+     * @covers \NHA\Brain\OllamaClient
+     */
     public function testChatUsesOpenAiEndpointWhenBaseUrlEndsInV1(): void
     {
         $client = $this->client(
@@ -75,6 +81,9 @@ class OllamaClientTest extends NHAUnitTestCase
         $this->assertSame('{"verb":"mine"}', $result);
     }
 
+    /**
+     * @covers \NHA\Brain\OllamaClient
+     */
     public function testChatMapsThinkFalseToOpenAiReasoningEffortNone(): void
     {
         $client = new OllamaClient(
@@ -95,6 +104,9 @@ class OllamaClientTest extends NHAUnitTestCase
         $this->assertSame('none', $sent['reasoning_effort']);
     }
 
+    /**
+     * @covers \NHA\Brain\OllamaClient
+     */
     public function testChatSurfacesOpenAiErrorBody(): void
     {
         $client = $this->client(
@@ -111,6 +123,9 @@ class OllamaClientTest extends NHAUnitTestCase
         $this->assertStringContainsString('gemma9', $err->getMessage());
     }
 
+    /**
+     * @covers \NHA\Brain\OllamaClient
+     */
     public function testChatSurfacesOllamaErrorBody(): void
     {
         $client = $this->client(json_encode(['error' => 'model "gemma9" not found']));
@@ -124,6 +139,9 @@ class OllamaClientTest extends NHAUnitTestCase
         $this->assertStringContainsString('gemma9', $err->getMessage());
     }
 
+    /**
+     * @covers \NHA\Brain\OllamaClient
+     */
     public function testChatRejectsNonJsonResponse(): void
     {
         $client = $this->client('<html>502 Bad Gateway</html>');
@@ -137,6 +155,9 @@ class OllamaClientTest extends NHAUnitTestCase
         $this->assertStringContainsString('non-JSON', $err->getMessage());
     }
 
+    /**
+     * @covers \NHA\Brain\OllamaClient
+     */
     public function testChatRejectsWhenTransportFails(): void
     {
         $client = new OllamaClient('http://x', 'm', fn() => reject(new \RuntimeException('connection refused')));
