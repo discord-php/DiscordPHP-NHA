@@ -725,7 +725,10 @@ if ($channel_id) {
 // -----------------------------------------------------------------------
 
 if ($autoPlayer) {
-    if (getenv('NHA_AUTOPLAY') === '1') {
+    // Autoplay runs by default whenever the LLM brain is configured. Boot paused
+    // with NHA_AUTOPLAY=0, and toggle at runtime with `/nha autoplay on|off`
+    // (the choice persists in var/state.json).
+    if (! in_array(getenv('NHA_AUTOPLAY'), ['0', 'false'], true)) {
         $state->setAutoplay(true);
     }
 
@@ -747,21 +750,29 @@ if ($autoPlayer) {
             $autoplay_busy = false;
         };
 
-        $autoPlayer->step($agent_id, (string) ($state->getDefaultAgentToken() ?? ''))->then(
-            function (string $line) use ($nha, $channel_id, $done): void {
-                $nha->logger->info("[autoplay] {$line}");
-                if ($channel_id) {
-                    $nha->getChannel($channel_id)?->sendMessage(
-                        NHA::createBuilder()->addComponent(Container::new()->addComponents([TextDisplay::new($line)])),
-                    );
-                }
-                $done();
-            },
-            function (\Throwable $e) use ($nha, $done): void {
-                $nha->logger->warning("[autoplay] {$e->getMessage()}");
-                $done();
-            },
-        );
+        // A single bad turn — network blip, model timeout, malformed reply —
+        // must never take the loop down; catch everything and let $done() reset
+        // the busy flag so the next tick tries again.
+        try {
+            $autoPlayer->step($agent_id, (string) ($state->getDefaultAgentToken() ?? ''))->then(
+                function (string $line) use ($nha, $channel_id, $done): void {
+                    $nha->logger->info("[autoplay] {$line}");
+                    if ($channel_id) {
+                        $nha->getChannel($channel_id)?->sendMessage(
+                            NHA::createBuilder()->addComponent(Container::new()->addComponents([TextDisplay::new($line)])),
+                        );
+                    }
+                    $done();
+                },
+                function (\Throwable $e) use ($nha, $done): void {
+                    $nha->logger->warning("[autoplay] {$e->getMessage()}");
+                    $done();
+                },
+            );
+        } catch (\Throwable $e) {
+            $nha->logger->warning("[autoplay] {$e->getMessage()}");
+            $done();
+        }
     });
 }
 
