@@ -134,12 +134,22 @@ final class AutoPlayer
         // real feedback ("combine iron+wood -> rejected: already known") instead
         // of blindly retrying it. Best-effort: a failed lookup just omits it.
         $last = $this->state->getLastDecision($agent_id);
-        $outcome = ($last !== null && ! empty($last['queued_intent']))
-            ? $this->nha->intents->getIntentStatus((int) $last['queued_intent'])->then(
-                static fn($s): array => [
-                    'status' => (string) ($s->status ?? '?'),
-                    'result' => (string) ($s->result ?? ''),
-                ],
+        $lastQueued = ($last !== null && ! empty($last['queued_intent'])) ? (int) $last['queued_intent'] : null;
+        $outcome = $lastQueued !== null
+            ? $this->nha->intents->getIntentStatus($lastQueued)->then(
+                function ($s) use ($agent_id, $lastQueued): array {
+                    $status = (string) ($s->status ?? '?');
+
+                    // Settled or aged out: forget the id so the next turn does
+                    // not keep polling GET /intent/{id} for an answer that will
+                    // never change.
+                    if (in_array($status, ['applied', 'rejected', 'gone'], true)) {
+                        $this->state->clearQueuedIntent($agent_id, $lastQueued);
+                    }
+
+                    return ['status' => $status, 'result' => (string) ($s->result ?? '')];
+                },
+                // A transient lookup failure: keep the id and retry next turn.
                 static fn(): ?array => null,
             )
             : resolve(null);

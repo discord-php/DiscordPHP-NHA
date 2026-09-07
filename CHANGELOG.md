@@ -4,6 +4,20 @@ All notable changes to DiscordPHP-NHA are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 SemVer with the **major tracking the NHA world API version**.
 
+## [3.1.5] - 2026-09-07
+
+### Fixed
+- A queued intent whose id has aged out of the world's retention window no
+  longer gets re-polled every autoplay turn. `IntentRepository::getIntentStatus()`
+  maps a `404`/`410` to a terminal `gone` status instead of rejecting, and the
+  autoplay loop drops the stored `queued_intent` once its outcome is settled
+  (`applied` / `rejected` / `gone`) via the new
+  `StateStore::clearQueuedIntent()`. This also stops the HTTP layer logging the
+  same failed `GET /intent/{id}` with a stack trace on a loop.
+- The autoplay loop in `bot.php` de-dupes its warnings: a persistent fault
+  (brain host unreachable, API down) is logged once and then at most once every
+  five minutes, instead of on every tick.
+
 ## [3.1.4] - 2026-09-07
 
 ### Fixed

@@ -138,6 +138,29 @@ class AutoPlayerTest extends NHAUnitTestCase
     /**
      * @covers \NHA\Brain\AutoPlayer
      * @covers \NHA\StateStore
+     * @covers \NHA\Repository\IntentRepository
+     */
+    public function testStepForgetsLastIntentIdOnceItsOutcomeIsTerminal(): void
+    {
+        // The world no longer retains last turn's intent: getIntentStatus() maps
+        // the 404/410 to a `gone` status, and the loop must drop the id so it is
+        // not re-polled forever.
+        $nha = $this->nhaWith(['tick' => 42, 'downed_until' => 0, 'position' => [1, 1], 'status' => 'gone', 'result' => '']);
+        $state = new StateStore($this->statePath);
+        $state->recordDecision(142287, ['verb' => 'combine', 'args' => [], 'reason' => 'x', 'queued_intent' => 3168877, 'tick' => 1]);
+
+        // Brain waits, so nothing new is recorded over the cleared id.
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"wait"}'), $state);
+        $player->step(142287, 'tok');
+
+        $last = $state->getLastDecision(142287);
+        $this->assertNull($last['queued_intent'], 'the aged-out id is forgotten');
+        $this->assertSame('combine', $last['verb'], 'the decision itself is left intact');
+    }
+
+    /**
+     * @covers \NHA\Brain\AutoPlayer
+     * @covers \NHA\StateStore
      */
     public function testStepWithALeaseSkipsWhenAnotherDriverHoldsIt(): void
     {

@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace NHA\Repository;
 
+use Discord\Http\Exceptions\NotFoundException;
+use Discord\Http\Exceptions\RequestFailedException;
 use NHA\Http\Endpoint;
 use NHA\Parts\IntentStatus;
 use React\Promise\PromiseInterface;
@@ -44,7 +46,10 @@ class IntentRepository extends AbstractRepository
      *
      * @param int|string $intent_id The `queued_intent` id from the `POST /intent` response.
      *
-     * @return PromiseInterface<IntentStatus>
+     * @return PromiseInterface<IntentStatus> Resolves with a synthetic `status: 'gone'`
+     *                                        part when the id has aged out of the world's
+     *                                        retention window (`404`/`410`); other transport
+     *                                        failures still reject.
      */
     public function getIntentStatus(int|string $intent_id): PromiseInterface
     {
@@ -52,6 +57,24 @@ class IntentRepository extends AbstractRepository
 
         return $this->nha_http->get($endpoint)->then(
             fn($data) => $this->factory->part(IntentStatus::class, (array) $data, true),
+            function (\Throwable $e) use ($intent_id) {
+                // A queued intent is only kept for a short retention window. Once
+                // it applied or was rejected long ago the world returns 404/410
+                // and will never resolve it again — surface that as a terminal
+                // `gone` status so the caller stops polling it every turn (and
+                // the HTTP layer stops logging the failure with a stack trace).
+                if ($e instanceof NotFoundException
+                    || ($e instanceof RequestFailedException && (int) $e->getCode() === 410)
+                ) {
+                    return $this->factory->part(IntentStatus::class, [
+                        'id' => is_numeric($intent_id) ? (int) $intent_id : $intent_id,
+                        'status' => 'gone',
+                        'result' => 'intent expired from the retention window',
+                    ], true);
+                }
+
+                throw $e;
+            },
         );
     }
 }

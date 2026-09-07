@@ -334,4 +334,34 @@ class StateStoreTest extends NHAUnitTestCase
             'json array' => ['[]'],
         ];
     }
+
+    /**
+     * @covers \NHA\StateStore
+     */
+    public function testClearQueuedIntentForgetsTheIdButKeepsTheRestOfTheDecision(): void
+    {
+        $store = new StateStore($this->path);
+        $store->recordDecision(7, ['verb' => 'combine', 'args' => ['a' => 'herb'], 'reason' => 'try it', 'queued_intent' => 3168877, 'tick' => 10]);
+
+        $store->clearQueuedIntent(7);
+
+        $last = (new StateStore($this->path))->getLastDecision(7);
+        $this->assertNull($last['queued_intent'], 'the settled/aged-out id is forgotten');
+        $this->assertSame('combine', $last['verb'], 'the rest of the decision is untouched');
+        $this->assertSame(10, $last['tick']);
+    }
+
+    /**
+     * @covers \NHA\StateStore
+     */
+    public function testClearQueuedIntentWithAMismatchedIdIsANoOp(): void
+    {
+        $store = new StateStore($this->path);
+        $store->recordDecision(7, ['verb' => 'mine', 'args' => [], 'reason' => '', 'queued_intent' => 999, 'tick' => 1]);
+
+        // A newer decision already replaced the id we were polling — do not wipe it.
+        $store->clearQueuedIntent(7, 555);
+
+        $this->assertSame(999, (new StateStore($this->path))->getLastDecision(7)['queued_intent']);
+    }
 }

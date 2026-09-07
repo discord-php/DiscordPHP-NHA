@@ -773,7 +773,20 @@ if ($autoPlayer) {
     $autoplay_interval = (float) (getenv('NHA_AUTOPLAY_INTERVAL') ?: 15);
     $autoplay_busy = false;
 
-    Loop::get()->addPeriodicTimer($autoplay_interval, function () use ($nha, $state, $autoPlayer, $channel_id, $autoplay_interval, &$autoplay_busy): void {
+    // A persistent fault — brain host unreachable, API down — repeats on every
+    // tick. Log the first occurrence, then the same message at most once every
+    // five minutes, so a sustained outage does not bury the rest of the log.
+    $autoplay_warn_seen = ['msg' => '', 'at' => 0];
+    $autoplay_warn = function (string $msg) use ($nha, &$autoplay_warn_seen): void {
+        $now = time();
+        if ($msg === $autoplay_warn_seen['msg'] && $now - $autoplay_warn_seen['at'] < 300) {
+            return;
+        }
+        $autoplay_warn_seen = ['msg' => $msg, 'at' => $now];
+        $nha->logger->warning("[autoplay] {$msg}");
+    };
+
+    Loop::get()->addPeriodicTimer($autoplay_interval, function () use ($nha, $state, $autoPlayer, $channel_id, $autoplay_interval, $autoplay_warn, &$autoplay_busy): void {
         if ($autoplay_busy || ! $state->isAutoplayEnabled()) {
             return;
         }
@@ -802,13 +815,13 @@ if ($autoPlayer) {
                     }
                     $done();
                 },
-                function (\Throwable $e) use ($nha, $done): void {
-                    $nha->logger->warning("[autoplay] {$e->getMessage()}");
+                function (\Throwable $e) use ($autoplay_warn, $done): void {
+                    $autoplay_warn($e->getMessage());
                     $done();
                 },
             );
         } catch (\Throwable $e) {
-            $nha->logger->warning("[autoplay] {$e->getMessage()}");
+            $autoplay_warn($e->getMessage());
             $done();
         }
     });

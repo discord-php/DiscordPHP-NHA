@@ -351,6 +351,34 @@ class StateStore
     }
 
     /**
+     * Drops the stored `queued_intent` id from an agent's last decision once its
+     * outcome is settled (`applied` / `rejected`) or it has aged out (`gone`),
+     * so the autoplay loop stops issuing `GET /intent/{id}` for it every turn.
+     *
+     * @param int      $agent_id
+     * @param int|null $only     When given, only clears the id if it still matches —
+     *                           a no-op if {@see recordDecision()} has since stored a
+     *                           newer intent, avoiding a lost update.
+     *
+     * @since 3.1.5
+     */
+    public function clearQueuedIntent(int $agent_id, ?int $only = null): void
+    {
+        $key = (string) $agent_id;
+        $entry = $this->data['agent_decisions'][$key] ?? null;
+
+        if (! is_array($entry) || ! isset($entry['queued_intent'])) {
+            return;
+        }
+        if ($only !== null && (int) $entry['queued_intent'] !== $only) {
+            return;
+        }
+
+        $this->data['agent_decisions'][$key]['queued_intent'] = null;
+        $this->save();
+    }
+
+    /**
      * Gets the brain's last recorded decision for an agent, if any.
      *
      * @return array{verb: string, args: array, reason: string, queued_intent: ?int, tick: ?int, at: int}|null
