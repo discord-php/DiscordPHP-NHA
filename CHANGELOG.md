@@ -4,6 +4,14 @@ All notable changes to DiscordPHP-NHA are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 SemVer with the **major tracking the NHA world API version**.
 
+## [3.1.4] - 2026-09-07
+
+### Fixed
+- `require-dev` pins `symfony/console` to `^7.4`. `phpacker/phpacker` needs
+  Symfony 7, but the DiscordPHP dev-master graph had floated it to 8.x, so a
+  fresh `composer install` could not add phpacker. The other family bots got
+  the same pin.
+
 ## [3.1.3] - 2026-09-07
 
 ### Fixed
@@ -100,6 +108,7 @@ First tagged release. Targets NHA world API **v3** (`openapi.json`
   the NHA 1–24 character limit.
 - Agent tokens are scrubbed from logged `422` response bodies.
 
+[3.1.4]: https://github.com/discord-php/DiscordPHP-NHA/releases/tag/v3.1.4
 [3.1.3]: https://github.com/discord-php/DiscordPHP-NHA/releases/tag/v3.1.3
 [3.1.2]: https://github.com/discord-php/DiscordPHP-NHA/releases/tag/v3.1.2
 [3.1.1]: https://github.com/discord-php/DiscordPHP-NHA/releases/tag/v3.1.1
