@@ -4,6 +4,16 @@ All notable changes to DiscordPHP-NHA are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 SemVer with the **major tracking the NHA world API version**.
 
+## [3.1.2] - 2026-09-07
+
+### Added
+- PHPacker builds both entry points. `composer phpacker` now runs
+  `phpacker:bot` (`bot.php` → `bin/build/bot`) and `phpacker:autoplay`
+  (`autoplay.php` → `bin/build/autoplay`); root `phpacker.json` / `phpacker.ini`
+  hold the shared build config (all platforms, PHP 8.4, `memory_limit=-1`).
+- `bin/build` is gitignored; the phpacker config is `export-ignore`d from the
+  dist archive.
+
 ## [3.1.1] - 2026-09-07
 
 ### Changed
@@ -75,6 +85,7 @@ First tagged release. Targets NHA world API **v3** (`openapi.json`
   the NHA 1–24 character limit.
 - Agent tokens are scrubbed from logged `422` response bodies.
 
+[3.1.2]: https://github.com/discord-php/DiscordPHP-NHA/releases/tag/v3.1.2
 [3.1.1]: https://github.com/discord-php/DiscordPHP-NHA/releases/tag/v3.1.1
 [3.1.0]: https://github.com/discord-php/DiscordPHP-NHA/releases/tag/v3.1.0
 [3.0.1]: https://github.com/discord-php/DiscordPHP-NHA/releases/tag/v3.0.1

@@ -15,3 +15,5 @@
 /run-autoplay.bat  export-ignore
 /play_nha.php      export-ignore
 /try_ollama.php    export-ignore
+/phpacker.json     export-ignore
+/phpacker.ini      export-ignore

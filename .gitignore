@@ -37,5 +37,8 @@ phpunit.log
 # runner logs from nohup
 *.nohup.out
 
+# phpacker build output
+/bin/build
+
 # composer (library: lockfile not tracked, matches the sibling extensions)
 composer.lock
