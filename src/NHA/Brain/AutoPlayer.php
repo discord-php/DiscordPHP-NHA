@@ -75,7 +75,7 @@ final class AutoPlayer
                 return resolve("🩹 Agent #{$agent_id} is downed until tick {$downedUntil} — skipping.");
             }
 
-            return $this->brain->decide($observation)->then(function (?array $decision) use ($agent_id, $token, $tick) {
+            return $this->brain->decide($observation, $this->state->getLastDecision($agent_id))->then(function (?array $decision) use ($agent_id, $token, $tick) {
                 if ($decision === null) {
                     return "💤 Agent #{$agent_id}: brain chose to wait (tick {$tick}).";
                 }
