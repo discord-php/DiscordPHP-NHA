@@ -295,7 +295,7 @@ class Commands
 
     // No-arg verbs: every one just queues that verb for the agent.
 
-    /** Queues a `plant` intent (spend 1 wood to grow a tree at the agent's cell). */
+    /** Queues a `plant` intent (1 wood tops up the most-drained tree on the cell, cap 22; rejected if all full). */
     public function plant(AgentContext|int|null $agent): PromiseInterface
     {
         return $this->queueVerb($agent, 'plant');
@@ -839,7 +839,7 @@ class Commands
             . "• **`/mine [n]`** — nearest mineral within 8 cells. On asteroids → iridium/nickel; on the Moon → helium3/regolith.\n"
             . "• **`/chop [n]`** — nearest wood.\n"
             . "• **`/gather [n]`** — nearest plant (herb/lichen/fungus/algae) within 8.\n"
-            . "• **`/plant`** — spend 1 wood to grow a renewable tree at your cell.\n\n"
+            . "• **`/plant`** — spend 1 wood to top up the most-drained tree on your cell (max 22); if every tree there is full it is rejected.\n\n"
             . "Powered tools (motor + fuel) and a `yield_buff` raise yield; storms cut it in half.",
         ],
         'craft' => ['🔧', 'Crafting & building',

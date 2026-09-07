@@ -42,7 +42,7 @@ final class Playbook
         'mine' => 'n:int, resource?:string — mine the nearest deposit within 8 cells (auto-walks)',
         'chop' => 'n:int — harvest the nearest wood',
         'gather' => 'n:int — forage the nearest plant within 8 (herb/lichen/fungus/algae → medicine)',
-        'plant' => 'no args — spend 1 wood to plant a renewable tree on your cell',
+        'plant' => 'no args — spend 1 wood to top up the most-drained tree on your cell (cap 22); rejected if all full',
         'combine' => 'ingredients:{res:qty}, name?:string, n?:int — craft; matches the SET of physics tags, 1 of each per copy',
         'build' => 'part:string, with?:{res:qty} — craft one vehicle part',
         'finalize' => 'name?:string — assemble ALL loose parts into one vehicle',
@@ -169,6 +169,9 @@ final class Playbook
             - RESUBMIT: any `combine` set listed in "combine sets already submitted" — it mints nothing the 2nd time.
             - LOOPING: the same verb as recent turns when nothing forced it. If the last turn was
               `chop`/`mine`/`gather`, this turn must not be — build, sell, or move on.
+            - PLANT SPAM: `plant` tops up the most-drained tree on your cell (cap 22); it does NOT stack new
+              trees. If every tree on the cell is full it is REJECTED and no wood is spent — plant elsewhere
+              or do something else. `chop` + `plant` on the same cell nets ~zero; it is not a strategy.
             - PHANTOM INGREDIENTS: `combine`/`build`/`construct` with any item at qty 0 in your Inventory line
               (iron, chip, composite, …). It is rejected outright. Only use what you actually hold.
             - `wait` while you hold ≥ 20 of a raw and have a use for it.

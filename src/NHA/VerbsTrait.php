@@ -117,7 +117,7 @@ trait VerbsTrait
         return $this->intent($agent_id, 'gather', ['n' => $n]);
     }
 
-    /** Plants a sapling at the agent's tile (verb `plant`). @link https://nha.recluse.lol/docs#/agent/submit_intent_intent_post */
+    /** Tops up the most-drained tree on the agent's cell (cap 22), 1 wood; rejected if all full (verb `plant`). @link https://nha.recluse.lol/docs#/agent/submit_intent_intent_post */
     public function plantTree(int $agent_id): PromiseInterface
     {
         return $this->intent($agent_id, 'plant', []);

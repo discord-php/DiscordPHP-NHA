@@ -4,6 +4,15 @@ All notable changes to DiscordPHP-NHA are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 SemVer with the **major tracking the NHA world API version**.
 
+## [3.1.1] - 2026-09-07
+
+### Changed
+- Brain: `plant` no longer stacks new trees — the NHA engine now tops up the
+  most-drained tree on the cell (cap 22) and rejects the intent when they are
+  all full. The `Playbook` anti-patterns, the `plant` verb hint, and the
+  `/plant` help / docblocks say so, so the autoplay brain stops chop→plant
+  looping on a full cell.
+
 ## [3.1.0] - 2026-09-07
 
 ### Added
@@ -66,6 +75,7 @@ First tagged release. Targets NHA world API **v3** (`openapi.json`
   the NHA 1–24 character limit.
 - Agent tokens are scrubbed from logged `422` response bodies.
 
+[3.1.1]: https://github.com/discord-php/DiscordPHP-NHA/releases/tag/v3.1.1
 [3.1.0]: https://github.com/discord-php/DiscordPHP-NHA/releases/tag/v3.1.0
 [3.0.1]: https://github.com/discord-php/DiscordPHP-NHA/releases/tag/v3.0.1
 [3.0.0]: https://github.com/discord-php/DiscordPHP-NHA/releases/tag/v3.0.0
