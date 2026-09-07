@@ -17,3 +17,7 @@
 /try_ollama.php    export-ignore
 /phpacker.json     export-ignore
 /phpacker.ini      export-ignore
+/bin/build         export-ignore
+/linux             export-ignore
+/mac               export-ignore
+/windows           export-ignore

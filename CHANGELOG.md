@@ -4,6 +4,21 @@ All notable changes to DiscordPHP-NHA are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 SemVer with the **major tracking the NHA world API version**.
 
+## [3.1.3] - 2026-09-07
+
+### Fixed
+- The packed binaries now run from wherever they land. `bot.php` /
+  `autoplay.php` resolve `vendor/`, `.env` and `var/` by walking up from the
+  real executable path (then the working directory), so a phpacker binary at
+  `bin/build/<name>/<platform>/` works when double-clicked or launched from a
+  shortcut with any working directory — previously it died with "Composer
+  autoloader not found".
+
+### Security
+- `bin/build` is gitignored **and** `export-ignore`d in `.gitattributes`. A
+  packed binary can be decompiled to recover whatever environment it ran with;
+  it must never be committed or shipped in a dist archive.
+
 ## [3.1.2] - 2026-09-07
 
 ### Added
@@ -85,6 +100,7 @@ First tagged release. Targets NHA world API **v3** (`openapi.json`
   the NHA 1–24 character limit.
 - Agent tokens are scrubbed from logged `422` response bodies.
 
+[3.1.3]: https://github.com/discord-php/DiscordPHP-NHA/releases/tag/v3.1.3
 [3.1.2]: https://github.com/discord-php/DiscordPHP-NHA/releases/tag/v3.1.2
 [3.1.1]: https://github.com/discord-php/DiscordPHP-NHA/releases/tag/v3.1.1
 [3.1.0]: https://github.com/discord-php/DiscordPHP-NHA/releases/tag/v3.1.0

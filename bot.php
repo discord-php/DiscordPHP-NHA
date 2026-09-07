@@ -33,9 +33,44 @@ use React\Promise\PromiseInterface;
 
 use function React\Promise\set_rejection_handler;
 
-$autoload_path = file_exists($autoload_path = __DIR__ . '/vendor/autoload.php') ? $autoload_path
-    : (file_exists($autoload_path = dirname(__DIR__) . '/vendor/autoload.php') ? $autoload_path : null);
-$autoload_path ? require ($autoload_path) : throw new \Exception('Composer autoloader not found. Run `composer update` and try again.');
+/**
+ * The project base directory. Works when run as `php bot.php` from the repo,
+ * and when run as a phpacker/phpmicro binary (which lands nested under
+ * `bin/build/<name>/<platform>/`) launched directly or from a shortcut, from
+ * any working directory: it walks up from the real executable path, then from
+ * the working directory, to the first ancestor that looks like the project
+ * (has `vendor/autoload.php` or a `.env` beside it).
+ */
+$baseDir = (static function (): string {
+    $seen = [];
+    foreach ([\Phar::running(false) ?: null, __FILE__, \getcwd() ?: null] as $start) {
+        if ($start === null) {
+            continue;
+        }
+        $dir = \is_dir($start) ? $start : \dirname((string) \preg_replace('#^phar://#', '', $start));
+        for ($i = 0; $i < 12; $i++) {
+            if (isset($seen[$dir])) {
+                break;
+            }
+            $seen[$dir] = true;
+            if (\is_file($dir . '/vendor/autoload.php') || \is_file($dir . '/.env')) {
+                return $dir;
+            }
+            if (($up = \dirname($dir)) === $dir) {
+                break;
+            }
+            $dir = $up;
+        }
+    }
+
+    return \getcwd() ?: __DIR__;
+})();
+
+$autoload_path = is_file(__DIR__ . '/vendor/autoload.php') ? __DIR__ . '/vendor/autoload.php'
+    : (is_file($baseDir . '/vendor/autoload.php') ? $baseDir . '/vendor/autoload.php' : null);
+$autoload_path
+    ? require $autoload_path
+    : throw new \Exception('Composer autoloader not found. Run `composer install`, or keep the binary inside the project directory (searched up from "' . dirname(\Phar::running(false) ?: __FILE__) . '").');
 
 function loadEnv(string $filePath): void
 {
@@ -54,9 +89,9 @@ function loadEnv(string $filePath): void
     });
 }
 
-$env_path = file_exists($env_path = getcwd() . '/.env') ? $env_path
-    : (file_exists($env_path = dirname(getcwd()) . '/.env') ? $env_path : null);
-$env_path ? loadEnv($env_path) : throw new \Exception('The .env file does not exist. Please create one in the root directory.');
+$env_path = file_exists($baseDir . '/.env') ? $baseDir . '/.env'
+    : (file_exists(getcwd() . '/.env') ? getcwd() . '/.env' : null);
+$env_path ? loadEnv($env_path) : throw new \Exception('The .env file does not exist. Create one in the project directory (' . $baseDir . ').');
 
 $error_channel_id = getenv('ERROR_CHANNEL_ID') ?: null;
 $channel_id = getenv('NHA_CHANNEL_ID') ?: null;
@@ -90,7 +125,7 @@ $reportFatalError = function (\Throwable $e) use ($nha, $error_channel_id, $logg
 set_rejection_handler($reportFatalError);
 set_exception_handler($reportFatalError);
 
-$state = new StateStore(__DIR__ . '/var/state.json');
+$state = new StateStore($baseDir . '/var/state.json');
 if ($token = $state->getDefaultAgentToken()) {
     $nha->setAgentToken($token);
 }

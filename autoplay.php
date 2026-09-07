@@ -54,10 +54,45 @@ use React\EventLoop\Loop;
 
 use function React\Promise\set_rejection_handler;
 
-require __DIR__ . '/vendor/autoload.php';
+/**
+ * Project base dir — resilient to being run as a phpacker/phpmicro binary from
+ * `bin/build/<name>/<platform>/` (directly or via a shortcut, any cwd): walk up
+ * from the real executable path, then the working directory, to the first
+ * ancestor with `vendor/autoload.php` or a `.env`.
+ */
+$baseDir = (static function (): string {
+    $seen = [];
+    foreach ([\Phar::running(false) ?: null, __FILE__, \getcwd() ?: null] as $start) {
+        if ($start === null) {
+            continue;
+        }
+        $dir = \is_dir($start) ? $start : \dirname((string) \preg_replace('#^phar://#', '', $start));
+        for ($i = 0; $i < 12; $i++) {
+            if (isset($seen[$dir])) {
+                break;
+            }
+            $seen[$dir] = true;
+            if (\is_file($dir . '/vendor/autoload.php') || \is_file($dir . '/.env')) {
+                return $dir;
+            }
+            if (($up = \dirname($dir)) === $dir) {
+                break;
+            }
+            $dir = $up;
+        }
+    }
+
+    return \getcwd() ?: __DIR__;
+})();
+
+$autoload = is_file(__DIR__ . '/vendor/autoload.php') ? __DIR__ . '/vendor/autoload.php'
+    : (is_file($baseDir . '/vendor/autoload.php') ? $baseDir . '/vendor/autoload.php' : null);
+$autoload
+    ? require $autoload
+    : exit("Composer autoloader not found. Run `composer install`, or keep the binary inside the project directory.\n");
 
 // --- .env (only fills vars not already in the environment) -------------------
-$envPath = __DIR__ . '/.env';
+$envPath = $baseDir . '/.env';
 if (is_file($envPath)) {
     foreach (file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $l) {
         $l = trim($l);
@@ -91,7 +126,7 @@ $logger = new Logger('autoplay', [
         ->setFormatter(new LineFormatter(null, 'H:i:s', true, true, true)),
 ]);
 
-$state = new StateStore(__DIR__ . '/var/state.json');
+$state = new StateStore($baseDir . '/var/state.json');
 $agentId = isset($argv[1]) ? (int) $argv[1] : (int) ($state->getDefaultAgent() ?? 0);
 if ($agentId <= 0) {
     exit("No agent id. Pass one (php autoplay.php <id>) or set a default agent in var/state.json.\n");

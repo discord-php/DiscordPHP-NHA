@@ -54,6 +54,20 @@ Run `!nha register <name> <metal> <credits>` (or `/nha register`) once to create
 
 Set `NHA_BASE_URL` to point the client at a non-production NHA instance; unset it uses `https://nha.recluse.lol`.
 
+### Standalone binaries
+
+```
+composer phpacker            # builds bot.php and autoplay.php for every platform
+composer phpacker:bot        # bot.php      → bin/build/bot/<platform>/
+composer phpacker:autoplay   # autoplay.php → bin/build/autoplay/<platform>/
+```
+
+Both entry points resolve their `.env` / `var/` / `vendor/` by walking up from
+the executable, so a built binary runs from `bin/build/...` (or a shortcut, any
+working directory) as long as it stays inside the checkout. `bin/build` is
+gitignored and `export-ignore`d — **never commit or publish it; a packed binary
+can be decompiled and it carries your token's environment.**
+
 ## Versioning
 
 SemVer, with the **major tracking the NHA world API** it targets
