@@ -73,8 +73,12 @@ NHA_AUTOPLAY_INTERVAL=60               # seconds between turns (default 15; rais
 `bot.php`'s in-process loop and the standalone `autoplay.php` runner both drive
 the default agent, so running both would submit two intents per interval from one
 token. They coordinate through an **autoplay lease** in `var/state.json`: the
-first to claim it drives, the other logs a skipped turn until the lease expires
-(a crashed driver frees it within ~45s). A manual `!nha think` is never gated.
+first to claim it drives, the other logs a skipped turn until the lease expires.
+The claim is a compare-and-swap under an OS file lock (`state.json.lease.lock`),
+so two runners that start at the same instant can't both take it. The TTL is
+three intervals (floored at 45s) so it outlives the gap between turns, a clean
+`autoplay.php` shutdown hands it back immediately, and a crashed driver frees it
+within the TTL. A manual `!nha think` is never gated.
 
 ### Headless runner
 

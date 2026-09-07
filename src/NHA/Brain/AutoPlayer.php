@@ -108,16 +108,18 @@ final class AutoPlayer
      * Executes one autoplay turn.
      *
      * @param int         $agent_id
-     * @param string      $token    The agent's action token (empty → the ambient token).
-     * @param string|null $lease    A per-process id for the driving loop. When set, the turn
-     *                              is skipped unless this process holds the autoplay lease
-     *                              (see {@see StateStore::acquireAutoplayLease()}), so
-     *                              `bot.php`'s loop and the headless runner never double-submit.
-     *                              Pass null for a one-off (`!nha think`), which is never gated.
+     * @param string      $token         The agent's action token (empty → the ambient token).
+     * @param string|null $lease         A per-process id for the driving loop. When set, the turn
+     *                                   is skipped unless this process holds the autoplay lease
+     *                                   (see {@see StateStore::acquireAutoplayLease()}), so
+     *                                   `bot.php`'s loop and the headless runner never double-submit.
+     *                                   Pass null for a one-off (`!nha think`), which is never gated.
+     * @param int|null    $leaseInterval The driving loop's turn interval in seconds, used to size
+     *                                   the lease TTL so it survives the gap between turns.
      */
-    public function step(int $agent_id, string $token = '', ?string $lease = null): PromiseInterface
+    public function step(int $agent_id, string $token = '', ?string $lease = null, ?int $leaseInterval = null): PromiseInterface
     {
-        if ($lease !== null && ! $this->state->acquireAutoplayLease($lease)) {
+        if ($lease !== null && ! $this->state->acquireAutoplayLease($lease, $leaseInterval)) {
             return resolve(sprintf(
                 '⏸️ Autoplay turn skipped — another driver (`%s`) holds the lease.',
                 $this->state->autoplayLeaseHolder() ?? '?',

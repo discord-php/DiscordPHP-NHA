@@ -138,8 +138,9 @@ $logger->info(sprintf(
 
 $busy = false;
 $stopping = false;
+$leaseHolder = 'autoplay.php:' . getmypid();
 
-$turn = function () use (&$busy, &$stopping, $player, $brain, $nha, $agentId, $token, $dryRun, $logger, $loop): void {
+$turn = function () use (&$busy, &$stopping, $player, $brain, $nha, $agentId, $token, $dryRun, $logger, $loop, $interval, $leaseHolder): void {
     if ($busy || $stopping) {
         return;
     }
@@ -160,7 +161,7 @@ $turn = function () use (&$busy, &$stopping, $player, $brain, $nha, $agentId, $t
                     : "🧪 #{$agentId} would → {$d['verb']} " . json_encode($d['args'], JSON_UNESCAPED_SLASHES)
                         . ($d['reason'] !== '' ? "\n> {$d['reason']}" : ''),
             )
-            : $player->step($agentId, $token, 'autoplay.php:' . getmypid());
+            : $player->step($agentId, $token, $leaseHolder, (int) $interval);
 
         $promise->then(
             static fn(string $line) => $logger->info($line),
@@ -175,15 +176,19 @@ $turn = function () use (&$busy, &$stopping, $player, $brain, $nha, $agentId, $t
 // Graceful stop where the platform supports POSIX signals (Linux/macOS with
 // ext-pcntl / ext-uv). On Windows, Ctrl+C hard-terminates the process, which is
 // still a clean "user stopped it".
-$installSignal = static function (int $signal) use ($loop, &$stopping, &$busy, $logger): void {
+$installSignal = static function (int $signal) use ($loop, &$stopping, &$busy, $logger, $state, $leaseHolder): void {
     try {
-        $loop->addSignal($signal, function () use ($loop, &$stopping, &$busy, $logger): void {
+        $loop->addSignal($signal, function () use ($loop, &$stopping, &$busy, $logger, $state, $leaseHolder): void {
             if ($stopping) {
                 $loop->stop();
 
                 return;
             }
             $stopping = true;
+            // Hand the lease back now so bot.php's loop can pick up on its very
+            // next tick instead of waiting out the TTL. Any in-flight turn has
+            // already passed its acquire check and won't touch the lease again.
+            $state->releaseAutoplayLease($leaseHolder);
             $logger->info($busy ? 'stop requested — finishing the current turn…' : 'stop requested');
             if (! $busy) {
                 $loop->stop();

@@ -737,7 +737,7 @@ if ($autoPlayer) {
     $autoplay_interval = (float) (getenv('NHA_AUTOPLAY_INTERVAL') ?: 15);
     $autoplay_busy = false;
 
-    Loop::get()->addPeriodicTimer($autoplay_interval, function () use ($nha, $state, $autoPlayer, $channel_id, &$autoplay_busy): void {
+    Loop::get()->addPeriodicTimer($autoplay_interval, function () use ($nha, $state, $autoPlayer, $channel_id, $autoplay_interval, &$autoplay_busy): void {
         if ($autoplay_busy || ! $state->isAutoplayEnabled()) {
             return;
         }
@@ -756,7 +756,7 @@ if ($autoPlayer) {
         // must never take the loop down; catch everything and let $done() reset
         // the busy flag so the next tick tries again.
         try {
-            $autoPlayer->step($agent_id, (string) ($state->getDefaultAgentToken() ?? ''), 'bot.php:' . getmypid())->then(
+            $autoPlayer->step($agent_id, (string) ($state->getDefaultAgentToken() ?? ''), 'bot.php:' . getmypid(), (int) $autoplay_interval)->then(
                 function (string $line) use ($nha, $channel_id, $done): void {
                     $nha->logger->info("[autoplay] {$line}");
                     if ($channel_id) {

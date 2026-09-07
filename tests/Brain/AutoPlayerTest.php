@@ -142,7 +142,7 @@ class AutoPlayerTest extends NHAUnitTestCase
     public function testStepWithALeaseSkipsWhenAnotherDriverHoldsIt(): void
     {
         $state = new StateStore($this->statePath);
-        $state->acquireAutoplayLease('autoplay.php:999', 45); // another process is already driving
+        $state->acquireAutoplayLease('autoplay.php:999', 15); // another process is already driving
 
         $nha = $this->nhaWith(['tick' => 1, 'downed_until' => 0]);
         $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"gather","args":{"n":1}}'), $state);
@@ -178,7 +178,7 @@ class AutoPlayerTest extends NHAUnitTestCase
     public function testAOneOffStepIsNeverLeaseGated(): void
     {
         $state = new StateStore($this->statePath);
-        $state->acquireAutoplayLease('autoplay.php:999', 45);
+        $state->acquireAutoplayLease('autoplay.php:999', 15);
 
         $nha = $this->nhaWith(['tick' => 1, 'downed_until' => 0]);
         $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"gather","args":{"n":1}}'), $state);

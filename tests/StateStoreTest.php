@@ -15,11 +15,13 @@ class StateStoreTest extends NHAUnitTestCase
 
     protected function tearDown(): void
     {
-        if (is_file($this->path)) {
-            unlink($this->path);
-        }
         $dir = dirname($this->path);
         if (is_dir($dir)) {
+            // Sweep everything the store may have dropped here: the state file,
+            // an orphaned `.tmp`, and the `.lease.lock` file the lease CAS uses.
+            foreach (glob($dir . '/*') ?: [] as $file) {
+                @unlink($file);
+            }
             rmdir($dir);
         }
     }
@@ -243,15 +245,27 @@ class StateStoreTest extends NHAUnitTestCase
     {
         $store = new StateStore($this->path);
 
-        $this->assertTrue($store->acquireAutoplayLease('bot.php:1', 45), 'a free lease is granted');
+        $this->assertTrue($store->acquireAutoplayLease('bot.php:1', 15), 'a free lease is granted');
         $this->assertSame('bot.php:1', $store->autoplayLeaseHolder());
 
-        $this->assertFalse($store->acquireAutoplayLease('autoplay.php:2', 45), 'a live lease blocks another holder');
-        $this->assertTrue($store->acquireAutoplayLease('bot.php:1', 45), 'the holder can always renew');
+        $this->assertFalse($store->acquireAutoplayLease('autoplay.php:2', 15), 'a live lease blocks another holder');
+        $this->assertTrue($store->acquireAutoplayLease('bot.php:1', 15), 'the holder can always renew');
 
         $store->releaseAutoplayLease('bot.php:1');
         $this->assertNull($store->autoplayLeaseHolder());
-        $this->assertTrue($store->acquireAutoplayLease('autoplay.php:2', 45), 'the lease is free again after release');
+        $this->assertTrue($store->acquireAutoplayLease('autoplay.php:2', 15), 'the lease is free again after release');
+    }
+
+    /**
+     * @covers \NHA\StateStore::leaseTtlForInterval
+     */
+    public function testAutoplayLeaseTtlIsThreeIntervalsFlooredAt45s(): void
+    {
+        $this->assertSame(45, StateStore::leaseTtlForInterval(null), 'null → the floor');
+        $this->assertSame(45, StateStore::leaseTtlForInterval(10), '3×10 is below the floor');
+        $this->assertSame(45, StateStore::leaseTtlForInterval(15), '3×15 sits exactly on the floor');
+        $this->assertSame(180, StateStore::leaseTtlForInterval(60), 'a 60s interval outlives the gap between turns');
+        $this->assertSame(45, StateStore::leaseTtlForInterval(-5), 'a nonsense interval still yields the floor');
     }
 
     /**
@@ -260,7 +274,7 @@ class StateStoreTest extends NHAUnitTestCase
     public function testAutoplayLeaseExpires(): void
     {
         $store = new StateStore($this->path);
-        $store->acquireAutoplayLease('bot.php:1', 45);
+        $store->acquireAutoplayLease('bot.php:1', 15);
 
         // Rewrite the on-disk lease so it is already stale, then reload.
         $data = json_decode(file_get_contents($this->path), true);
@@ -269,7 +283,7 @@ class StateStoreTest extends NHAUnitTestCase
 
         $reloaded = new StateStore($this->path);
         $this->assertNull($reloaded->autoplayLeaseHolder(), 'an expired lease is nobody\'s');
-        $this->assertTrue($reloaded->acquireAutoplayLease('autoplay.php:2', 45), 'and can be taken over');
+        $this->assertTrue($reloaded->acquireAutoplayLease('autoplay.php:2', 15), 'and can be taken over');
     }
 
     /**
@@ -278,7 +292,7 @@ class StateStoreTest extends NHAUnitTestCase
     public function testReleaseOnlyAffectsYourOwnLease(): void
     {
         $store = new StateStore($this->path);
-        $store->acquireAutoplayLease('bot.php:1', 45);
+        $store->acquireAutoplayLease('bot.php:1', 15);
 
         $store->releaseAutoplayLease('someone-else');
 
