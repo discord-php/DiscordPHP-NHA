@@ -26,7 +26,7 @@ namespace NHA\Brain;
  * @link https://nha.recluse.lol/rules      Crafting physics (combine matches tag SETS)
  * @link https://nha.recluse.lol/depot      Depot prices (buy = it pays you; sell = you pay it)
  *
- * @since 0.2.0
+ * @since 3.0.0
  */
 final class Playbook
 {

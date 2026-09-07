@@ -28,7 +28,7 @@ use React\Promise\PromiseInterface;
  * @link https://nha.recluse.lol/AGENTS.md
  * @link https://nha.recluse.lol/docs#/agent/submit_intent_intent_post
  *
- * @since 0.1.0
+ * @since 3.0.0
  */
 final class AgentBrain
 {
@@ -297,11 +297,15 @@ final class AgentBrain
                         : "Do not repeat {$lastVerb} unless it is still clearly the right call (e.g. still moving toward a target).");
             }
 
+            // Only the verb, args and the server's own outcome are echoed back —
+            // never the previous turn's free-text `reason`. A model paraphrase
+            // like "I have 9 wood" that landed in one turn's reason would
+            // otherwise be replayed verbatim every subsequent turn and read as
+            // fact, even after the real inventory (below) has moved on.
             $lines[] = sprintf(
-                'Last turn: you chose %s%s%s. %s',
+                'Last turn: you chose %s%s. %s',
                 $lastVerb,
                 $lastArgs === [] ? '' : ' ' . json_encode($lastArgs, JSON_UNESCAPED_SLASHES),
-                ($lastDecision['reason'] ?? '') !== '' ? " (\"{$lastDecision['reason']}\")" : '',
                 $tail,
             );
         }

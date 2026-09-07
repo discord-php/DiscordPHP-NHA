@@ -26,7 +26,7 @@ namespace NHA\Parts;
  *
  * @property array $pending Open proposals with ingredient physics.
  *
- * @since 0.1.0
+ * @since 3.0.0
  */
 class GuildPending extends Out
 {

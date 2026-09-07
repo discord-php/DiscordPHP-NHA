@@ -25,7 +25,7 @@ use Discord\Parts\Channel\Message\AllowedMentions;
  *
  * @see \Discord\Builders\MessageBuilder Discord message builder this wraps
  *
- * @since 0.1.0
+ * @since 3.0.0
  */
 trait HelperTrait
 {

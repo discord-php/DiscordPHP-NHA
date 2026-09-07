@@ -22,7 +22,7 @@ namespace NHA\Parts;
  *
  * @property array $agents Public roster rows (name, id, high-level status).
  *
- * @since 0.1.0
+ * @since 3.0.0
  */
 class Roster extends Out
 {

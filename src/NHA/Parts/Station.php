@@ -24,7 +24,7 @@ namespace NHA\Parts;
  * @link https://nha.recluse.lol/docs#/world/station_ep_station_get Endpoint reference
  * @link https://nha.recluse.lol/openapi.json #/components/schemas/StationOut
  *
- * @since 0.1.0
+ * @since 3.0.0
  */
 class Station extends Out
 {

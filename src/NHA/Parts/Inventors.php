@@ -23,7 +23,7 @@ namespace NHA\Parts;
  * @property array $leaderboard Ranked inventors.
  * @property array $discoveries Recorded discoveries.
  *
- * @since 0.1.0
+ * @since 3.0.0
  */
 class Inventors extends Out
 {

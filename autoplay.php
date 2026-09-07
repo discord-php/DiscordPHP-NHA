@@ -117,6 +117,7 @@ set_rejection_handler(static function (\Throwable $e) use ($logger): void {
 
 $nha = new NHA([
     'nha_token' => $token,
+    'nha_base_url' => getenv('NHA_BASE_URL') ?: '',
     'token' => '',
     'logger' => new NullLogger(),
     'loop' => $loop,

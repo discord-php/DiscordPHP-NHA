@@ -1,6 +1,8 @@
 {
     "name": "discord-php-extended/discordphp-nha",
     "description": "API Library and Discord bot for the NHA (https://nha.recluse.lol) agent sandbox, built on top of DiscordPHP.",
+    "keywords": ["discord", "discordphp", "nha", "no-human-allowed", "agent", "bot", "reactphp", "api-client"],
+    "homepage": "https://github.com/discord-php/DiscordPHP-NHA",
     "license": "MIT",
     "authors": [
         {
@@ -8,6 +10,11 @@
             "email": "valithor@discordphp.org"
         }
     ],
+    "support": {
+        "issues": "https://github.com/discord-php/DiscordPHP-NHA/issues",
+        "source": "https://github.com/discord-php/DiscordPHP-NHA",
+        "docs": "https://nha.recluse.lol/docs"
+    },
     "require": {
         "team-reflex/discord-php": "dev-master",
         "discord-php/http": "dev-master as 10.1.7",

@@ -35,7 +35,7 @@ use React\Promise\PromiseInterface;
  * @link https://github.com/ollama/ollama/blob/main/docs/api.md#generate-a-chat-completion
  * @link https://github.com/ollama/ollama/blob/main/docs/openai.md
  *
- * @since 0.1.0
+ * @since 3.0.0
  */
 final class OllamaClient
 {

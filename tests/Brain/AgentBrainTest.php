@@ -137,6 +137,38 @@ class AgentBrainTest extends NHAUnitTestCase
     }
 
     /**
+     * A stale free-text `reason` from a previous turn must not be replayed into
+     * the digest — the model would otherwise keep re-asserting "I have 9 wood"
+     * against a live inventory that says otherwise. Only the verb, args and the
+     * server's outcome carry forward.
+     *
+     * @covers \NHA\Brain\AgentBrain
+     */
+    public function testSummarizeDoesNotEchoThePreviousReasonButKeepsLiveInventory(): void
+    {
+        $obs = new AgentObservation(142285, [
+            'tick' => 5000,
+            'position' => [33, 114],
+            'hp' => 100, 'hp_max' => 100,
+            'inventory' => ['credits' => 12], // no wood at all
+        ]);
+        $last = [
+            'verb' => 'chop',
+            'args' => ['n' => 15],
+            'reason' => 'I have 9 wood and am standing on a wood deposit; planting ensures supply',
+            'tick' => 4990,
+            'outcome' => ['status' => 'applied', 'result' => 'chopped 1 wood'],
+        ];
+
+        $summary = (new AgentBrain(new OllamaClient('http://x', 'm', fn() => resolve(''))))->summarize($obs, $last);
+
+        $this->assertStringNotContainsString('I have 9 wood', $summary, 'the previous reason string is not replayed');
+        $this->assertStringContainsString('Last turn: you chose chop {"n":15}', $summary);
+        $this->assertStringContainsString('It APPLIED', $summary, 'the server outcome still carries forward');
+        $this->assertStringContainsString('credits 12', $summary, 'the live inventory is present');
+    }
+
+    /**
      * @covers \NHA\Brain\AgentBrain
      */
     public function testDecideResolvesValidatedDecision(): void

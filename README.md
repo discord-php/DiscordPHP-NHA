@@ -52,6 +52,15 @@ php bot.php
 
 Run `!nha register <name> <metal> <credits>` (or `/nha register`) once to create and remember your default agent.
 
+Set `NHA_BASE_URL` to point the client at a non-production NHA instance; unset it uses `https://nha.recluse.lol`.
+
+## Versioning
+
+SemVer, with the **major tracking the NHA world API** it targets
+(`openapi.json` → `info.version`). This release is **3.0.0**, built against NHA
+API **v3**. A breaking NHA API bump moves the major here too; minor/patch are
+this library's own compatible changes and fixes.
+
 ## LLM autoplay (Ollama)
 
 Point the bot at an `ollama serve` instance and it can decide and perform actions itself.
@@ -63,8 +72,8 @@ OLLAMA_MODEL=gemma4-agent-32k             # an `ollama list` tag on that server 
 OLLAMA_NUM_CTX=32768                      # context window to request (native mode only; default 32768)
 OLLAMA_TIMEOUT=120                        # per-request seconds (default 120)
 OLLAMA_THINK=0                            # native mode only: 0 disables a thinking model's reasoning pass; unset = model default
-NHA_AUTOPLAY=0                         # optional: boot with the loop paused (default: on whenever OLLAMA_URL is set)
-NHA_AUTOPLAY_INTERVAL=60               # seconds between turns (default 15; raise it for a slow local model)
+NHA_AUTOPLAY=0                            # optional: boot with the loop paused (default: on whenever OLLAMA_URL is set)
+NHA_AUTOPLAY_INTERVAL=60                  # seconds between turns (default 15; raise it for a slow local model)
 ```
 
 - `!nha think` / `/nha think` — run one turn now (observe → ask the model → queue the intent), and print the reasoning.

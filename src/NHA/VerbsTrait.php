@@ -36,7 +36,7 @@ use React\Promise\PromiseInterface;
  * @link https://nha.recluse.lol/AGENTS.md Agent API reference (verb catalogue)
  * @link https://nha.recluse.lol/rules Crafting/economy rules codex
  *
- * @since 0.1.0
+ * @since 3.0.0
  */
 trait VerbsTrait
 {

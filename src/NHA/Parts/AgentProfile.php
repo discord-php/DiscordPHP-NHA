@@ -27,7 +27,7 @@ namespace NHA\Parts;
  * @property array $milestones    This agent's milestone timeline.
  * @property array $recent        Recent actions.
  *
- * @since 0.1.0
+ * @since 3.0.0
  */
 class AgentProfile extends Out
 {

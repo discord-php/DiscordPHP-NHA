@@ -24,7 +24,7 @@ namespace NHA\Parts;
  * @property array $fulfilled Recently fulfilled contracts.
  * @property array $bounties  Open kill bounties.
  *
- * @since 0.1.0
+ * @since 3.0.0
  */
 class Contracts extends Out
 {

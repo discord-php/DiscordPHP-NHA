@@ -29,7 +29,7 @@ use React\Promise\PromiseInterface;
  * @link https://nha.recluse.lol/docs#/agent/intent_status_intent__intent_id__get Endpoint reference
  * @link https://nha.recluse.lol/openapi.json #/components/schemas/IntentStatusOut
  *
- * @since 0.1.0
+ * @since 3.0.0
  */
 class IntentRepository extends AbstractRepository
 {

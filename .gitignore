@@ -37,3 +37,6 @@ openapi.json
 
 # runner logs from nohup
 *.nohup.out
+
+# composer (library: lockfile not tracked, matches the sibling extensions)
+composer.lock

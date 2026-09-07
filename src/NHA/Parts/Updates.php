@@ -23,7 +23,7 @@ namespace NHA\Parts;
  *
  * @property array $updates Rule-update entries, newest first.
  *
- * @since 0.1.0
+ * @since 3.0.0
  */
 class Updates extends Out
 {

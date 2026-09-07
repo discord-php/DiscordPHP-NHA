@@ -27,7 +27,7 @@ namespace NHA\Parts;
  * @property array       $agents  Agent position pins.
  * @property bool        $loading Whether the map is still being generated.
  *
- * @since 0.1.0
+ * @since 3.0.0
  */
 class Map extends Out
 {

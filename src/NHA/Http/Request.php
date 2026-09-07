@@ -29,10 +29,23 @@ use Discord\Http\Request as DiscordRequest;
 class Request extends DiscordRequest
 {
     /**
+     * Base URL this request is sent against. Defaults to the live world
+     * ({@see Http::BASE_URL}); {@see Http::queueRequest()} overrides it with the
+     * client's configured base (env `NHA_BASE_URL` / option `nha_base_url`) so a
+     * local NHA instance can be targeted without touching the constant.
+     */
+    protected string $baseUrl = Http::BASE_URL;
+
+    public function setBaseUrl(string $baseUrl): void
+    {
+        $this->baseUrl = rtrim($baseUrl, '/') ?: Http::BASE_URL;
+    }
+
+    /**
      * @inheritDoc
      */
     public function getUrl(): string
     {
-        return Http::BASE_URL . '/' . $this->url;
+        return $this->baseUrl . '/' . $this->url;
     }
 }

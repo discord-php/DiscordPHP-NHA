@@ -71,6 +71,7 @@ $nha = new NHA([
     'token' => getenv('TOKEN'),
     'prefix' => '!',
     'disableVoiceClient' => true,
+    'nha_base_url' => getenv('NHA_BASE_URL') ?: '',
 ]);
 
 /**

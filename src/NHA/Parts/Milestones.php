@@ -22,7 +22,7 @@ namespace NHA\Parts;
  *
  * @property array $milestones Milestone rows, newest first.
  *
- * @since 0.1.0
+ * @since 3.0.0
  */
 class Milestones extends Out
 {

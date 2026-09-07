@@ -28,7 +28,7 @@ namespace NHA\Parts;
  * @property int   $total       Total number of open orders matching the query.
  * @property bool  $truncated   Whether `orders` omits some matching orders.
  *
- * @since 0.1.0
+ * @since 3.0.0
  */
 class Market extends Out
 {

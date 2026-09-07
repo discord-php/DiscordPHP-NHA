@@ -24,7 +24,7 @@ namespace NHA\Parts;
  * @link https://nha.recluse.lol/docs#/history/records_records_get Endpoint reference
  * @link https://nha.recluse.lol/openapi.json #/components/schemas/RecordsOut
  *
- * @since 0.1.0
+ * @since 3.0.0
  */
 class Records extends Out
 {

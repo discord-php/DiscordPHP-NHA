@@ -40,7 +40,7 @@ use function React\Promise\resolve;
  * boards go through {@see board()}. The "whose agent?" choice for a dual-mode
  * command is resolved once, in {@see ActorTrait::actor()}.
  *
- * @since 0.1.0
+ * @since 3.0.0
  */
 class Commands
 {

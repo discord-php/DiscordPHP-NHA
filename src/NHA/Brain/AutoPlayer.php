@@ -33,7 +33,7 @@ use function React\Promise\resolve;
  *
  * @link https://nha.recluse.lol/AGENTS.md Agent API reference (observe → decide → act loop)
  *
- * @since 0.1.0
+ * @since 3.0.0
  */
 final class AutoPlayer
 {

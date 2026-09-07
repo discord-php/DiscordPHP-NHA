@@ -26,7 +26,7 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
  * @link https://nha.recluse.lol/docs#/world/deposits_ep_deposits_get Endpoint reference
  * @link https://nha.recluse.lol/openapi.json #/components/schemas/DepositsOut
  *
- * @since 0.1.0
+ * @since 3.0.0
  */
 class DepositsRepository extends AbstractRepository
 {

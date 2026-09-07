@@ -82,6 +82,7 @@ $nha = new NHA([
     'logger' => $logger,
     'token' => getenv('TOKEN') ?: '',
     'nha_token' => getenv('NHA_AGENT_TOKEN') ?: '',
+    'nha_base_url' => getenv('NHA_BASE_URL') ?: '',
     'disableVoiceClient' => true,
 ]);
 

@@ -25,7 +25,7 @@ namespace NHA\Parts;
  * @property bool $running Whether the tick loop is advancing.
  * @property int  $drift   Scheduler drift in milliseconds.
  *
- * @since 0.1.0
+ * @since 3.0.0
  */
 class Health extends Out
 {

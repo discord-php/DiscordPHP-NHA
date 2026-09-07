@@ -27,7 +27,7 @@ use NHA\Parts\AgentObservation;
  * client via {@see NHA::setStateStore()} so {@see NHA::observe()} can snapshot
  * position for every caller.
  *
- * @since 0.1.0
+ * @since 3.0.0
  */
 class StateStore
 {

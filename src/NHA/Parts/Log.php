@@ -27,7 +27,7 @@ namespace NHA\Parts;
  * @property bool  $has_more       Whether older rows exist beyond this page.
  * @property int   $next_before_id Cursor for the next (older) page.
  *
- * @since 0.1.0
+ * @since 3.0.0
  */
 class Log extends Out
 {

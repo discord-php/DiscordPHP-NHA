@@ -21,7 +21,7 @@ namespace NHA;
  * its "whose agent?" selector through {@see actor()}, so the choice lives in
  * exactly one place.
  *
- * @since 0.2.0
+ * @since 3.0.0
  */
 trait ActorTrait
 {

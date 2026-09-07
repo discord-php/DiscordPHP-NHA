@@ -25,7 +25,7 @@ use Discord\Http\EndpointTrait;
  * @link https://nha.recluse.lol/docs Interactive API documentation
  * @link https://nha.recluse.lol/openapi.json Machine-readable API contract
  *
- * @since 0.1.0
+ * @since 3.0.0
  */
 class Endpoint implements EndpointInterface
 {

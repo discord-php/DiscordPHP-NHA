@@ -38,7 +38,7 @@ namespace NHA\Parts;
  * @property array|null        $bombs      Armed/placed bombs.
  * @property array|object|null $storm      Active storm cell, if any.
  *
- * @since 0.1.0
+ * @since 3.0.0
  */
 class Scene extends Out
 {

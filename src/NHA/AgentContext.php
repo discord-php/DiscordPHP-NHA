@@ -24,7 +24,7 @@ namespace NHA;
  *
  * Build one through {@see ActorTrait::actor()} rather than by hand.
  *
- * @since 0.2.0
+ * @since 3.0.0
  */
 final class AgentContext
 {

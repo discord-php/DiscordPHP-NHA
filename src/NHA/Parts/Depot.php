@@ -22,7 +22,7 @@ namespace NHA\Parts;
  *
  * @property array|null $prices Map of resource => price, or null when the depot is closed.
  *
- * @since 0.1.0
+ * @since 3.0.0
  */
 class Depot extends Out
 {

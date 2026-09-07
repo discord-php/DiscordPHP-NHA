@@ -23,7 +23,7 @@ namespace NHA\Parts;
  * @property array $agents Live agent rows.
  * @property int   $tick   World tick the snapshot was taken at.
  *
- * @since 0.1.0
+ * @since 3.0.0
  */
 class Agents extends Out
 {

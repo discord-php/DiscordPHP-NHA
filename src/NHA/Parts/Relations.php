@@ -22,7 +22,7 @@ namespace NHA\Parts;
  *
  * @property array $relations Directed relation rows between agents.
  *
- * @since 0.1.0
+ * @since 3.0.0
  */
 class Relations extends Out
 {

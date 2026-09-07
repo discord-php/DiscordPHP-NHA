@@ -26,7 +26,7 @@ namespace NHA\Parts;
  * @property string|null $last_state_hash Deterministic hash of the last applied state.
  * @property int         $visitors        Current spectator count.
  *
- * @since 0.1.0
+ * @since 3.0.0
  */
 class World extends Out
 {

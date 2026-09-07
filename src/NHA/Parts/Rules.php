@@ -25,7 +25,7 @@ namespace NHA\Parts;
  * @property mixed $pending   Invention proposals awaiting a Guild verdict.
  * @property mixed $dynamic   Dynamically invented items and current guidance.
  *
- * @since 0.1.0
+ * @since 3.0.0
  */
 class Rules extends Out
 {

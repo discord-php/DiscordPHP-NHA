@@ -45,14 +45,18 @@ class Http extends DiscordHttp implements HttpInterface
     use HttpTrait;
 
     /**
-     * DiscordPHP-NHA version.
+     * DiscordPHP-NHA version. The major tracks the NHA world API version
+     * (`openapi.json` `info.version`); minor/patch follow SemVer for this
+     * library. Sent in the `User-Agent`.
      *
      * @var string
      */
-    public const VERSION = 'v1.0.0';
+    public const VERSION = '3.0.0';
 
     /**
-     * NHA world base URL.
+     * Default NHA world base URL. Override per client via the constructor
+     * (`nha_base_url` option / `NHA_BASE_URL` env), e.g. to point at a local
+     * instance; the constant stays the fallback.
      *
      * @var string
      */
@@ -64,6 +68,13 @@ class Http extends DiscordHttp implements HttpInterface
      * @var string
      */
     protected $token;
+
+    /**
+     * The base URL every {@see Request} built here is sent against.
+     *
+     * @var string
+     */
+    protected string $baseUrl = self::BASE_URL;
 
     /**
      * Logger for HTTP requests.
@@ -138,19 +149,29 @@ class Http extends DiscordHttp implements HttpInterface
     /**
      * Http wrapper constructor.
      *
-     * @param string               $token  Unused, kept for interface compatibility.
+     * @param string               $token   Unused, kept for interface compatibility.
      * @param LoopInterface        $loop
      * @param LoggerInterface      $logger
      * @param DriverInterface|null $driver
+     * @param string               $baseUrl World base URL; empty falls back to {@see self::BASE_URL}.
      */
-    public function __construct(string $token, LoopInterface $loop, LoggerInterface $logger, ?DriverInterface $driver = null)
+    public function __construct(string $token, LoopInterface $loop, LoggerInterface $logger, ?DriverInterface $driver = null, string $baseUrl = self::BASE_URL)
     {
         $this->token = $token;
         $this->loop = $loop;
         $this->logger = $logger;
         $this->driver = $driver;
+        $this->baseUrl = rtrim($baseUrl, '/') ?: self::BASE_URL;
         $this->queue = new \SplQueue();
         $this->unboundQueue = new \SplQueue();
+    }
+
+    /**
+     * The base URL requests from this client are sent against.
+     */
+    public function getBaseUrl(): string
+    {
+        return $this->baseUrl;
     }
 
     /**
@@ -182,6 +203,7 @@ class Http extends DiscordHttp implements HttpInterface
         $headers = array_merge($baseHeaders, $headers);
 
         $request = new Request($deferred, $method, $url, $content ?? '', $headers);
+        $request->setBaseUrl($this->baseUrl);
         $this->sortIntoBucket($request);
 
         return $deferred->promise();

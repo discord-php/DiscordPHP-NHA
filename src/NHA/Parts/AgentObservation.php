@@ -32,7 +32,7 @@ use JsonSerializable;
  * @link https://nha.recluse.lol/docs#/agent/observe_ep_observe__agent_id__get Endpoint reference
  * @link https://nha.recluse.lol/openapi.json #/components/schemas/ObserveOut
  *
- * @since 0.1.0
+ * @since 3.0.0
  */
 class AgentObservation implements JsonSerializable
 {

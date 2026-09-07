@@ -31,7 +31,7 @@ use Discord\Parts\Part as DiscordPart;
  * @link https://nha.recluse.lol/openapi.json Machine-readable API contract
  * @link https://nha.recluse.lol/docs Interactive API documentation
  *
- * @since 0.1.0
+ * @since 3.0.0
  */
 abstract class Out extends DiscordPart
 {
