@@ -160,6 +160,63 @@ class AutoPlayerTest extends NHAUnitTestCase
 
     /**
      * @covers \NHA\Brain\AutoPlayer
+     */
+    public function testStepDropsACombineTheWorldAlreadyInvented(): void
+    {
+        // GET /rules (same mock as observe) reports glass+wood as a known recipe.
+        $nha = $this->nhaWith([
+            'tick' => 42, 'downed_until' => 0, 'position' => [1, 1],
+            'inventory' => ['wood' => 30],
+            'dynamic' => [['sig' => 'glass,wood']],
+        ]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"combine","args":{"ingredients":{"glass":1,"wood":1}}}'), new StateStore($this->statePath));
+
+        $player->step(142287, 'tok');
+
+        $this->assertCount(1, $this->posts, 'one intent went out');
+        $this->assertSame('sell', $this->posts[0][1]['verb'], 'the spent combine was swapped for the sell fallback');
+        $this->assertSame('wood', $this->posts[0][1]['args']['resource']);
+    }
+
+    /**
+     * @covers \NHA\Brain\AutoPlayer
+     * @covers \NHA\StateStore
+     */
+    public function testStepDropsACombineThisAgentAlreadyTriedThisRun(): void
+    {
+        $state = new StateStore($this->statePath);
+        $state->recordCombineSignature(142287, 'iron+wood');
+
+        $nha = $this->nhaWith([
+            'tick' => 7, 'downed_until' => 0, 'position' => [1, 1],
+            'inventory' => ['metal' => 25],
+        ]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"combine","args":{"ingredients":{"wood":1,"iron":1}}}'), $state);
+
+        $player->step(142287, 'tok');
+
+        $this->assertSame('sell', $this->posts[0][1]['verb'], 'a set already tried this run is not resubmitted');
+        $this->assertSame('metal', $this->posts[0][1]['args']['resource']);
+    }
+
+    /**
+     * @covers \NHA\Brain\AutoPlayer
+     * @covers \NHA\StateStore
+     */
+    public function testStepRecordsEveryCombineSignatureItSubmits(): void
+    {
+        $state = new StateStore($this->statePath);
+        $nha = $this->nhaWith(['tick' => 1, 'downed_until' => 0, 'position' => [1, 1], 'inventory' => ['herb' => 2, 'salt' => 2]]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"combine","args":{"ingredients":{"salt":1,"herb":1}}}'), $state);
+
+        $player->step(142287, 'tok');
+
+        $this->assertSame('combine', $this->posts[0][1]['verb'], 'a fresh set still goes through');
+        $this->assertSame(['herb+salt'], $state->getTriedCombineSignatures(142287));
+    }
+
+    /**
+     * @covers \NHA\Brain\AutoPlayer
      * @covers \NHA\StateStore
      */
     public function testStepWithALeaseSkipsWhenAnotherDriverHoldsIt(): void

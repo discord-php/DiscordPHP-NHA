@@ -37,14 +37,22 @@ use function React\Promise\resolve;
  */
 final class AutoPlayer
 {
+    /** Re-pull `GET /rules` at most this often (seconds) so sets invented mid-run enter the known list. */
+    private const RULES_TTL = 90;
+
     /**
      * `a+b => true` for every combine set the world has already invented, from
-     * `GET /rules`. Fetched once on the first turn and reused — the codex only
-     * grows, and a stale entry never causes a wrong "already known" call.
+     * `GET /rules`, plus any set this loop has since seen a `combine` APPLY for.
+     * Refreshed every {@see self::RULES_TTL}s — the codex only grows, so a stale
+     * entry is never wrong, but a missing fresh one makes the brain re-try a set
+     * that now mints nothing.
      *
      * @var array<string, bool>|null
      */
     private ?array $knownCombines = null;
+
+    /** `microtime(true)` of the last successful `GET /rules`, for the TTL above. */
+    private float $knownFetchedAt = 0.0;
 
     /**
      * @param NHA        $nha   The NHA client used to observe and submit intents.
@@ -71,28 +79,88 @@ final class AutoPlayer
      */
     private function knownCombines(): PromiseInterface
     {
-        if ($this->knownCombines !== null) {
+        if ($this->knownCombines !== null && (microtime(true) - $this->knownFetchedAt) < self::RULES_TTL) {
             return resolve($this->knownCombines);
         }
 
         return $this->nha->world->getRules()->then(
             function ($rules): array {
-                $sigs = [];
+                // Keep anything already merged from an APPLY this run — the codex
+                // only grows, so a union can never be wrong.
+                $sigs = $this->knownCombines ?? [];
                 foreach ((array) ($rules['dynamic'] ?? []) as $entry) {
                     $entry = (array) $entry;
-                    $sig = (string) ($entry['sig'] ?? '');
-                    if ($sig === '') {
-                        continue;
+                    $sig = self::signatureFromList((string) ($entry['sig'] ?? ''));
+                    if ($sig !== '') {
+                        $sigs[$sig] = true;
                     }
-                    $tokens = array_map('trim', explode(',', $sig));
-                    sort($tokens);
-                    $sigs[implode('+', $tokens)] = true;
                 }
+
+                $this->knownFetchedAt = microtime(true);
 
                 return $this->knownCombines = $sigs;
             },
-            fn(): array => $this->knownCombines = [],
+            fn(): array => $this->knownCombines ?? ($this->knownCombines = []),
         );
+    }
+
+    /**
+     * The canonical signature for a `combine` — its ingredient keys, trimmed,
+     * de-duplicated and sorted, joined with `+` (`{iron:1, wood:2}` → `iron+wood`).
+     * The world resolves a combine on the SET of tags, so amounts and order do
+     * not matter. Returns `''` when there are no ingredients.
+     *
+     * @param array<string, mixed> $args
+     */
+    public static function combineSignature(array $args): string
+    {
+        $ingredients = array_keys((array) ($args['ingredients'] ?? []));
+
+        return self::signatureFromList(implode(',', $ingredients));
+    }
+
+    /** Normalises a comma-separated ingredient list to the sorted `a+b` signature. */
+    private static function signatureFromList(string $csv): string
+    {
+        $tokens = array_values(array_unique(array_filter(array_map('trim', explode(',', $csv)), 'strlen')));
+        sort($tokens);
+
+        return implode('+', $tokens);
+    }
+
+    /**
+     * A safe, productive move for when the brain insisted on a spent `combine`
+     * set. Sells the largest raw glut (≥ 20 held) to the depot for guaranteed
+     * credits; returns `null` when there is nothing obvious to do, so the caller
+     * can just pass the tick rather than force a bad action.
+     *
+     * @param string $spentSig The set that was refused, for the decision reason.
+     *
+     * @return array{verb: string, args: array<string, mixed>, reason: string}|null
+     */
+    private function fallbackDecision(AgentObservation $observation, string $spentSig): ?array
+    {
+        $best = null;
+        $bestQty = 0;
+        foreach ($observation->getInventory() as $resource => $qty) {
+            if ($resource === 'credits' || ! is_numeric($qty)) {
+                continue;
+            }
+            if ((int) $qty >= 20 && (int) $qty > $bestQty) {
+                $best = (string) $resource;
+                $bestQty = (int) $qty;
+            }
+        }
+
+        if ($best === null) {
+            return null;
+        }
+
+        return [
+            'verb' => 'sell',
+            'args' => ['resource' => $best, 'n' => 15],
+            'reason' => "combine `{$spentSig}` is spent; selling surplus {$best} instead",
+        ];
     }
 
     /**
@@ -135,9 +203,12 @@ final class AutoPlayer
         // of blindly retrying it. Best-effort: a failed lookup just omits it.
         $last = $this->state->getLastDecision($agent_id);
         $lastQueued = ($last !== null && ! empty($last['queued_intent'])) ? (int) $last['queued_intent'] : null;
+        $lastCombineSig = ($last !== null && ($last['verb'] ?? '') === 'combine')
+            ? self::combineSignature((array) ($last['args'] ?? []))
+            : '';
         $outcome = $lastQueued !== null
             ? $this->nha->intents->getIntentStatus($lastQueued)->then(
-                function ($s) use ($agent_id, $lastQueued): array {
+                function ($s) use ($agent_id, $lastQueued, $lastCombineSig): array {
                     $status = (string) ($s->status ?? '?');
 
                     // Settled or aged out: forget the id so the next turn does
@@ -145,6 +216,13 @@ final class AutoPlayer
                     // never change.
                     if (in_array($status, ['applied', 'rejected', 'gone'], true)) {
                         $this->state->clearQueuedIntent($agent_id, $lastQueued);
+                    }
+
+                    // A combine that landed is now a world-known set — merge it
+                    // straight into the known list so it is refused from here on,
+                    // without waiting for the next GET /rules.
+                    if ($status === 'applied' && $lastCombineSig !== '' && is_array($this->knownCombines)) {
+                        $this->knownCombines[$lastCombineSig] = true;
                     }
 
                     return ['status' => $status, 'result' => (string) ($s->result ?? '')];
@@ -162,16 +240,38 @@ final class AutoPlayer
                 return resolve("🩹 Agent #{$agent_id} is downed until tick {$downedUntil} — skipping.");
             }
 
+            $known = (array) ($pre['known'] ?? []);
+            $tried = $this->state->getTriedCombineSignatures($agent_id);
+
             $context = ($last ?? []);
             if (($pre['outcome'] ?? null) !== null) {
                 $context['outcome'] = $pre['outcome'];
             }
             $context['recent'] = $this->state->getRecentDecisions($agent_id, 10);
-            $context['known_combines'] = array_keys($pre['known'] ?? []);
+            $context['known_combines'] = array_keys($known);
+            $context['tried_combines'] = $tried;
 
-            return $this->brain->decide($observation, $context ?: null)->then(function (?array $decision) use ($agent_id, $token, $tick) {
+            return $this->brain->decide($observation, $context ?: null)->then(function (?array $decision) use ($agent_id, $token, $tick, $observation, $known, $tried) {
                 if ($decision === null) {
                     return "💤 Agent #{$agent_id}: brain chose to wait (tick {$tick}).";
+                }
+
+                // Deterministic guardrail: never submit a `combine` set the world
+                // has already invented or that this agent already tried this run.
+                // A repeat mints nothing — swap it for a productive fallback
+                // instead of burning the turn on it (the model loops here badly).
+                if (($decision['verb'] ?? '') === 'combine') {
+                    $sig = self::combineSignature((array) ($decision['args'] ?? []));
+                    if ($sig !== '' && (isset($known[$sig]) || in_array($sig, $tried, true))) {
+                        $decision = $this->fallbackDecision($observation, $sig);
+                        if ($decision === null) {
+                            return "🔁 Agent #{$agent_id}: skipped a spent combine set (`{$sig}`) with no better move (tick {$tick}).";
+                        }
+                    }
+                }
+
+                if (($decision['verb'] ?? '') === 'combine') {
+                    $this->state->recordCombineSignature($agent_id, self::combineSignature((array) ($decision['args'] ?? [])));
                 }
 
                 return $this->nha->intentWithToken($agent_id, $token, $decision['verb'], $decision['args'])

@@ -4,6 +4,25 @@ All notable changes to DiscordPHP-NHA are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 SemVer with the **major tracking the NHA world API version**.
 
+## [3.1.6] - 2026-09-07
+
+### Fixed
+- Autoplay no longer loops on `combine`. The brain would resubmit the same
+  handful of ingredient sets dozens of times ("an uninvented combination for
+  inventor points") when they were long-since known and minting nothing.
+  - `AutoPlayer` now refreshes `GET /rules` every 90s (was fetched once per
+    process) and merges the signature of any `combine` that APPLIES into the
+    known set immediately.
+  - A `combine` whose sorted signature is world-known, or already submitted by
+    this agent this run, is dropped before it is sent and replaced with a
+    productive fallback (sell a raw surplus) or a skipped turn.
+  - Every submitted `combine` signature is recorded durably
+    (`StateStore::recordCombineSignature()` / `getTriedCombineSignatures()`),
+    so the "already submitted" list the brain sees is the whole run, not just
+    the last eight turns.
+  - The prompt tells the brain a `combine` that merely APPLIED still scores
+    nothing unless `inventor_points` rose.
+
 ## [3.1.5] - 2026-09-07
 
 ### Fixed

@@ -166,7 +166,9 @@ final class Playbook
             - HOARDING: harvesting a resource you already hold 15+ of. Raw stockpiles do not score — `construct`
               with them instead.
             - COMBINE GRIND: submitting `combine` set after set while `inventor_points` stays 0. Two tries, then build.
-            - RESUBMIT: any `combine` set listed in "combine sets already submitted" — it mints nothing the 2nd time.
+            - RESUBMIT: any `combine` set listed in "combine sets already submitted" or "already-invented" — it mints
+              nothing the 2nd time. The loop now auto-drops such a combine and sells a surplus instead, so a wasted
+              pick just costs you the turn — choose a fresh set or a different verb.
             - LOOPING: the same verb as recent turns when nothing forced it. If the last turn was
               `chop`/`mine`/`gather`, this turn must not be — build, sell, or move on.
             - PLANT SPAM: `plant` tops up the most-drained tree on your cell (cap 22); it does NOT stack new

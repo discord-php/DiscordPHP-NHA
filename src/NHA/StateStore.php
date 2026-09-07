@@ -401,6 +401,51 @@ class StateStore
     }
 
     /**
+     * Records that a `combine` set — identified by its sorted `"a+b"` signature —
+     * has been submitted for this agent, so {@see \NHA\Brain\AutoPlayer} can
+     * refuse to resubmit it (the world mints nothing for a repeat). Kept as a
+     * capped, de-duplicated list that also survives a restart: a restart is not
+     * a fresh invention budget.
+     *
+     * @since 3.1.6
+     */
+    public function recordCombineSignature(int $agent_id, string $signature): void
+    {
+        $signature = trim($signature);
+        if ($signature === '') {
+            return;
+        }
+
+        $key = (string) $agent_id;
+        $sigs = array_values(array_filter(
+            (array) ($this->data['agent_combine_sigs'][$key] ?? []),
+            'is_string',
+        ));
+        if (in_array($signature, $sigs, true)) {
+            return;
+        }
+
+        $sigs[] = $signature;
+        $this->data['agent_combine_sigs'][$key] = array_slice($sigs, -400);
+        $this->save();
+    }
+
+    /**
+     * Every `combine` signature this agent has already submitted, oldest first.
+     *
+     * @return list<string>
+     *
+     * @since 3.1.6
+     */
+    public function getTriedCombineSignatures(int $agent_id): array
+    {
+        return array_values(array_filter(
+            (array) ($this->data['agent_combine_sigs'][(string) $agent_id] ?? []),
+            'is_string',
+        ));
+    }
+
+    /**
      * The agent's last few decisions, oldest first — a rolling window so the
      * brain can detect a loop or an already-tried `combine` pair. Each entry is
      * `{verb, args, tick}`; older/other fields are not kept here.

@@ -285,10 +285,14 @@ final class AgentBrain
                 $tail = 'It was REJECTED' . ($result !== '' ? ": \"{$result}\"" : '')
                     . ". Do NOT try that again — pick a DIFFERENT verb or different args.";
             } elseif ($status === 'applied') {
+                $craftTail = $lastVerb === 'combine'
+                    ? ' A combine only SCORES if it invented something new; if inventor_points did not rise, that set is'
+                        . ' spent — never submit it again.'
+                    : " Move on — do not repeat {$lastVerb} unless it is still clearly the right call.";
                 $tail = 'It APPLIED' . ($result !== '' ? ": \"{$result}\"" : '') . '.'
                     . ($harvested
                         ? ' You just harvested — this turn do NOT harvest again; craft, build, or move on.'
-                        : " Move on — do not repeat {$lastVerb} unless it is still clearly the right call.");
+                        : $craftTail);
             } else {
                 // Still pending / unknown — the pre-outcome guidance.
                 $tail = 'It is queued (result not in yet). '
@@ -315,6 +319,15 @@ final class AgentBrain
         // did and one concrete recommended move keeps it productive.
         $recent = is_array($lastDecision['recent'] ?? null) ? $lastDecision['recent'] : [];
         $tried = [];
+
+        // The full set of combine signatures already submitted this run (survives
+        // the 8-turn recent window), fed in by AutoPlayer from durable state.
+        foreach (is_array($lastDecision['tried_combines'] ?? null) ? $lastDecision['tried_combines'] : [] as $sig) {
+            if (is_string($sig) && $sig !== '') {
+                $tried[$sig] = true;
+            }
+        }
+
         if ($recent !== []) {
             $hist = [];
             foreach ($recent as $r) {
@@ -335,10 +348,11 @@ final class AgentBrain
             if ($hist !== []) {
                 $lines[] = 'Recent turns (oldest→newest): ' . implode(' → ', array_slice($hist, -8));
             }
-            if ($tried !== []) {
-                $lines[] = 'combine sets already submitted this session (do NOT resubmit — a repeat mints nothing): '
-                    . implode(', ', array_keys($tried)) . '.';
-            }
+        }
+
+        if ($tried !== []) {
+            $lines[] = 'combine sets already submitted this session (do NOT resubmit — a repeat mints nothing): '
+                . implode(', ', array_slice(array_keys($tried), -40)) . '.';
         }
 
         // Combine sets the whole world has ALREADY invented (from /rules) that
