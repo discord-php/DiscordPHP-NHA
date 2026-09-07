@@ -168,7 +168,9 @@ final class Playbook
             - RESUBMIT: any `combine` set listed in "combine sets already submitted" — it mints nothing the 2nd time.
             - LOOPING: the same verb as recent turns when nothing forced it. If the last turn was
               `chop`/`mine`/`gather`, this turn must not be — build, sell, or move on.
-            - `wait` while you hold ≥ 20 of a raw and have built nothing (→ `construct`).
+            - PHANTOM INGREDIENTS: `combine`/`build`/`construct` with any item at qty 0 in your Inventory line
+              (iron, chip, composite, …). It is rejected outright. Only use what you actually hold.
+            - `wait` while you hold ≥ 20 of a raw and have a use for it.
             - `construct shape=station` when not `in_space`; `depart` with no fueled ion-thruster ship or a closed window.
             - `move` with no target in mind, or toward a resource you already have plenty of.
 

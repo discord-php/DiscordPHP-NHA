@@ -358,6 +358,15 @@ final class AgentBrain
                 . implode(', ', array_slice($makeableKnown, 0, 20)) . '.';
         }
 
+        if ($invNames !== []) {
+            $lines[] = 'You may ONLY combine/build from what you hold (qty ≥ 1): ' . implode(', ', $invNames)
+                . '. Anything else — iron, chip, composite, … at qty 0 — will be rejected.';
+        }
+        if (($raw['inventory']['composite_material'] ?? 0) > 0 && ($raw['inventory']['composite'] ?? 0) === 0) {
+            $lines[] = 'NOTE: you hold `composite_material`, NOT `composite`. A `construct` tower needs `composite` '
+                . '(aluminium + carbon) — you cannot build one yet, so do not keep trying.';
+        }
+
         if ($suggestion = $this->suggestion($raw, $tried, array_fill_keys($knownCombines, true))) {
             $lines[] = sprintf(
                 'SUGGESTED next action: %s%s — %s. Do this unless you clearly see something better.',
