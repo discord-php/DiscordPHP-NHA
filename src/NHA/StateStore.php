@@ -268,6 +268,12 @@ class StateStore
      * exactly as other processes last left it — and, on {@see save()}, does not
      * clobber unrelated keys another process wrote in the meantime.
      *
+     * The re-read is only adopted when it decodes to a non-empty array. An empty
+     * or truncated state file (full disk, interrupted first write, a hand-edit)
+     * would otherwise become `[]`, and the next {@see save()} would persist a
+     * file holding nothing but the lease — dropping the agent token, which the
+     * NHA server issues exactly once. A stale in-memory read is the safe failure.
+     *
      * Degrades to running `$fn` unlocked (the old best-effort read-modify-write)
      * when the lock file can't be opened: a rare doubled interval beats a loop
      * that never drives.
@@ -291,7 +297,10 @@ class StateStore
             }
 
             if (is_file($this->path)) {
-                $this->data = (array) json_decode((string) file_get_contents($this->path), true);
+                $fresh = json_decode((string) file_get_contents($this->path), true);
+                if (is_array($fresh) && $fresh !== []) {
+                    $this->data = $fresh;
+                }
             }
 
             return $fn();

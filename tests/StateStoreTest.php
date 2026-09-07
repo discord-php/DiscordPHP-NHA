@@ -298,4 +298,40 @@ class StateStoreTest extends NHAUnitTestCase
 
         $this->assertSame('bot.php:1', $store->autoplayLeaseHolder(), 'a foreign release is ignored');
     }
+
+    /**
+     * A corrupt/empty state file must not let the lease re-read wipe the store.
+     * The NHA server issues an agent token once, so losing it is permanent.
+     *
+     * @covers \NHA\StateStore
+     *
+     * @dataProvider corruptStateFiles
+     */
+    public function testLeaseReReadDoesNotAdoptAnEmptyOrInvalidStateFile(string $corrupt): void
+    {
+        $store = new StateStore($this->path);
+        $store->setDefaultAgent(142285, 'once-only-token');
+        $store->acquireAutoplayLease('bot.php:1', 15);
+
+        // The file goes bad between turns; the next acquire re-reads it under lock.
+        file_put_contents($this->path, $corrupt);
+        $store->acquireAutoplayLease('bot.php:1', 15);
+
+        $reloaded = new StateStore($this->path);
+        $this->assertSame(142285, $reloaded->getDefaultAgent(), 'the agent id survived');
+        $this->assertSame('once-only-token', $reloaded->getDefaultAgentToken(), 'the once-only token survived');
+        $this->assertSame('bot.php:1', $reloaded->autoplayLeaseHolder(), 'and the lease is still held');
+    }
+
+    /** @return array<string, array{string}> */
+    public static function corruptStateFiles(): array
+    {
+        return [
+            'empty file' => [''],
+            'whitespace only' => ["  \n"],
+            'truncated json' => ['{"default_agent": 142285, "default_agent_'],
+            'json null' => ['null'],
+            'json array' => ['[]'],
+        ];
+    }
 }
