@@ -122,4 +122,45 @@ class AutoPlayerTest extends NHAUnitTestCase
 
         $this->assertSame('client-tok', $this->posts[0][1]['token']);
     }
+
+    public function testStepWithALeaseSkipsWhenAnotherDriverHoldsIt(): void
+    {
+        $state = new StateStore($this->statePath);
+        $state->acquireAutoplayLease('autoplay.php:999', 45); // another process is already driving
+
+        $nha = $this->nhaWith(['tick' => 1, 'downed_until' => 0]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"gather","args":{"n":1}}'), $state);
+
+        $line = null;
+        $player->step(7, 'tok', 'bot.php:1')->then(function ($l) use (&$line) {
+            $line = $l;
+        });
+
+        $this->assertSame([], $this->posts, 'no intent submitted while another driver holds the lease');
+        $this->assertStringContainsString('skipped', strtolower((string) $line));
+        $this->assertStringContainsString('autoplay.php:999', (string) $line);
+    }
+
+    public function testStepWithALeaseRunsWhenItCanTakeTheLease(): void
+    {
+        $nha = $this->nhaWith(['tick' => 1, 'downed_until' => 0]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"gather","args":{"n":1}}'), new StateStore($this->statePath));
+
+        $player->step(7, 'tok', 'bot.php:1');
+
+        $this->assertNotSame([], $this->posts, 'the turn runs and queues an intent');
+    }
+
+    public function testAOneOffStepIsNeverLeaseGated(): void
+    {
+        $state = new StateStore($this->statePath);
+        $state->acquireAutoplayLease('autoplay.php:999', 45);
+
+        $nha = $this->nhaWith(['tick' => 1, 'downed_until' => 0]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"gather","args":{"n":1}}'), $state);
+
+        $player->step(7, 'tok'); // no lease arg -> `!nha think`
+
+        $this->assertNotSame([], $this->posts, 'a manual one-off turn is not blocked by the loop lease');
+    }
 }

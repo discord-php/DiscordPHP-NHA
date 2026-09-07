@@ -160,7 +160,7 @@ $turn = function () use (&$busy, &$stopping, $player, $brain, $nha, $agentId, $t
                     : "🧪 #{$agentId} would → {$d['verb']} " . json_encode($d['args'], JSON_UNESCAPED_SLASHES)
                         . ($d['reason'] !== '' ? "\n> {$d['reason']}" : ''),
             )
-            : $player->step($agentId, $token);
+            : $player->step($agentId, $token, 'autoplay.php:' . getmypid());
 
         $promise->then(
             static fn(string $line) => $logger->info($line),

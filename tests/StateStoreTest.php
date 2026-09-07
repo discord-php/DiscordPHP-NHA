@@ -187,4 +187,44 @@ class StateStoreTest extends NHAUnitTestCase
         $this->assertJson(file_get_contents($this->path));
         $this->assertSame([], glob(dirname($this->path) . '/*.tmp'), 'the temp file is renamed away, not left behind');
     }
+
+    public function testAutoplayLeaseIsHeldByOneDriverAtATime(): void
+    {
+        $store = new StateStore($this->path);
+
+        $this->assertTrue($store->acquireAutoplayLease('bot.php:1', 45), 'a free lease is granted');
+        $this->assertSame('bot.php:1', $store->autoplayLeaseHolder());
+
+        $this->assertFalse($store->acquireAutoplayLease('autoplay.php:2', 45), 'a live lease blocks another holder');
+        $this->assertTrue($store->acquireAutoplayLease('bot.php:1', 45), 'the holder can always renew');
+
+        $store->releaseAutoplayLease('bot.php:1');
+        $this->assertNull($store->autoplayLeaseHolder());
+        $this->assertTrue($store->acquireAutoplayLease('autoplay.php:2', 45), 'the lease is free again after release');
+    }
+
+    public function testAutoplayLeaseExpires(): void
+    {
+        $store = new StateStore($this->path);
+        $store->acquireAutoplayLease('bot.php:1', 45);
+
+        // Rewrite the on-disk lease so it is already stale, then reload.
+        $data = json_decode(file_get_contents($this->path), true);
+        $data['autoplay_lease']['expires'] = time() - 1;
+        file_put_contents($this->path, json_encode($data));
+
+        $reloaded = new StateStore($this->path);
+        $this->assertNull($reloaded->autoplayLeaseHolder(), 'an expired lease is nobody\'s');
+        $this->assertTrue($reloaded->acquireAutoplayLease('autoplay.php:2', 45), 'and can be taken over');
+    }
+
+    public function testReleaseOnlyAffectsYourOwnLease(): void
+    {
+        $store = new StateStore($this->path);
+        $store->acquireAutoplayLease('bot.php:1', 45);
+
+        $store->releaseAutoplayLease('someone-else');
+
+        $this->assertSame('bot.php:1', $store->autoplayLeaseHolder(), 'a foreign release is ignored');
+    }
 }

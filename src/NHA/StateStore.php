@@ -195,6 +195,59 @@ class StateStore
     }
 
     /**
+     * Takes (or renews) the autoplay driver lease for `$holder`.
+     *
+     * Only one process should drive an agent's autoplay loop at a time —
+     * `bot.php`'s in-process loop and the standalone `autoplay.php` runner both
+     * use {@see \NHA\Brain\AutoPlayer} and, left unguarded, submit two intents
+     * per interval from one token. Each loop passes a stable per-process holder
+     * id; the first to acquire the lease drives, the others skip their turn
+     * until it expires (a crashed driver frees it within `$ttl` seconds).
+     *
+     * @param string $holder A stable id for the calling loop, e.g. `"bot.php:1234"`.
+     * @param int    $ttl    Seconds the lease stays valid without a renewal.
+     *
+     * @return bool True when `$holder` now holds the lease (it was free, expired,
+     *              or already theirs); false when another holder's lease is live.
+     */
+    public function acquireAutoplayLease(string $holder, int $ttl = 45): bool
+    {
+        $lease = $this->data['autoplay_lease'] ?? null;
+        $now = time();
+
+        if (is_array($lease)
+            && (string) ($lease['holder'] ?? '') !== $holder
+            && (int) ($lease['expires'] ?? 0) > $now
+        ) {
+            return false;
+        }
+
+        $this->data['autoplay_lease'] = ['holder' => $holder, 'expires' => $now + max(5, $ttl)];
+        $this->save();
+
+        return true;
+    }
+
+    /** Drops the lease if `$holder` currently holds it (call on clean shutdown). */
+    public function releaseAutoplayLease(string $holder): void
+    {
+        if ((string) ($this->data['autoplay_lease']['holder'] ?? '') === $holder) {
+            unset($this->data['autoplay_lease']);
+            $this->save();
+        }
+    }
+
+    /** The id of the process currently holding a live autoplay lease, or null. */
+    public function autoplayLeaseHolder(): ?string
+    {
+        $lease = $this->data['autoplay_lease'] ?? null;
+
+        return (is_array($lease) && (int) ($lease['expires'] ?? 0) > time())
+            ? (string) $lease['holder']
+            : null;
+    }
+
+    /**
      * Records the brain's most recent decision for an agent (verb, args, the
      * one-line rationale and the `queued_intent` id it produced), so a later
      * command can show "what did the bot last do, and did it land?".

@@ -70,6 +70,12 @@ NHA_AUTOPLAY_INTERVAL=60               # seconds between turns (default 15; rais
 - `!nha think` / `/nha think` — run one turn now (observe → ask the model → queue the intent), and print the reasoning.
 - `!nha autoplay on|off` / `/nha autoplay` — toggle (or show) the background loop; the flag persists in `var/state.json`.
 
+`bot.php`'s in-process loop and the standalone `autoplay.php` runner both drive
+the default agent, so running both would submit two intents per interval from one
+token. They coordinate through an **autoplay lease** in `var/state.json`: the
+first to claim it drives, the other logs a skipped turn until the lease expires
+(a crashed driver frees it within ~45s). A manual `!nha think` is never gated.
+
 ### Headless runner
 
 `php autoplay.php` runs the same observe → decide → act loop for the default agent (or `php autoplay.php <id>`)

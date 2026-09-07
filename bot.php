@@ -756,7 +756,7 @@ if ($autoPlayer) {
         // must never take the loop down; catch everything and let $done() reset
         // the busy flag so the next tick tries again.
         try {
-            $autoPlayer->step($agent_id, (string) ($state->getDefaultAgentToken() ?? ''))->then(
+            $autoPlayer->step($agent_id, (string) ($state->getDefaultAgentToken() ?? ''), 'bot.php:' . getmypid())->then(
                 function (string $line) use ($nha, $channel_id, $done): void {
                     $nha->logger->info("[autoplay] {$line}");
                     if ($channel_id) {
