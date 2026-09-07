@@ -70,19 +70,6 @@ NHA_AUTOPLAY_INTERVAL=60               # seconds between turns (default 15; rais
 - `!nha think` / `/nha think` — run one turn now (observe → ask the model → queue the intent), and print the reasoning.
 - `!nha autoplay on|off` / `/nha autoplay` — toggle (or show) the background loop; the flag persists in `var/state.json`.
 
-### HTTP rate limiting
-
-The NHA world API sends no `X-RateLimit-*` headers, so DiscordPHP's request buckets
-can't pace themselves and a bare `429` would otherwise be dropped with no retry.
-`NHA\Http\RateLimitDriver` wraps the transport to fix both: it spaces every request
-by a minimum interval and rewrites a `429` into a proper per-bucket retry
-(honouring `Retry-After`, or a fallback when the server omits it).
-
-```
-NHA_HTTP_MIN_INTERVAL=0.25   # min seconds between any two NHA HTTP requests (default 0.25)
-NHA_HTTP_RETRY_AFTER=2.0     # back-off applied to a 429 that carries no Retry-After (default 2.0)
-```
-
 ### Headless runner
 
 `php autoplay.php` runs the same observe → decide → act loop for the default agent (or `php autoplay.php <id>`)

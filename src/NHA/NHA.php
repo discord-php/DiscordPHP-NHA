@@ -26,7 +26,6 @@ use Discord\Repository\UserRepository;
 use NHA\Http\Endpoint;
 use NHA\Http\Http;
 use NHA\Parts\AgentObservation;
-use Psr\Log\NullLogger;
 use React\Promise\PromiseInterface;
 use NHA\Repository\AgentRepository;
 use NHA\Repository\DepositsRepository;
@@ -132,15 +131,11 @@ class NHA extends MessageCommandClient
         parent::__construct($options);
 
         // The react/socket driver hangs indefinitely against the live NHA host (TLS renegotiation is never completed).
-        // The driver is wrapped in a RateLimitDriver inside Http: the NHA API sends no X-RateLimit-* headers, so
-        // requests are paced client-side and a bare 429 is turned into a proper bucket retry. Tunable via env.
         $this->nha_http = new Http(
             '',
             $this->loop,
-            $this->options['logger'] ?? new NullLogger(),
+            $this->options['logger'] ?? null,
             new Guzzle($this->loop, $options['socket_options'] ?? []),
-            (float) (getenv('NHA_HTTP_MIN_INTERVAL') ?: 0.25),
-            (float) (getenv('NHA_HTTP_RETRY_AFTER') ?: 2.0),
         );
 
         $this->ensureClient();

@@ -138,28 +138,17 @@ class Http extends DiscordHttp implements HttpInterface
     /**
      * Http wrapper constructor.
      *
-     * @param string               $token              Unused, kept for interface compatibility.
+     * @param string               $token  Unused, kept for interface compatibility.
      * @param LoopInterface        $loop
      * @param LoggerInterface      $logger
-     * @param DriverInterface|null $driver             Wrapped in a {@see RateLimitDriver} unless it already is one.
-     * @param float                $minInterval        Minimum seconds between outbound requests (the NHA API sends no
-     *                                                 `X-RateLimit-*` headers, so the bucket cannot pace itself).
-     * @param float                $fallbackRetryAfter Back-off applied to a 429 that carries no `Retry-After`.
+     * @param DriverInterface|null $driver
      */
-    public function __construct(
-        string $token,
-        LoopInterface $loop,
-        LoggerInterface $logger,
-        ?DriverInterface $driver = null,
-        float $minInterval = 0.25,
-        float $fallbackRetryAfter = 2.0,
-    ) {
+    public function __construct(string $token, LoopInterface $loop, LoggerInterface $logger, ?DriverInterface $driver = null)
+    {
         $this->token = $token;
         $this->loop = $loop;
         $this->logger = $logger;
-        $this->driver = ($driver === null || $driver instanceof RateLimitDriver)
-            ? $driver
-            : new RateLimitDriver($driver, $loop, $logger, $minInterval, $fallbackRetryAfter);
+        $this->driver = $driver;
         $this->queue = new \SplQueue();
         $this->unboundQueue = new \SplQueue();
     }
