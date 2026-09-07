@@ -7,7 +7,7 @@ use NHA\Http\Http;
 use NHA\Http\Request;
 use React\Promise\Deferred;
 
-class RequestTest extends NHATestCase
+class RequestTest extends NHAUnitTestCase
 {
     private function request(): Request
     {

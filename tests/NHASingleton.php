@@ -42,7 +42,7 @@ class NHASingleton
         $logger->pushHandler($handler);
 
         $nha = new NHA([
-            'token' => getenv('NHA_TOKEN'),
+            'token' => (string) (getenv('NHA_TOKEN') ?: ''),
             'loop' => $loop,
             'logger' => $logger,
         ]);
@@ -81,7 +81,7 @@ class NHASingleton
         $logger->pushHandler($handler);
 
         $nha = new NHA([
-            'token' => getenv('NHA_TOKEN'),
+            'token' => (string) (getenv('NHA_TOKEN') ?: ''),
             'logger' => $logger,
         ]);
 

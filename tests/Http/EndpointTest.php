@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use NHA\Http\Endpoint;
 
-class EndpointTest extends NHATestCase
+class EndpointTest extends NHAUnitTestCase
 {
     /**
      * @covers \NHA\Http\Endpoint

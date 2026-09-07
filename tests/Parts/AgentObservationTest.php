@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use NHA\Parts\AgentObservation;
 
-class AgentObservationTest extends NHATestCase
+class AgentObservationTest extends NHAUnitTestCase
 {
     /**
      * @covers \NHA\Parts\AgentObservation
