@@ -167,7 +167,12 @@ class AgentObservationTest extends NHAUnitTestCase
      */
     public function testPartsMatchOpenApiSchemaKeys(): void
     {
-        $schema = json_decode(file_get_contents(__DIR__ . '/../../openapi.json'), true);
+        $openApiPath = __DIR__ . '/../../openapi.json';
+        if (! is_file($openApiPath)) {
+            $this->markTestSkipped('openapi.json is not present in this checkout.');
+        }
+
+        $schema = json_decode((string) file_get_contents($openApiPath), true);
         $schemas = $schema['components']['schemas'];
 
         $map = [

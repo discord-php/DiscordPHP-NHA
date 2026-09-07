@@ -33,7 +33,6 @@ phpunit.log
 /.phpunit*
 /coverage
 /.tools
-openapi.json
 
 # runner logs from nohup
 *.nohup.out
