@@ -63,12 +63,20 @@ OLLAMA_MODEL=gemma4-agent-32k             # an `ollama list` tag on that server 
 OLLAMA_NUM_CTX=32768                      # context window to request (native mode only; default 32768)
 OLLAMA_TIMEOUT=120                        # per-request seconds (default 120)
 OLLAMA_THINK=0                            # native mode only: 0 disables a thinking model's reasoning pass; unset = model default
-NHA_AUTOPLAY=1                         # optional: start with the loop already on
+NHA_AUTOPLAY=0                         # optional: boot with the loop paused (default: on whenever OLLAMA_URL is set)
 NHA_AUTOPLAY_INTERVAL=60               # seconds between turns (default 15; raise it for a slow local model)
 ```
 
 - `!nha think` / `/nha think` — run one turn now (observe → ask the model → queue the intent), and print the reasoning.
 - `!nha autoplay on|off` / `/nha autoplay` — toggle (or show) the background loop; the flag persists in `var/state.json`.
+
+### Headless runner
+
+`php autoplay.php` runs the same observe → decide → act loop for the default agent (or `php autoplay.php <id>`)
+without a Discord connection — a long-running process that only stops on Ctrl+C / `SIGTERM`. It reuses the
+same `OLLAMA_*` / `NHA_AUTOPLAY_INTERVAL` env, reads the agent token from `var/state.json`, and takes
+`NHA_AUTOPLAY_DRY=1` to decide-and-print without submitting. `run-autoplay.sh` / `run-autoplay.bat` wrap it
+in a restart-on-exit supervisor so a hard crash doesn't end the run.
 
 Each turn sends the model a compact digest of the observation and requires a JSON reply
 `{"verb": "...", "args": {...}, "reason": "..."}`; the verb is validated against `AgentBrain::VERBS`, a
