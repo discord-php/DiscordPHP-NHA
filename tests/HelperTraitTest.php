@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use NHA\HelperTrait;
+use Discord\Builders\Components\Separator;
+use Discord\Builders\Components\TextDisplay;
 use Discord\Builders\MessageBuilder;
 
 class HelperTraitTest extends NHAUnitTestCase
@@ -62,5 +64,22 @@ class HelperTraitTest extends NHAUnitTestCase
         $result = $this->subject()::bar(0, 0, 4);
 
         $this->assertSame(str_repeat('░', 4) . ' (0/1)', $result);
+    }
+
+    /**
+     * @covers \NHA\HelperTrait
+     */
+    public function testAttributionComponentsIsASeparatorPlusASubtleRepoAndSponsorLine(): void
+    {
+        $subject = $this->subject();
+        [$separator, $text] = $subject::attributionComponents();
+
+        $this->assertInstanceOf(Separator::class, $separator);
+        $this->assertInstanceOf(TextDisplay::class, $text);
+
+        $content = $text->jsonSerialize()['content'] ?? '';
+        $this->assertStringStartsWith('-# ', $content, 'rendered as subtle text');
+        $this->assertStringContainsString($subject::GITHUB, $content);
+        $this->assertStringContainsString($subject::SPONSOR, $content);
     }
 }

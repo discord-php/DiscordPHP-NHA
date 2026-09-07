@@ -974,6 +974,7 @@ class Commands
             TextDisplay::new($body),
             Separator::new(),
             ActionRow::new()->addComponents([$select]),
+            ...NHA::attributionComponents(),
         ]);
     }
 
@@ -1045,6 +1046,7 @@ class Commands
         return NHA::createBuilder()->addComponent(Container::new()->addComponents([
             TextDisplay::new("### NHA Agent\n{$status}\n\nUse **Login** once. The buttons below queue one intent as your agent; **Observe** opens the live panel. More: `/observe`, `/move`, and the per-verb slash commands (add `agent: bot` to run one as the bot)."),
             ActionRow::new()->addComponents([$login, $observe, $mine, $chop, $gather]),
+            ...NHA::attributionComponents(),
         ]));
     }
 }

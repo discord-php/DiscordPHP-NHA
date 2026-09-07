@@ -13,13 +13,16 @@ declare(strict_types=1);
 
 namespace NHA;
 
+use Discord\Builders\Components\Separator;
+use Discord\Builders\Components\TextDisplay;
 use Discord\Builders\MessageBuilder;
 use Discord\Parts\Channel\Message\AllowedMentions;
 
 /**
  * Small presentation helpers shared by {@see NHA} and {@see Commands} for
  * turning NHA world data into Discord output: a mention-safe
- * {@see MessageBuilder} factory and a text progress-bar renderer.
+ * {@see MessageBuilder} factory, a text progress-bar renderer and the
+ * project attribution footer.
  *
  * Pure formatting only — no NHA API or world-model concerns live here.
  *
@@ -29,6 +32,31 @@ use Discord\Parts\Channel\Message\AllowedMentions;
  */
 trait HelperTrait
 {
+    /** The project source repository. */
+    public const GITHUB = 'https://github.com/discord-php/DiscordPHP-NHA';
+
+    /** GitHub Sponsors page for the maintainer. */
+    public const SPONSOR = 'https://github.com/sponsors/valzargaming';
+
+    /**
+     * A {@see Separator} plus a subtle one-line footer crediting the project
+     * and pointing at the repo and GitHub Sponsors. Appended to the rich
+     * panels (observation, help, control panel) — not the one-line replies.
+     *
+     * @return array{0: Separator, 1: TextDisplay}
+     */
+    public static function attributionComponents(): array
+    {
+        return [
+            Separator::new(),
+            TextDisplay::new(sprintf(
+                '-# 🤖 Built on [DiscordPHP-NHA](%s) · ⭐ Star it · 💜 [Sponsor](%s)',
+                self::GITHUB,
+                self::SPONSOR,
+            )),
+        ];
+    }
+
     /**
      * Creates a new instance of MessageBuilder, optionally preventing
      * mentions in the message.

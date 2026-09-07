@@ -276,6 +276,8 @@ class AgentObservation implements JsonSerializable
             }
         }
 
+        $components = array_merge($components, self::attributionComponents());
+
         return Container::new()->addComponents($components);
     }
 

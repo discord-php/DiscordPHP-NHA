@@ -16,6 +16,7 @@
         "docs": "https://nha.recluse.lol/docs"
     },
     "require": {
+        "php": "^8.3",
         "team-reflex/discord-php": "dev-master",
         "discord-php/http": "dev-master as 10.1.7",
         "guzzlehttp/guzzle": "^7.9"
