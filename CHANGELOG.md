@@ -4,6 +4,16 @@ All notable changes to DiscordPHP-NHA are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 SemVer with the **major tracking the NHA world API version**.
 
+## [3.1.9] - 2026-09-07
+
+### Fixed
+- The "is research paying" check now uses the recent trend, not the absolute.
+  Inventor points never drop, so `inventor_points > 0` stayed true forever once
+  an agent had invented anything — the fallback would never actually reach
+  infrastructure. `StateStore::noteInventorPoints()` records the score each turn
+  and reports paying only when it rose this turn or within the last 15 minutes;
+  once discoveries dry up the fallback drops to build / wealth / harvest.
+
 ## [3.1.8] - 2026-09-07
 
 ### Changed

@@ -383,6 +383,28 @@ class StateStoreTest extends NHAUnitTestCase
     /**
      * @covers \NHA\StateStore
      */
+    public function testNoteInventorPointsTracksTheRecentTrendNotTheAbsolute(): void
+    {
+        $store = new StateStore($this->path);
+
+        // First sighting only sets a baseline — no trend yet, even at 72 points.
+        $this->assertFalse($store->noteInventorPoints(7, 72));
+
+        // Score stalls: still 72 next turn → research is not paying.
+        $this->assertFalse($store->noteInventorPoints(7, 72));
+
+        // A discovery lands (72 → 84) → paying now, and it stays "paying" while
+        // the gain is still recent.
+        $this->assertTrue($store->noteInventorPoints(7, 84));
+        $this->assertTrue($store->noteInventorPoints(7, 84));
+
+        // A fresh reader sees the same recent-gain window.
+        $this->assertTrue((new StateStore($this->path))->noteInventorPoints(7, 84));
+    }
+
+    /**
+     * @covers \NHA\StateStore
+     */
     public function testCombineSignatureListIsCappedAt400(): void
     {
         $store = new StateStore($this->path);

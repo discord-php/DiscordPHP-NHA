@@ -430,6 +430,47 @@ class StateStore
         $this->save();
     }
 
+    /** Research counts as "paying" for this long after the last inventor-point gain. */
+    private const RESEARCH_PAYING_WINDOW = 900;
+
+    /**
+     * Records the agent's current lifetime `inventor_points` and reports whether
+     * research is paying *right now* — the score rose this turn, or rose within
+     * the last {@see self::RESEARCH_PAYING_WINDOW} seconds.
+     *
+     * Inventor points never drop (a rejected invention only refunds ingredients),
+     * so an absolute `> 0` test stays true forever once an agent has invented
+     * anything. The autoplay fallback needs the recent trend instead: keep
+     * speculating while discoveries are still landing, fall to infrastructure
+     * once they dry up. The first sighting only sets the baseline and returns
+     * `false` (no trend yet).
+     *
+     * @since 3.1.9
+     */
+    public function noteInventorPoints(int $agent_id, int $points): bool
+    {
+        $key = (string) $agent_id;
+        $prev = $this->data['agent_inventor_points'][$key] ?? null;
+        $now = time();
+
+        if (! is_array($prev)) {
+            $this->data['agent_inventor_points'][$key] = ['value' => $points, 'rose_at' => 0];
+            $this->save();
+
+            return false;
+        }
+
+        $roseNow = $points > (int) ($prev['value'] ?? 0);
+        $roseAt = $roseNow ? $now : (int) ($prev['rose_at'] ?? 0);
+
+        if ($roseNow || $points !== (int) ($prev['value'] ?? 0)) {
+            $this->data['agent_inventor_points'][$key] = ['value' => $points, 'rose_at' => $roseAt];
+            $this->save();
+        }
+
+        return $roseNow || ($roseAt > 0 && ($now - $roseAt) < self::RESEARCH_PAYING_WINDOW);
+    }
+
     /**
      * Every `combine` signature this agent has already submitted, oldest first.
      *

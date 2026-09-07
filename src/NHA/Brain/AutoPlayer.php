@@ -156,13 +156,15 @@ final class AutoPlayer
      * Returns `null` only when the ladder has nothing either, so the caller can
      * pass the tick instead of forcing a bad action.
      *
-     * @param string              $spentSig The set that was refused, for the decision reason.
-     * @param list<string>        $tried    Combine signatures already submitted this run.
-     * @param array<string, bool> $known    `a+b => true` for world-known sets.
+     * @param string              $spentSig       The set that was refused, for the decision reason.
+     * @param list<string>        $tried          Combine signatures already submitted this run.
+     * @param array<string, bool> $known          `a+b => true` for world-known sets.
+     * @param bool                $researchPaying Whether inventor points rose recently — if so a fresh
+     *                                            pair is still worth a shot, otherwise go to infrastructure.
      *
      * @return array{verb: string, args: array<string, mixed>, reason: string}|null
      */
-    private function fallbackDecision(AgentObservation $observation, string $spentSig, array $tried, array $known): ?array
+    private function fallbackDecision(AgentObservation $observation, string $spentSig, array $tried, array $known, bool $researchPaying): ?array
     {
         $raw = json_decode(json_encode($observation->jsonSerialize()), true);
         $raw = is_array($raw) ? $raw : [];
@@ -171,11 +173,6 @@ final class AutoPlayer
         foreach ($tried as $sig) {
             $exhausted[$sig] = true;
         }
-
-        // Speculate on a fresh pair only while inventor points are actually
-        // rising; once they have stalled at 0, research is not paying — skip the
-        // combine rung and go straight to infrastructure.
-        $researchPaying = (int) ($raw['inventor_points'] ?? 0) > 0;
 
         $suggestion = AgentBrain::suggestion($raw, $exhausted, $exhausted, $researchPaying);
         if ($suggestion === null) {
@@ -278,6 +275,7 @@ final class AutoPlayer
 
             $known = (array) ($pre['known'] ?? []);
             $tried = $this->state->getTriedCombineSignatures($agent_id);
+            $researchPaying = $this->state->noteInventorPoints($agent_id, (int) ($observation->get('inventor_points') ?? 0));
 
             $context = ($last ?? []);
             if (($pre['outcome'] ?? null) !== null) {
@@ -287,7 +285,7 @@ final class AutoPlayer
             $context['known_combines'] = array_keys($known);
             $context['tried_combines'] = $tried;
 
-            return $this->brain->decide($observation, $context ?: null)->then(function (?array $decision) use ($agent_id, $token, $tick, $observation, $known, $tried) {
+            return $this->brain->decide($observation, $context ?: null)->then(function (?array $decision) use ($agent_id, $token, $tick, $observation, $known, $tried, $researchPaying) {
                 if ($decision === null) {
                     return "💤 Agent #{$agent_id}: brain chose to wait (tick {$tick}).";
                 }
@@ -304,7 +302,7 @@ final class AutoPlayer
                         && ! isset(self::PRODUCTION_COMBINES[$sig])
                         && (isset($known[$sig]) || in_array($sig, $tried, true));
                     if ($spent) {
-                        $decision = $this->fallbackDecision($observation, $sig, $tried, $known);
+                        $decision = $this->fallbackDecision($observation, $sig, $tried, $known, $researchPaying);
                         if ($decision === null) {
                             return "🔁 Agent #{$agent_id}: no research left and no infrastructure move available — skipped `{$sig}` (tick {$tick}).";
                         }
