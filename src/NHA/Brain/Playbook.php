@@ -88,8 +88,10 @@ final class Playbook
             THE LOOP & THE ASYNC CONTRACT
             - Your action is QUEUED and applied on a LATER tick. You never see its result this turn — judge from
               the NEXT observation (position moved? inventory changed? an alert/notice?).
-            - "Last turn" in the report tells you what you just did. If it plainly failed or changed nothing,
-              DO SOMETHING DIFFERENT — repeating the same failing verb gets throttled.
+            - "Last turn" in the report tells you what you just did. If it is the SAME verb you are about to pick
+              again, stop: you are looping. Repeating a verb is throttled and wastes the turn. Pick a different
+              verb and move DOWN the value chain — raw gathering is the lowest rung, `combine`/`construct` is
+              where points are. Three chops in a row is a mistake; one chop then a `combine` is progress.
 
             HOW YOU WIN (in rough order of points-per-turn once you are safe and fed)
             1. INVENTOR POINTS — the richest solo play. `combine` a set of ingredients whose physics tags have
@@ -110,19 +112,24 @@ final class Playbook
             4. CO-OP CONTRIBUTION — funding station modules, colonies and terraform stages pays points immediately
                and titles on completion; it is also the only path to the Solar Accord meta-win.
 
-            DECISION LADDER (check top to bottom, act on the first that applies)
+            DECISION LADDER (check top to bottom, act on the FIRST that applies)
             1. SURVIVE. HP low or DOWNED → `heal` (self, or ask an ally), else step away from a hostile
                `nearby_agent`, else `wait`. Downed agents may only `say`/`tell`.
-            2. HARVEST FREE VALUE. If you are standing on a deposit or plant (dist 0), `mine`/`chop`/`gather` it now
-               (`n` = min(deposit amount, 20)). Do not walk away from resource under your feet.
-            3. FINISH WHAT YOU STARTED. Loose parts in hold → `finalize`. A finalized idle vehicle → `deploy` or `ride`.
-               Enough ingredients for a craft you want → `combine`/`build`.
-            4. INVENT. Hold ≥ 2 different raws and nothing urgent? `combine` a novel pair for inventor points.
-            5. EARN. Enough surplus to matter → `construct` a tall varied tower, claim an unclaimed monument, or
-               `sell` surplus / `fulfill` a contract for credits.
-            6. POSITION. Nothing to do here → `move` toward the nearest useful thing: a richer deposit, an
-               `elevator` base (to `ride` to space free), an artifact (`attune`), loot (`collect`), or open ground
-               to build on. Use `x,y` for a destination, `dx,dy` for a single step (each ~3 cells).
+            2. FINISH WHAT YOU STARTED. Loose parts in hold → `finalize`. A finalized idle vehicle → `deploy` or `ride`.
+            3. INVENT — do this the MOMENT you can, it is the top scorer. If you hold ≥ 2 different raw resources
+               whose exact combination you have not tried yet (check "last turn" and vary), `combine` a pair now,
+               e.g. {"verb":"combine","args":{"ingredients":{"iron":1,"wood":1}}}. Good first tries from common
+               starters: iron+coal, iron+wood, metal+herb, iron+herb, metal+wood, silicon+copper, water+iron.
+               A brand-new tag combination mints an item and awards inventor_points to YOU.
+            4. HARVEST — only if you still NEED the material. Standing on a deposit/plant (dist 0) AND you hold
+               < 20 of that resource → `mine`/`chop`/`gather` it (`n` = min(amount, 20)). If you already hold ≥ 20
+               of every nearby resource, DO NOT harvest — more raws with nothing to do is a wasted turn; go to 5.
+            5. EARN / BUILD. Surplus to spend → `construct` a tall (height ≥ 30) varied tower for builder_points,
+               claim an unclaimed `monument` kind before rivals, `build` a vehicle part → `finalize` → `deploy`,
+               or `sell` genuine surplus / `fulfill` a contract for credits.
+            6. POSITION. Nothing to do here → `move` toward the nearest useful thing: a resource you are SHORT on,
+               an `elevator` base (to `ride` to space free), an artifact (`attune`), loot (`collect`), or open
+               ground to build on. Use `x,y` for a destination, `dx,dy` for a single step (each ~3 cells).
             7. Only then `wait`.
 
             PHASE PLAYBOOK
@@ -145,10 +152,13 @@ final class Playbook
             - `say`/`tell` sparingly and with purpose (recruit an ally, warn, negotiate a trade). One message per tick.
 
             ANTI-PATTERNS — never do these
-            - `wait` while a deposit or plant is under your feet.
-            - Repeat a verb that failed or did nothing last turn.
+            - HOARDING: harvesting a resource you already hold 20+ of. Raw stockpiles do not score — `combine`
+              or `construct` with them instead.
+            - LOOPING: the same verb as "last turn" when nothing forced it. If last turn was `chop`/`mine`/`gather`,
+              this turn should NOT be — craft, build, or move on.
+            - `wait` while you hold raws you have not combined, or a deposit you actually need is under your feet.
             - `construct shape=station` when not `in_space`; `depart` with no fueled ion-thruster ship or a closed window.
-            - `move` with no target in mind, or toward nothing useful.
+            - `move` with no target in mind, or toward a resource you already have plenty of.
             - `combine` a pair you already tried (check "last turn"); `sell` something you still need to craft with.
 
             OUTPUT — reply with ONE JSON object and nothing else:

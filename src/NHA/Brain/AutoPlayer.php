@@ -67,7 +67,21 @@ final class AutoPlayer
             $token = $this->nha->getAgentToken();
         }
 
-        return $this->nha->observe($agent_id)->then(function (AgentObservation $observation) use ($agent_id, $token) {
+        // Fetch the outcome of the intent we queued last turn so the brain gets
+        // real feedback ("combine iron+wood -> rejected: already known") instead
+        // of blindly retrying it. Best-effort: a failed lookup just omits it.
+        $last = $this->state->getLastDecision($agent_id);
+        $outcome = ($last !== null && ! empty($last['queued_intent']))
+            ? $this->nha->intents->getIntentStatus((int) $last['queued_intent'])->then(
+                static fn($s): array => [
+                    'status' => (string) ($s->status ?? '?'),
+                    'result' => (string) ($s->result ?? ''),
+                ],
+                static fn(): ?array => null,
+            )
+            : resolve(null);
+
+        return $outcome->then(fn(?array $outcome) => $this->nha->observe($agent_id)->then(function (AgentObservation $observation) use ($agent_id, $token, $last, $outcome) {
             $tick = (int) ($observation->get('tick') ?? 0);
             $downedUntil = (int) ($observation->get('downed_until') ?? 0);
 
@@ -75,7 +89,11 @@ final class AutoPlayer
                 return resolve("🩹 Agent #{$agent_id} is downed until tick {$downedUntil} — skipping.");
             }
 
-            return $this->brain->decide($observation, $this->state->getLastDecision($agent_id))->then(function (?array $decision) use ($agent_id, $token, $tick) {
+            if ($last !== null && $outcome !== null) {
+                $last['outcome'] = $outcome;
+            }
+
+            return $this->brain->decide($observation, $last)->then(function (?array $decision) use ($agent_id, $token, $tick) {
                 if ($decision === null) {
                     return "💤 Agent #{$agent_id}: brain chose to wait (tick {$tick}).";
                 }
@@ -100,6 +118,6 @@ final class AutoPlayer
                         return "🤖 Agent #{$agent_id} → **{$decision['verb']}**{$args}{$ref}{$reason}";
                     });
             });
-        });
+        }));
     }
 }

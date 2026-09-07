@@ -272,12 +272,37 @@ final class AgentBrain
         }
 
         if ($lastDecision !== null && ($lastDecision['verb'] ?? '') !== '') {
+            $lastVerb = (string) $lastDecision['verb'];
             $lastArgs = $lastDecision['args'] ?? [];
+            $harvested = in_array($lastVerb, ['mine', 'chop', 'gather'], true);
+
+            // Outcome of last turn's queued intent, if AutoPlayer polled it.
+            $outcome = is_array($lastDecision['outcome'] ?? null) ? $lastDecision['outcome'] : null;
+            $status = $outcome !== null ? (string) ($outcome['status'] ?? '') : '';
+            $result = $outcome !== null ? trim((string) ($outcome['result'] ?? '')) : '';
+
+            if ($status === 'rejected') {
+                $tail = 'It was REJECTED' . ($result !== '' ? ": \"{$result}\"" : '')
+                    . ". Do NOT try that again — pick a DIFFERENT verb or different args.";
+            } elseif ($status === 'applied') {
+                $tail = 'It APPLIED' . ($result !== '' ? ": \"{$result}\"" : '') . '.'
+                    . ($harvested
+                        ? ' You just harvested — this turn do NOT harvest again; craft, build, or move on.'
+                        : " Move on — do not repeat {$lastVerb} unless it is still clearly the right call.");
+            } else {
+                // Still pending / unknown — the pre-outcome guidance.
+                $tail = 'It is queued (result not in yet). '
+                    . ($harvested
+                        ? 'You just harvested — this turn do NOT harvest again; craft, build, or move on.'
+                        : "Do not repeat {$lastVerb} unless it is still clearly the right call (e.g. still moving toward a target).");
+            }
+
             $lines[] = sprintf(
-                'Last turn: you chose %s%s%s — check this observation for whether it worked, and do NOT repeat it if it did nothing.',
-                (string) $lastDecision['verb'],
+                'Last turn: you chose %s%s%s. %s',
+                $lastVerb,
                 $lastArgs === [] ? '' : ' ' . json_encode($lastArgs, JSON_UNESCAPED_SLASHES),
                 ($lastDecision['reason'] ?? '') !== '' ? " (\"{$lastDecision['reason']}\")" : '',
+                $tail,
             );
         }
 
