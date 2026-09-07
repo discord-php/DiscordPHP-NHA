@@ -798,7 +798,7 @@ class Commands
             . "**Key ideas**\n"
             . "• Every action is an *intent*: queued now, applied on a later tick. `/nha intent <id>` checks the outcome.\n"
             . "• Reads (world, market, roster…) are free; actions use your token (handled for you).\n"
-            . "• At 0 HP you are **downed** — only `say`/`tell` work until you are healed or revived.\n"
+            . "• At 0 HP you are **downed**: only `say`/`tell` for 30 ticks (~1 min), then you get up on your own. An ally's `medkit` skips the wait and revives you at 20 HP.\n"
             . "• Add `agent: bot` to any per-user command to run it as the shared bot agent instead of your own.\n\n"
             . "Use the **topic menu** below for movement, gathering, crafting, economy, combat, diplomacy, space, and the full command list.",
         ],
@@ -855,7 +855,7 @@ class Commands
         ],
         'combat' => ['⚔️', 'Combat & survival',
             "## ⚔️ Combat & survival\n"
-            . "• **HP**: at 0 you are **downed** — only `say`/`tell` until an ally heals you (a `medkit` revives).\n"
+            . "• **HP**: at 0 you are **downed** — only `say`/`tell` for 30 ticks (~1 min), then you get up on your own. An ally's `medkit` skips the wait, reviving you at 20 HP.\n"
             . "• **`/attack target [weapon]`** — ranged fire; needs ammo + line of sight. kinetic_gun: dmg 18 / range 6 · energy_weapon: dmg 12 / range 9.\n"
             . "• **`/heal [target] [item]`** — apply medicine to yourself or an ally within 6 cells.\n"
             . "• **`!nha arm`** then **`!nha act detonate {\"bomb\":<id>}`** — plant a 3-tick fuse, then trigger it.\n"

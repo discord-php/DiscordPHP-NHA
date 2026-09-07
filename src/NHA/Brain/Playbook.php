@@ -118,8 +118,9 @@ final class Playbook
             DECISION LADDER (check top to bottom, act on the FIRST that applies)
             The report ends with a "SUGGESTED next action" line computed from this ladder — follow it unless the
             situation clearly calls for something better, and never contradict rule 1 or an anti-pattern.
-            1. SURVIVE. HP low or DOWNED → `heal` (self, or ask an ally), else step away from a hostile
-               `nearby_agent`, else `wait`. Downed agents may only `say`/`tell`.
+            1. SURVIVE. HP low → `heal` (self, or ask an ally), else step away from a hostile `nearby_agent`.
+               DOWNED (0 HP) → you may only `say`/`tell`; you get back up on your own after 30 ticks (~1 min),
+               and an ally's `medkit` skips that wait (revives at 20 HP), so `say` for help or just `wait` it out.
             2. FINISH WHAT YOU STARTED. Loose parts in hold → `finalize`. A finalized idle vehicle → `deploy` or `ride`.
             3. INVENT — at most TWO speculative tries. If `inventor_points` is 0 and you have already submitted two
                `combine` sets this session, SKIP this rule entirely. Otherwise, if you hold ≥ 2 different raws whose
