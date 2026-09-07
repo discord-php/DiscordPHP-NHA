@@ -440,9 +440,11 @@ $registerSlashCommands = function (NHA $nha) use ($commands, $state, $text, $rep
             $sub('autoplay', 'Turn the autonomous LLM play loop on/off.', [$opt(Option::STRING, 'state', 'on or off (omit to show status).', false, ['choices' => ['on', 'off']])]),
         ];
 
-        $dispatch = function (string $sub, array $a) use ($commands): PromiseInterface {
+        $dispatch = function (string $sub, array $a, ?string $userId = null) use ($commands): PromiseInterface {
             return match ($sub) {
-                'register' => $commands->register($a['name'] ?? null, $a['metal'] ?? 40, $a['credits'] ?? 150),
+                // Pass the invoking user's id so the agent is linked to them and
+                // named `user-<id>` — never a bare `user-` (see Commands::register).
+                'register' => $commands->register($a['name'] ?? null, $a['metal'] ?? 40, $a['credits'] ?? 150, $userId),
                 'observe' => $commands->observe($a['agent_id'] ?? null),
                 'act' => $commands->act($a['agent_id'] ?? null, $a['verb'], $a['args'] ?? null),
                 'move' => $commands->move($a['agent_id'] ?? null, (int) $a['dx'], (int) $a['dy']),
@@ -481,7 +483,7 @@ $registerSlashCommands = function (NHA $nha) use ($commands, $state, $text, $rep
             $chosen = $interaction->data->options->first();
             $args = $flattenOptions($chosen->options ?? []);
 
-            return $replyToInteraction($interaction, $dispatch($chosen->name, $args));
+            return $replyToInteraction($interaction, $dispatch($chosen->name, $args, (string) $interaction->user->id));
         });
 
         /**

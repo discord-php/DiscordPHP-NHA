@@ -147,7 +147,18 @@ class Commands
             ));
         }
 
-        $name ??= 'user-' . $provider_id;
+        // Derive a safe, non-empty agent name. `??=` alone is not enough: the
+        // slash command passes `null` when `name` is omitted AND omits
+        // `$provider_id`, which used to yield the literal "user-" (agent
+        // #142285 on the live roster is one such orphan). Guard both the
+        // null and empty-string cases, and honour NHA's 1–24 char limit.
+        $name = trim((string) ($name ?? ''));
+        if ($name === '') {
+            $name = ($provider_id !== null && $provider_id !== '')
+                ? 'user-' . $provider_id
+                : 'agent-' . bin2hex(random_bytes(4));
+        }
+        $name = mb_substr($name, 0, 24);
 
         $materials = $metal !== null || $credits !== null
             ? array_filter(['metal' => $metal, 'credits' => $credits], fn($v) => null !== $v)
@@ -975,11 +986,16 @@ class Commands
      */
     public function login(string $discord_user_id): PromiseInterface
     {
+        $discord_user_id = trim($discord_user_id);
+        if ($discord_user_id === '') {
+            return reject(new \RuntimeException('Could not determine your Discord account.'));
+        }
+
         if ($linked = $this->state->getDiscordUserAgent($discord_user_id)) {
             return resolve($this->dashboard($discord_user_id, "Agent #{$linked['agent_id']} is ready."));
         }
 
-        $name = 'user-' . $discord_user_id;
+        $name = mb_substr('user-' . $discord_user_id, 0, 24);
 
         return $this->nha->registerAgentIdentity($name, NHA::DEFAULT_MATERIALS)->then(function (array $identity) use ($discord_user_id) {
             $this->state->setDiscordUserAgent($discord_user_id, $identity['agent_id'], $identity['name'] ?? 'unknown', $identity['token']);

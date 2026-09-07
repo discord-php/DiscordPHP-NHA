@@ -274,4 +274,49 @@ class CommandsTest extends NHAUnitTestCase
             $this->assertNotEmpty($this->calls, "board('{$board}') made no HTTP call");
         }
     }
+
+    /** The name that {@see Commands::register()} actually sent to the API. */
+    private function registeredName(Commands $commands, ?string $name, ?string $providerId): string
+    {
+        $err = null;
+        $commands->register($name, 40, 150, $providerId)->then(null, function (\Throwable $e) use (&$err) {
+            $err = $e;
+        });
+        $this->assertNull($err, 'register() rejected: ' . ($err?->getMessage() ?? ''));
+
+        return (string) (json_decode(json_encode($this->lastPostBody), true)['name'] ?? '');
+    }
+
+    public function testRegisterNeverProducesABareUserDashName(): void
+    {
+        // The original bug: /nha register with no `name` option and no provider
+        // id passed through as `'user-' . null` === 'user-' (agent #142285).
+        $name = $this->registeredName($this->commands([], ['agent_id' => 5001, 'token' => 't']), null, null);
+
+        $this->assertNotSame('user-', $name);
+        $this->assertNotSame('', $name);
+        $this->assertMatchesRegularExpression('/^agent-[0-9a-f]{8}$/', $name);
+    }
+
+    public function testRegisterTreatsAnEmptyOrBlankNameAsUnset(): void
+    {
+        foreach (['', '   '] as $blank) {
+            $name = $this->registeredName($this->commands([], ['agent_id' => 5002, 'token' => 't']), $blank, null);
+            $this->assertMatchesRegularExpression('/^agent-[0-9a-f]{8}$/', $name, 'blank name ' . var_export($blank, true));
+        }
+    }
+
+    public function testRegisterWithAProviderIdNamesTheAgentAfterTheUser(): void
+    {
+        $name = $this->registeredName($this->commands([], ['agent_id' => 5003, 'token' => 't']), null, '116927250145869826');
+
+        $this->assertSame('user-116927250145869826', $name);
+    }
+
+    public function testRegisterClampsNameToTwentyFourCharacters(): void
+    {
+        $name = $this->registeredName($this->commands([], ['agent_id' => 5004, 'token' => 't']), str_repeat('x', 60), null);
+
+        $this->assertSame(24, mb_strlen($name));
+    }
 }
