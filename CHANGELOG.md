@@ -4,6 +4,20 @@ All notable changes to DiscordPHP-NHA are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 SemVer with the **major tracking the NHA world API version**.
 
+## [3.1.7] - 2026-09-07
+
+### Changed
+- When a research `combine` is refused (world-known or already tried this run),
+  autoplay now works on infrastructure instead of just selling a surplus. The
+  fallback runs the shared decision ladder with speculation switched off:
+  `finalize` loose parts → `construct` a tower when `composite` + `metal` are in
+  hand → sell a glut → harvest a shortage → move toward the materials a build
+  needs. `AgentBrain::suggestion()` is now `public static` with an
+  `$allowSpeculation` flag so both callers share one ladder.
+- Production recipes (`aluminium+carbon` → `composite`, the `construct` gate)
+  are exempt from the "already tried" guardrail — you re-craft them every time
+  you build, so they are never treated as spent research.
+
 ## [3.1.6] - 2026-09-07
 
 ### Fixed

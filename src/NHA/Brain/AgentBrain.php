@@ -385,7 +385,7 @@ final class AgentBrain
                 . '(aluminium + carbon) — you cannot build one yet, so do not keep trying.';
         }
 
-        if ($suggestion = $this->suggestion($raw, $tried, array_fill_keys($knownCombines, true))) {
+        if ($suggestion = self::suggestion($raw, $tried, array_fill_keys($knownCombines, true))) {
             $lines[] = sprintf(
                 'SUGGESTED next action: %s%s — %s. Do this unless you clearly see something better.',
                 $suggestion['verb'],
@@ -422,13 +422,20 @@ final class AgentBrain
      * when short → reposition. Returns `null` when nothing is obviously right
      * (the model is then on its own).
      *
-     * @param array<string,mixed> $raw        The normalised observation.
-     * @param array<string,bool>  $tried      `a+b => true` for combine sets submitted THIS session.
-     * @param array<string,bool>  $worldKnown `a+b => true` for sets the whole world has already invented.
+     * Also reused by {@see \NHA\Brain\AutoPlayer} as the infrastructure fallback
+     * when a research `combine` is refused — pass the whole tried+known combine
+     * space as both `$tried` and `$worldKnown` and the ladder skips its
+     * speculative-combine rung and drops straight to build / wealth / harvest.
+     *
+     * @param array<string,mixed> $raw              The normalised observation.
+     * @param array<string,bool>  $tried            `a+b => true` for combine sets submitted THIS session.
+     * @param array<string,bool>  $worldKnown       `a+b => true` for sets the whole world has already invented.
+     * @param bool                $allowSpeculation When false, the speculative-combine rung is skipped entirely —
+     *                                              used by the infrastructure fallback, where research is finished.
      *
      * @return array{verb: string, args: array<string,mixed>, why: string}|null
      */
-    private function suggestion(array $raw, array $tried, array $worldKnown = []): ?array
+    public static function suggestion(array $raw, array $tried, array $worldKnown = [], bool $allowSpeculation = true): ?array
     {
         $inv = (array) ($raw['inventory'] ?? []);
         $points = (int) ($raw['inventor_points'] ?? 0);
@@ -453,7 +460,7 @@ final class AgentBrain
         // 2. One speculative combine: a pair of raws not submitted this session
         //    and not already invented world-wide, while it is still a cheap
         //    gamble (< 2 session tries, or points are already moving).
-        if (count($raws) >= 2 && (count($tried) < 2 || $points > 0)) {
+        if ($allowSpeculation && count($raws) >= 2 && (count($tried) < 2 || $points > 0)) {
             $names = array_keys($raws);
             for ($i = 0; $i < count($names); $i++) {
                 for ($j = $i + 1; $j < count($names); $j++) {

@@ -41,6 +41,20 @@ final class AutoPlayer
     private const RULES_TTL = 90;
 
     /**
+     * Known recipes that stay worth repeating — infrastructure intermediates,
+     * not research. These are never blocked by the "already tried / world-known"
+     * guardrail, because you re-craft them every time you want to build.
+     *
+     * @var array<string, true>
+     *
+     * @since 3.1.7
+     */
+    private const PRODUCTION_COMBINES = [
+        'aluminium+carbon' => true, // → composite, the `construct` gate
+        'aluminum+carbon' => true,  // US spelling of the same
+    ];
+
+    /**
      * `a+b => true` for every combine set the world has already invented, from
      * `GET /rules`, plus any set this loop has since seen a `combine` APPLY for.
      * Refreshed every {@see self::RULES_TTL}s — the codex only grows, so a stale
@@ -129,37 +143,42 @@ final class AutoPlayer
     }
 
     /**
-     * A safe, productive move for when the brain insisted on a spent `combine`
-     * set. Sells the largest raw glut (≥ 20 held) to the depot for guaranteed
-     * credits; returns `null` when there is nothing obvious to do, so the caller
-     * can just pass the tick rather than force a bad action.
+     * The move for when the brain insisted on a spent research `combine`: run the
+     * shared ladder ({@see AgentBrain::suggestion()}) with the entire tried +
+     * world-known combine space marked exhausted, so it skips speculation and
+     * picks infrastructure — `finalize` loose parts, `construct` a tower when the
+     * materials are on hand, otherwise sell a glut / harvest / reposition toward
+     * the materials a build needs. Returns `null` only when the ladder has
+     * nothing either, so the caller can pass the tick instead of forcing a bad
+     * action.
      *
-     * @param string $spentSig The set that was refused, for the decision reason.
+     * @param string              $spentSig The set that was refused, for the decision reason.
+     * @param list<string>        $tried    Combine signatures already submitted this run.
+     * @param array<string, bool> $known    `a+b => true` for world-known sets.
      *
      * @return array{verb: string, args: array<string, mixed>, reason: string}|null
      */
-    private function fallbackDecision(AgentObservation $observation, string $spentSig): ?array
+    private function fallbackDecision(AgentObservation $observation, string $spentSig, array $tried, array $known): ?array
     {
-        $best = null;
-        $bestQty = 0;
-        foreach ($observation->getInventory() as $resource => $qty) {
-            if ($resource === 'credits' || ! is_numeric($qty)) {
-                continue;
-            }
-            if ((int) $qty >= 20 && (int) $qty > $bestQty) {
-                $best = (string) $resource;
-                $bestQty = (int) $qty;
-            }
+        $raw = json_decode(json_encode($observation->jsonSerialize()), true);
+        $raw = is_array($raw) ? $raw : [];
+
+        $exhausted = $known;
+        foreach ($tried as $sig) {
+            $exhausted[$sig] = true;
         }
 
-        if ($best === null) {
+        // Speculation off: the ladder skips its combine rung and goes straight to
+        // finalize → construct → wealth → harvest → reposition.
+        $suggestion = AgentBrain::suggestion($raw, $exhausted, $exhausted, false);
+        if ($suggestion === null || ($suggestion['verb'] ?? '') === 'combine') {
             return null;
         }
 
         return [
-            'verb' => 'sell',
-            'args' => ['resource' => $best, 'n' => 15],
-            'reason' => "combine `{$spentSig}` is spent; selling surplus {$best} instead",
+            'verb' => (string) $suggestion['verb'],
+            'args' => (array) ($suggestion['args'] ?? []),
+            'reason' => "research set `{$spentSig}` spent — {$suggestion['why']}",
         ];
     }
 
@@ -256,16 +275,21 @@ final class AutoPlayer
                     return "💤 Agent #{$agent_id}: brain chose to wait (tick {$tick}).";
                 }
 
-                // Deterministic guardrail: never submit a `combine` set the world
-                // has already invented or that this agent already tried this run.
-                // A repeat mints nothing — swap it for a productive fallback
-                // instead of burning the turn on it (the model loops here badly).
+                // Deterministic guardrail: never submit a research `combine` set
+                // the world has already invented or that this agent already tried
+                // this run — a repeat mints nothing and the model loops here
+                // badly. Production recipes (see PRODUCTION_COMBINES) are exempt.
+                // When one is refused, fall through to the infrastructure ladder
+                // (finalize → construct → wealth → harvest) rather than idle.
                 if (($decision['verb'] ?? '') === 'combine') {
                     $sig = self::combineSignature((array) ($decision['args'] ?? []));
-                    if ($sig !== '' && (isset($known[$sig]) || in_array($sig, $tried, true))) {
-                        $decision = $this->fallbackDecision($observation, $sig);
+                    $spent = $sig !== ''
+                        && ! isset(self::PRODUCTION_COMBINES[$sig])
+                        && (isset($known[$sig]) || in_array($sig, $tried, true));
+                    if ($spent) {
+                        $decision = $this->fallbackDecision($observation, $sig, $tried, $known);
                         if ($decision === null) {
-                            return "🔁 Agent #{$agent_id}: skipped a spent combine set (`{$sig}`) with no better move (tick {$tick}).";
+                            return "🔁 Agent #{$agent_id}: no research left and no infrastructure move available — skipped `{$sig}` (tick {$tick}).";
                         }
                     }
                 }

@@ -160,13 +160,15 @@ class AutoPlayerTest extends NHAUnitTestCase
 
     /**
      * @covers \NHA\Brain\AutoPlayer
+     * @covers \NHA\Brain\AgentBrain
      */
-    public function testStepDropsACombineTheWorldAlreadyInvented(): void
+    public function testStepDropsACombineTheWorldAlreadyInventedAndFallsToInfrastructure(): void
     {
-        // GET /rules (same mock as observe) reports glass+wood as a known recipe.
+        // GET /rules (same mock as observe) reports glass+wood as a known recipe;
+        // the agent holds the composite + metal a tower needs.
         $nha = $this->nhaWith([
             'tick' => 42, 'downed_until' => 0, 'position' => [1, 1],
-            'inventory' => ['wood' => 30],
+            'inventory' => ['composite' => 3, 'metal' => 12],
             'dynamic' => [['sig' => 'glass,wood']],
         ]);
         $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"combine","args":{"ingredients":{"glass":1,"wood":1}}}'), new StateStore($this->statePath));
@@ -174,8 +176,7 @@ class AutoPlayerTest extends NHAUnitTestCase
         $player->step(142287, 'tok');
 
         $this->assertCount(1, $this->posts, 'one intent went out');
-        $this->assertSame('sell', $this->posts[0][1]['verb'], 'the spent combine was swapped for the sell fallback');
-        $this->assertSame('wood', $this->posts[0][1]['args']['resource']);
+        $this->assertSame('construct', $this->posts[0][1]['verb'], 'the spent research combine became infrastructure work');
     }
 
     /**
@@ -187,9 +188,10 @@ class AutoPlayerTest extends NHAUnitTestCase
         $state = new StateStore($this->statePath);
         $state->recordCombineSignature(142287, 'iron+wood');
 
+        // No build materials, but a real glut — the ladder sells it for credits.
         $nha = $this->nhaWith([
             'tick' => 7, 'downed_until' => 0, 'position' => [1, 1],
-            'inventory' => ['metal' => 25],
+            'inventory' => ['metal' => 40],
         ]);
         $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"combine","args":{"ingredients":{"wood":1,"iron":1}}}'), $state);
 
@@ -197,6 +199,26 @@ class AutoPlayerTest extends NHAUnitTestCase
 
         $this->assertSame('sell', $this->posts[0][1]['verb'], 'a set already tried this run is not resubmitted');
         $this->assertSame('metal', $this->posts[0][1]['args']['resource']);
+    }
+
+    /**
+     * @covers \NHA\Brain\AutoPlayer
+     */
+    public function testStepAllowsAProductionCombineEvenWhenWorldKnown(): void
+    {
+        // aluminium+carbon → composite is a production recipe: known, but you
+        // re-craft it every time you want to build, so it is never blocked.
+        $nha = $this->nhaWith([
+            'tick' => 5, 'downed_until' => 0, 'position' => [1, 1],
+            'inventory' => ['aluminium' => 4, 'carbon' => 4],
+            'dynamic' => [['sig' => 'aluminium,carbon']],
+        ]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"combine","args":{"ingredients":{"aluminium":1,"carbon":1}}}'), new StateStore($this->statePath));
+
+        $player->step(142287, 'tok');
+
+        $this->assertSame('combine', $this->posts[0][1]['verb'], 'a production recipe is not treated as spent research');
+        $this->assertSame(['aluminium' => 1, 'carbon' => 1], $this->posts[0][1]['args']['ingredients']);
     }
 
     /**
