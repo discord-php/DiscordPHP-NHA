@@ -447,35 +447,24 @@ final class AgentBrain
         $biggest = $raws === [] ? null : array_key_first($raws);
         $has = static fn(string $k): int => (int) ($inv[$k] ?? 0);
 
-        // 3. Build for RELIABLE points — but `construct` costs metal (= size) plus
-        //    composite (= ceil(height/14)). Only suggest it when you can pay.
-        if ($onGround && $has('composite') >= 3 && $has('metal') >= 8) {
+        // 3. Build for RELIABLE points — but a `construct` tower costs metal
+        //    (= size) plus `composite` (= ceil(height/14)), and `composite` is
+        //    aluminium+carbon, not something most ground agents hold. Only
+        //    suggest it when the exact material is on hand.
+        if ($onGround && $has('composite') >= 2 && $has('metal') >= 8) {
             $shape = ['box', 'cylinder', 'pyramid', 'cone', 'sphere'][$tick % 5];
             $size = min(8, $has('metal'));
+            $height = 14 * min($has('composite'), 3);
             return [
                 'verb' => 'construct',
-                'args' => ['shape' => $shape, 'size' => $size, 'height' => 42, 'name' => 'spire-' . ($tick % 1000)],
-                'why' => "you can afford a tall {$shape} (needs metal + composite) — builder points score every time",
+                'args' => ['shape' => $shape, 'size' => $size, 'height' => $height, 'name' => 'spire-' . ($tick % 1000)],
+                'why' => "you hold the composite + metal a tall {$shape} needs — builder points score every time",
             ];
         }
 
-        // 3b. Can't build for lack of composite? Craft it: aluminum+carbon, or the
-        //     player-known herb+wood shortcut. That is a productive combine.
-        if ($onGround && $has('composite') < 3 && $has('metal') >= 8) {
-            foreach ([['aluminum', 'carbon'], ['herb', 'wood']] as [$a, $b]) {
-                if ($has($a) > 0 && $has($b) > 0) {
-                    return [
-                        'verb' => 'combine',
-                        'args' => ['ingredients' => [$a => 1, $b => 1], 'n' => 3],
-                        'why' => "{$a}+{$b} makes composite — you need it to `construct` for builder points",
-                    ];
-                }
-            }
-        }
-
-        // 4. Turn a genuine glut into credits.
-        if ($biggest !== null && $raws[$biggest] >= 40) {
-            return ['verb' => 'sell', 'args' => ['resource' => $biggest, 'n' => 20], 'why' => "you are sitting on {$raws[$biggest]} {$biggest} — sell the surplus for credits"];
+        // 4. Turn a genuine glut into credits (the depot buys raws from anywhere).
+        if ($biggest !== null && $raws[$biggest] >= 30) {
+            return ['verb' => 'sell', 'args' => ['resource' => $biggest, 'n' => 20], 'why' => "you are sitting on {$raws[$biggest]} {$biggest} with nothing to craft — sell 20 for credits"];
         }
 
         // 5. Harvest only a resource you are actually short on and standing on.

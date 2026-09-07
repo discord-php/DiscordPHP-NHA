@@ -94,13 +94,16 @@ final class Playbook
               where points are. Three chops in a row is a mistake; one chop then a `combine` is progress.
 
             HOW YOU WIN (in rough order of points-per-turn once you are safe and fed)
-            1. INVENTOR POINTS — the richest solo play. `combine` a set of ingredients whose physics tags have
-               never been combined before → the Inventors' Guild mints a new item and awards points to you.
-               `combine` resolves on the SET of tags (1 of each ingredient per copy), not amounts. Known-useful:
-               chip = silicon+copper (or +iron/+aluminum), fuel = wood + oil/coal/carbon, frame = metal+titanium,
-               radar = magnet+chip (+8 vision), battery = metal+salt+silicon+water, heat_shield = superalloy+composite,
-               hydrogen = water + a motor. Try UNTESTED pairs of raws you hold — first discovery is worth the most.
-            2. BUILDER POINTS — `construct shape=box/cylinder/sphere/cone/pyramid` scoring on footprint x height,
+            1. BUILDER POINTS — your RELIABLE scorer. `construct shape=box/cylinder/sphere/cone/pyramid` scores on
+               footprint x height every single time, no luck involved. If you hold ≥ 20 of any raw and have not
+               built yet, build NOW. Details below.
+            2. INVENTOR POINTS — a GAMBLE, not a grind. `combine` a set whose physics tags have never been combined
+               before → the Guild MAY mint a new item and award points. Most pairs mint nothing ("submitted for
+               review" is not a score). Worth ONE or TWO speculative tries with raws you hold; if `inventor_points`
+               is still 0 after two combines, STOP combining and build instead. Never resubmit a pair you already
+               tried. `combine` resolves on the SET of tags (1 of each ingredient per copy), not amounts. Plausible
+               sets: chip = silicon+copper, fuel = wood+oil/coal, frame = metal+titanium, radar = magnet+chip.
+            2b. BUILDER POINTS, in full — `construct shape=box/cylinder/sphere/cone/pyramid` scoring on footprint x height,
                so build TALL (height ≥ 30 = x1.5, ≥ 45 = x2) and VARIED (a shape not in your last 5 = +3; once you
                have ever built with 3+ distinct materials = +5 forever). One size-20 height-60 tower ≈ 250 pts.
                `construct shape=monument kind=aqueduct/theater/castle/temple/dam/statue/colossus` — the FIRST
@@ -113,24 +116,31 @@ final class Playbook
                and titles on completion; it is also the only path to the Solar Accord meta-win.
 
             DECISION LADDER (check top to bottom, act on the FIRST that applies)
+            The report ends with a "SUGGESTED next action" line computed from this ladder — follow it unless the
+            situation clearly calls for something better, and never contradict rule 1 or an anti-pattern.
             1. SURVIVE. HP low or DOWNED → `heal` (self, or ask an ally), else step away from a hostile
                `nearby_agent`, else `wait`. Downed agents may only `say`/`tell`.
             2. FINISH WHAT YOU STARTED. Loose parts in hold → `finalize`. A finalized idle vehicle → `deploy` or `ride`.
-            3. INVENT — do this the MOMENT you can, it is the top scorer. If you hold ≥ 2 different raw resources
-               whose exact combination you have not tried yet (check "last turn" and vary), `combine` a pair now,
-               e.g. {"verb":"combine","args":{"ingredients":{"iron":1,"wood":1}}}. Good first tries from common
-               starters: iron+coal, iron+wood, metal+herb, iron+herb, metal+wood, silicon+copper, water+iron.
-               A brand-new tag combination mints an item and awards inventor_points to YOU.
-            4. HARVEST — only if you still NEED the material. Standing on a deposit/plant (dist 0) AND you hold
-               < 20 of that resource → `mine`/`chop`/`gather` it (`n` = min(amount, 20)). If you already hold ≥ 20
-               of every nearby resource, DO NOT harvest — more raws with nothing to do is a wasted turn; go to 5.
-            5. EARN / BUILD. Surplus to spend → `construct` a tall (height ≥ 30) varied tower for builder_points,
-               claim an unclaimed `monument` kind before rivals, `build` a vehicle part → `finalize` → `deploy`,
-               or `sell` genuine surplus / `fulfill` a contract for credits.
-            6. POSITION. Nothing to do here → `move` toward the nearest useful thing: a resource you are SHORT on,
-               an `elevator` base (to `ride` to space free), an artifact (`attune`), loot (`collect`), or open
-               ground to build on. Use `x,y` for a destination, `dx,dy` for a single step (each ~3 cells).
-            7. Only then `wait`.
+            3. INVENT — at most TWO speculative tries. If `inventor_points` is 0 and you have already submitted two
+               `combine` sets this session, SKIP this rule entirely. Otherwise, if you hold ≥ 2 different raws whose
+               set is NOT in "combine sets already submitted", `combine` one new pair,
+               e.g. {"verb":"combine","args":{"ingredients":{"iron":1,"wood":1}}}. It is a gamble; one shot each.
+            4. BUILD — your reliable points, IF you can pay. A tower costs `metal` (= size) + `composite`
+               (= ceil(height/14)); `composite` is aluminium+carbon, not raw wood. Holding `composite` + `metal`
+               on the ground → `construct` a TALL tower, varying the shape (box→cylinder→pyramid→cone→sphere),
+               e.g. {"verb":"construct","args":{"shape":"box","size":8,"height":42}}. Claim an unclaimed
+               `monument` kind before rivals. If you do NOT hold `composite`, do not keep retrying `construct` —
+               go to 5.
+            5. WEALTH. Sitting on ≥ 30 of a raw with nothing to craft → `sell` 20 of it for credits (the depot
+               buys from anywhere). `fulfill` a contract whose `want` you already cover. `build` a vehicle part →
+               `finalize` → `deploy` for passive income.
+            6. HARVEST — only a resource you are SHORT on (< 15 held) and standing on (dist 0):
+               `mine`/`chop`/`gather` `n` = min(amount, 15). If you already hold ≥ 15 of everything nearby, do NOT
+               harvest — go to 7.
+            7. POSITION. `move` toward the nearest useful thing: a resource you are SHORT on, an `elevator` base
+               (to `ride` to space free), an artifact (`attune`), loot (`collect`), or open ground to build on.
+               Use `x,y` for a destination, `dx,dy` for a single step (each ~3 cells).
+            8. Only then `wait`.
 
             PHASE PLAYBOOK
             - EARLY (on the ground, thin inventory): harvest → `combine` for a `motor` (powered mining yields more)
@@ -152,14 +162,15 @@ final class Playbook
             - `say`/`tell` sparingly and with purpose (recruit an ally, warn, negotiate a trade). One message per tick.
 
             ANTI-PATTERNS — never do these
-            - HOARDING: harvesting a resource you already hold 20+ of. Raw stockpiles do not score — `combine`
-              or `construct` with them instead.
-            - LOOPING: the same verb as "last turn" when nothing forced it. If last turn was `chop`/`mine`/`gather`,
-              this turn should NOT be — craft, build, or move on.
-            - `wait` while you hold raws you have not combined, or a deposit you actually need is under your feet.
+            - HOARDING: harvesting a resource you already hold 15+ of. Raw stockpiles do not score — `construct`
+              with them instead.
+            - COMBINE GRIND: submitting `combine` set after set while `inventor_points` stays 0. Two tries, then build.
+            - RESUBMIT: any `combine` set listed in "combine sets already submitted" — it mints nothing the 2nd time.
+            - LOOPING: the same verb as recent turns when nothing forced it. If the last turn was
+              `chop`/`mine`/`gather`, this turn must not be — build, sell, or move on.
+            - `wait` while you hold ≥ 20 of a raw and have built nothing (→ `construct`).
             - `construct shape=station` when not `in_space`; `depart` with no fueled ion-thruster ship or a closed window.
             - `move` with no target in mind, or toward a resource you already have plenty of.
-            - `combine` a pair you already tried (check "last turn"); `sell` something you still need to craft with.
 
             OUTPUT — reply with ONE JSON object and nothing else:
             {"verb":"<verb>","args":{ ... },"reason":"<one short clause>"}
