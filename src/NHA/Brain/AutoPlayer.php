@@ -18,6 +18,7 @@ use NHA\Parts\AgentObservation;
 use NHA\StateStore;
 use React\Promise\PromiseInterface;
 
+use function React\Promise\all;
 use function React\Promise\resolve;
 
 /**
@@ -37,6 +38,15 @@ use function React\Promise\resolve;
 final class AutoPlayer
 {
     /**
+     * `a+b => true` for every combine set the world has already invented, from
+     * `GET /rules`. Fetched once on the first turn and reused — the codex only
+     * grows, and a stale entry never causes a wrong "already known" call.
+     *
+     * @var array<string, bool>|null
+     */
+    private ?array $knownCombines = null;
+
+    /**
      * @param NHA        $nha   The NHA client used to observe and submit intents.
      * @param AgentBrain $brain Turns an observation into a `{verb, args, reason}` decision.
      * @param StateStore $state Durable store; also attached to `$nha` here so a standalone
@@ -50,6 +60,39 @@ final class AutoPlayer
         // Make the observe() → position write self-sufficient even when this
         // player is used without a Commands layer wiring the store.
         $this->nha->setStateStore($state);
+    }
+
+    /**
+     * The set of already-invented `combine` signatures (`"herb+wood"`, …), so
+     * the brain does not waste turns re-submitting a set that mints nothing.
+     * Resolves to `[]` when the codex cannot be read.
+     *
+     * @return PromiseInterface<array<string, bool>>
+     */
+    private function knownCombines(): PromiseInterface
+    {
+        if ($this->knownCombines !== null) {
+            return resolve($this->knownCombines);
+        }
+
+        return $this->nha->world->getRules()->then(
+            function ($rules): array {
+                $sigs = [];
+                foreach ((array) ($rules['dynamic'] ?? []) as $entry) {
+                    $entry = (array) $entry;
+                    $sig = (string) ($entry['sig'] ?? '');
+                    if ($sig === '') {
+                        continue;
+                    }
+                    $tokens = array_map('trim', explode(',', $sig));
+                    sort($tokens);
+                    $sigs[implode('+', $tokens)] = true;
+                }
+
+                return $this->knownCombines = $sigs;
+            },
+            fn(): array => $this->knownCombines = [],
+        );
     }
 
     /**
@@ -81,7 +124,7 @@ final class AutoPlayer
             )
             : resolve(null);
 
-        return $outcome->then(fn(?array $outcome) => $this->nha->observe($agent_id)->then(function (AgentObservation $observation) use ($agent_id, $token, $last, $outcome) {
+        return all(['outcome' => $outcome, 'known' => $this->knownCombines()])->then(fn(array $pre) => $this->nha->observe($agent_id)->then(function (AgentObservation $observation) use ($agent_id, $token, $last, $pre) {
             $tick = (int) ($observation->get('tick') ?? 0);
             $downedUntil = (int) ($observation->get('downed_until') ?? 0);
 
@@ -89,11 +132,14 @@ final class AutoPlayer
                 return resolve("🩹 Agent #{$agent_id} is downed until tick {$downedUntil} — skipping.");
             }
 
-            if ($last !== null && $outcome !== null) {
-                $last['outcome'] = $outcome;
+            $context = ($last ?? []);
+            if (($pre['outcome'] ?? null) !== null) {
+                $context['outcome'] = $pre['outcome'];
             }
+            $context['recent'] = $this->state->getRecentDecisions($agent_id, 10);
+            $context['known_combines'] = array_keys($pre['known'] ?? []);
 
-            return $this->brain->decide($observation, $last)->then(function (?array $decision) use ($agent_id, $token, $tick) {
+            return $this->brain->decide($observation, $context ?: null)->then(function (?array $decision) use ($agent_id, $token, $tick) {
                 if ($decision === null) {
                     return "💤 Agent #{$agent_id}: brain chose to wait (tick {$tick}).";
                 }

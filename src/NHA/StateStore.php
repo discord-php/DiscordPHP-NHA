@@ -204,7 +204,7 @@ class StateStore
      */
     public function recordDecision(int $agent_id, array $decision): void
     {
-        $this->data['agent_decisions'][(string) $agent_id] = [
+        $entry = [
             'verb' => (string) ($decision['verb'] ?? ''),
             'args' => (array) ($decision['args'] ?? []),
             'reason' => (string) ($decision['reason'] ?? ''),
@@ -212,6 +212,15 @@ class StateStore
             'tick' => isset($decision['tick']) ? (int) $decision['tick'] : null,
             'at' => time(),
         ];
+
+        $this->data['agent_decisions'][(string) $agent_id] = $entry;
+
+        // Also keep a short rolling history so the brain can see it is looping
+        // (or has already tried a `combine` pair) beyond just the last turn.
+        $log = (array) ($this->data['agent_decision_log'][(string) $agent_id] ?? []);
+        $log[] = ['verb' => $entry['verb'], 'args' => $entry['args'], 'tick' => $entry['tick']];
+        $this->data['agent_decision_log'][(string) $agent_id] = array_slice($log, -15);
+
         $this->save();
     }
 
@@ -235,6 +244,31 @@ class StateStore
             'tick' => isset($entry['tick']) ? (int) $entry['tick'] : null,
             'at' => (int) ($entry['at'] ?? 0),
         ];
+    }
+
+    /**
+     * The agent's last few decisions, oldest first — a rolling window so the
+     * brain can detect a loop or an already-tried `combine` pair. Each entry is
+     * `{verb, args, tick}`; older/other fields are not kept here.
+     *
+     * @return list<array{verb: string, args: array, tick: ?int}>
+     */
+    public function getRecentDecisions(int $agent_id, int $limit = 10): array
+    {
+        $log = (array) ($this->data['agent_decision_log'][(string) $agent_id] ?? []);
+        $out = [];
+        foreach (array_slice($log, -max(1, $limit)) as $e) {
+            if (! is_array($e) || ! isset($e['verb'])) {
+                continue;
+            }
+            $out[] = [
+                'verb' => (string) $e['verb'],
+                'args' => (array) ($e['args'] ?? []),
+                'tick' => isset($e['tick']) ? (int) $e['tick'] : null,
+            ];
+        }
+
+        return $out;
     }
 
     /**

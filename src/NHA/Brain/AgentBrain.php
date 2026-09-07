@@ -306,9 +306,213 @@ final class AgentBrain
             );
         }
 
+        // Rolling history + a deterministic suggestion. A small local model
+        // loops badly on the 7-rung ladder alone; showing it what it already
+        // did and one concrete recommended move keeps it productive.
+        $recent = is_array($lastDecision['recent'] ?? null) ? $lastDecision['recent'] : [];
+        $tried = [];
+        if ($recent !== []) {
+            $hist = [];
+            foreach ($recent as $r) {
+                $v = (string) ($r['verb'] ?? '');
+                if ($v === '') {
+                    continue;
+                }
+                $a = (array) ($r['args'] ?? []);
+                if ($v === 'combine') {
+                    $ing = array_keys((array) ($a['ingredients'] ?? []));
+                    sort($ing);
+                    if ($ing !== []) {
+                        $tried[implode('+', $ing)] = true;
+                    }
+                }
+                $hist[] = $v . ($a === [] ? '' : self::compactArgs($a));
+            }
+            if ($hist !== []) {
+                $lines[] = 'Recent turns (oldest→newest): ' . implode(' → ', array_slice($hist, -8));
+            }
+            if ($tried !== []) {
+                $lines[] = 'combine sets already submitted this session (do NOT resubmit — a repeat mints nothing): '
+                    . implode(', ', array_keys($tried)) . '.';
+            }
+        }
+
+        // Combine sets the whole world has ALREADY invented (from /rules) that
+        // you could make right now with what you hold — these mint no points, so
+        // skip them; anything else is potentially novel.
+        $knownCombines = array_values(array_filter(
+            is_array($lastDecision['known_combines'] ?? null) ? $lastDecision['known_combines'] : [],
+            'is_string',
+        ));
+        $invNames = array_keys(array_filter(
+            (array) ($raw['inventory'] ?? []),
+            static fn($qty, $k): bool => $k !== 'credits' && is_numeric($qty) && $qty > 0,
+            ARRAY_FILTER_USE_BOTH,
+        ));
+        $makeableKnown = array_values(array_filter(
+            $knownCombines,
+            static fn(string $sig): bool => array_diff(explode('+', $sig), $invNames) === [],
+        ));
+        if ($makeableKnown !== []) {
+            $lines[] = 'Already-invented combine sets you could make now (mint nothing — do NOT pick these): '
+                . implode(', ', array_slice($makeableKnown, 0, 20)) . '.';
+        }
+
+        if ($suggestion = $this->suggestion($raw, $tried, array_fill_keys($knownCombines, true))) {
+            $lines[] = sprintf(
+                'SUGGESTED next action: %s%s — %s. Do this unless you clearly see something better.',
+                $suggestion['verb'],
+                $suggestion['args'] === [] ? '' : ' ' . json_encode($suggestion['args'], JSON_UNESCAPED_SLASHES),
+                $suggestion['why'],
+            );
+        }
+
         $lines[] = 'Choose one action. Reply with JSON only.';
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * Compact `{"k":v,...}` rendering for the recent-turns line — short enough to
+     * list eight of them without bloating the prompt.
+     *
+     * @param array<string,mixed> $args
+     */
+    private static function compactArgs(array $args): string
+    {
+        $flat = [];
+        foreach ($args as $k => $v) {
+            $flat[] = $k . '=' . (is_array($v) ? implode('/', array_map('strval', array_keys($v))) : (string) $v);
+        }
+
+        return '{' . implode(',', $flat) . '}';
+    }
+
+    /**
+     * A deterministic "what would the ladder do" pick, surfaced to anchor a weak
+     * model. Mirrors {@see Playbook}'s priorities: finish parts → gamble one
+     * novel combine → build for reliable points → sell a glut → harvest only
+     * when short → reposition. Returns `null` when nothing is obviously right
+     * (the model is then on its own).
+     *
+     * @param array<string,mixed> $raw        The normalised observation.
+     * @param array<string,bool>  $tried      `a+b => true` for combine sets submitted THIS session.
+     * @param array<string,bool>  $worldKnown `a+b => true` for sets the whole world has already invented.
+     *
+     * @return array{verb: string, args: array<string,mixed>, why: string}|null
+     */
+    private function suggestion(array $raw, array $tried, array $worldKnown = []): ?array
+    {
+        $inv = (array) ($raw['inventory'] ?? []);
+        $points = (int) ($raw['inventor_points'] ?? 0);
+        $tick = (int) ($raw['tick'] ?? 0);
+        $onGround = ! ($raw['in_space'] ?? false) && (int) ($raw['altitude'] ?? 0) === 0;
+
+        // Raw resources on hand (drop currency + obvious craft outputs).
+        $skip = ['credits' => 1, 'engine' => 1, 'motor' => 1, 'chip' => 1, 'frame' => 1, 'fuel' => 1];
+        $raws = [];
+        foreach ($inv as $k => $qty) {
+            if (! isset($skip[$k]) && is_numeric($qty) && $qty > 0) {
+                $raws[(string) $k] = (int) $qty;
+            }
+        }
+        arsort($raws);
+
+        // 1. Assemble anything already crafted.
+        if (count((array) ($raw['loose_parts'] ?? [])) > 0) {
+            return ['verb' => 'finalize', 'args' => [], 'why' => 'you have loose parts — assemble them into a vehicle'];
+        }
+
+        // 2. One speculative combine: a pair of raws not submitted this session
+        //    and not already invented world-wide, while it is still a cheap
+        //    gamble (< 2 session tries, or points are already moving).
+        if (count($raws) >= 2 && (count($tried) < 2 || $points > 0)) {
+            $names = array_keys($raws);
+            for ($i = 0; $i < count($names); $i++) {
+                for ($j = $i + 1; $j < count($names); $j++) {
+                    $pair = [$names[$i], $names[$j]];
+                    sort($pair);
+                    $sig = implode('+', $pair);
+                    if (! isset($tried[$sig]) && ! isset($worldKnown[$sig])) {
+                        return [
+                            'verb' => 'combine',
+                            'args' => ['ingredients' => [$pair[0] => 1, $pair[1] => 1]],
+                            'why' => "{$pair[0]}+{$pair[1]} is an untried, uninvented tag set — one shot at inventor points",
+                        ];
+                    }
+                }
+            }
+        }
+
+        $biggest = $raws === [] ? null : array_key_first($raws);
+        $has = static fn(string $k): int => (int) ($inv[$k] ?? 0);
+
+        // 3. Build for RELIABLE points — but `construct` costs metal (= size) plus
+        //    composite (= ceil(height/14)). Only suggest it when you can pay.
+        if ($onGround && $has('composite') >= 3 && $has('metal') >= 8) {
+            $shape = ['box', 'cylinder', 'pyramid', 'cone', 'sphere'][$tick % 5];
+            $size = min(8, $has('metal'));
+            return [
+                'verb' => 'construct',
+                'args' => ['shape' => $shape, 'size' => $size, 'height' => 42, 'name' => 'spire-' . ($tick % 1000)],
+                'why' => "you can afford a tall {$shape} (needs metal + composite) — builder points score every time",
+            ];
+        }
+
+        // 3b. Can't build for lack of composite? Craft it: aluminum+carbon, or the
+        //     player-known herb+wood shortcut. That is a productive combine.
+        if ($onGround && $has('composite') < 3 && $has('metal') >= 8) {
+            foreach ([['aluminum', 'carbon'], ['herb', 'wood']] as [$a, $b]) {
+                if ($has($a) > 0 && $has($b) > 0) {
+                    return [
+                        'verb' => 'combine',
+                        'args' => ['ingredients' => [$a => 1, $b => 1], 'n' => 3],
+                        'why' => "{$a}+{$b} makes composite — you need it to `construct` for builder points",
+                    ];
+                }
+            }
+        }
+
+        // 4. Turn a genuine glut into credits.
+        if ($biggest !== null && $raws[$biggest] >= 40) {
+            return ['verb' => 'sell', 'args' => ['resource' => $biggest, 'n' => 20], 'why' => "you are sitting on {$raws[$biggest]} {$biggest} — sell the surplus for credits"];
+        }
+
+        // 5. Harvest only a resource you are actually short on and standing on.
+        foreach ((array) ($raw['nearby_deposits'] ?? []) as $d) {
+            $d = (array) $d;
+            $res = (string) ($d['resource'] ?? '');
+            if ($res === '' || (int) ($d['dist'] ?? 9) !== 0) {
+                continue;
+            }
+            if (($raws[$res] ?? 0) < 15) {
+                $verb = $res === 'wood' ? 'chop' : (in_array($res, ['herb', 'lichen', 'fungus', 'algae'], true) ? 'gather' : 'mine');
+                $n = min((int) ($d['amount'] ?? 10), 15);
+                return ['verb' => $verb, 'args' => ['n' => $n], 'why' => "you hold only " . ($raws[$res] ?? 0) . " {$res} and are standing on a deposit"];
+            }
+        }
+
+        // 6. On the ground with stock but nothing to do here — head for a finished
+        //    elevator to `ride` to space, where funding the station pays points now.
+        if ($onGround && $biggest !== null && $raws[$biggest] >= 15) {
+            foreach ((array) ($raw['elevators'] ?? []) as $e) {
+                $e = (array) $e;
+                if (isset($e['x'], $e['y'])) {
+                    return ['verb' => 'move', 'args' => ['x' => (int) $e['x'], 'y' => (int) $e['y']], 'why' => 'stocked up but idle here — walk to the elevator base to ride to space and build the station'];
+                }
+            }
+        }
+
+        // 7. Nothing here — head toward the nearest deposit of something scarce.
+        foreach ((array) ($raw['nearby_deposits'] ?? []) as $d) {
+            $d = (array) $d;
+            $res = (string) ($d['resource'] ?? '');
+            if ($res !== '' && ($raws[$res] ?? 0) < 10 && isset($d['x'], $d['y'])) {
+                return ['verb' => 'move', 'args' => ['x' => (int) $d['x'], 'y' => (int) $d['y']], 'why' => "you are short on {$res} — walk to that deposit"];
+            }
+        }
+
+        return null;
     }
 
     /** @param array<string,mixed> $map */
