@@ -206,12 +206,24 @@ class Http extends DiscordHttp implements HttpInterface
     public function handleError(ResponseInterface $response): \Throwable
     {
         if ($response->getStatusCode() === 422) {
-            $body = (string) $response->getBody();
+            // FastAPI 422 bodies echo the offending request back under `input`,
+            // which includes the agent token — scrub it before it reaches a log
+            // sink or an exception message.
+            $body = self::redactTokens((string) $response->getBody());
             $this->logger->error('NHA API rejected request as unprocessable (422)', ['body' => $body]);
 
             return new ValidationException("NHA API returned 422 Unprocessable Entity: {$body}");
         }
 
         return parent::handleError($response);
+    }
+
+    /**
+     * Replaces the value of any `token` / `nha_token` JSON field with `***` so a
+     * response body can be logged or surfaced without leaking a live credential.
+     */
+    private static function redactTokens(string $body): string
+    {
+        return preg_replace('/("(?:nha_)?token"\s*:\s*)"[^"]*"/i', '$1"***"', $body) ?? $body;
     }
 }
