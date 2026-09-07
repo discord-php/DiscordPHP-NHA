@@ -145,12 +145,16 @@ final class AutoPlayer
     /**
      * The move for when the brain insisted on a spent research `combine`: run the
      * shared ladder ({@see AgentBrain::suggestion()}) with the entire tried +
-     * world-known combine space marked exhausted, so it skips speculation and
-     * picks infrastructure — `finalize` loose parts, `construct` a tower when the
-     * materials are on hand, otherwise sell a glut / harvest / reposition toward
-     * the materials a build needs. Returns `null` only when the ladder has
-     * nothing either, so the caller can pass the tick instead of forcing a bad
-     * action.
+     * world-known combine space marked exhausted.
+     *
+     * If `inventor_points` are already moving the ladder may offer a *fresh*
+     * (untried, uninvented) pair — research is still paying, so that is allowed
+     * through. Once points have stalled at 0 the ladder's speculation rung gates
+     * itself off and it drops to infrastructure — `finalize` loose parts,
+     * `construct` a tower when `composite` + `metal` are in hand, otherwise sell
+     * a glut, harvest a shortage, or move toward the materials a build needs.
+     * Returns `null` only when the ladder has nothing either, so the caller can
+     * pass the tick instead of forcing a bad action.
      *
      * @param string              $spentSig The set that was refused, for the decision reason.
      * @param list<string>        $tried    Combine signatures already submitted this run.
@@ -168,11 +172,24 @@ final class AutoPlayer
             $exhausted[$sig] = true;
         }
 
-        // Speculation off: the ladder skips its combine rung and goes straight to
-        // finalize → construct → wealth → harvest → reposition.
-        $suggestion = AgentBrain::suggestion($raw, $exhausted, $exhausted, false);
-        if ($suggestion === null || ($suggestion['verb'] ?? '') === 'combine') {
+        // Speculate on a fresh pair only while inventor points are actually
+        // rising; once they have stalled at 0, research is not paying — skip the
+        // combine rung and go straight to infrastructure.
+        $researchPaying = (int) ($raw['inventor_points'] ?? 0) > 0;
+
+        $suggestion = AgentBrain::suggestion($raw, $exhausted, $exhausted, $researchPaying);
+        if ($suggestion === null) {
             return null;
+        }
+
+        // A combine may still come back — but only a genuinely fresh pair (the
+        // ladder allows one while points are rising). Never re-surface a spent
+        // set unless it is a production recipe.
+        if (($suggestion['verb'] ?? '') === 'combine') {
+            $sig = self::combineSignature((array) ($suggestion['args'] ?? []));
+            if ($sig === '' || (isset($exhausted[$sig]) && ! isset(self::PRODUCTION_COMBINES[$sig]))) {
+                return null;
+            }
         }
 
         return [

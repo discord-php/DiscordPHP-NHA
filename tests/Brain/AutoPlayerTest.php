@@ -203,6 +203,30 @@ class AutoPlayerTest extends NHAUnitTestCase
 
     /**
      * @covers \NHA\Brain\AutoPlayer
+     * @covers \NHA\Brain\AgentBrain
+     */
+    public function testWhenResearchIsPayingASpentComboIsSwappedForAFreshPairNotInfrastructure(): void
+    {
+        // In space (no construct), points rising — the fallback should pick a
+        // fresh untried pair rather than idling.
+        $nha = $this->nhaWith([
+            'tick' => 5, 'downed_until' => 0, 'position' => [1, 1],
+            'in_space' => true, 'altitude' => 60, 'inventor_points' => 50,
+            'inventory' => ['water' => 18, 'wood' => 17, 'crystal' => 17],
+            'dynamic' => [['sig' => 'glass,wood']],
+        ]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"combine","args":{"ingredients":{"glass":1,"wood":1}}}'), new StateStore($this->statePath));
+
+        $player->step(142287, 'tok');
+
+        $this->assertSame('combine', $this->posts[0][1]['verb']);
+        $sent = array_keys($this->posts[0][1]['args']['ingredients']);
+        sort($sent);
+        $this->assertNotSame(['glass', 'wood'], $sent, 'the spent pair was replaced with a fresh one');
+    }
+
+    /**
+     * @covers \NHA\Brain\AutoPlayer
      */
     public function testStepAllowsAProductionCombineEvenWhenWorldKnown(): void
     {

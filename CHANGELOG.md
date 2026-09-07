@@ -4,6 +4,16 @@ All notable changes to DiscordPHP-NHA are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 SemVer with the **major tracking the NHA world API version**.
 
+## [3.1.8] - 2026-09-07
+
+### Changed
+- The infrastructure fallback now keys off whether research is actually paying.
+  When `inventor_points` are above 0 a refused set is swapped for a *fresh*
+  untried pair (research still works — keep at it); only once points have
+  stalled at 0 does the fallback skip speculation and go to build / wealth /
+  harvest. Fixes an in-space agent idling when it held no ground-build
+  materials despite research still scoring.
+
 ## [3.1.7] - 2026-09-07
 
 ### Changed
