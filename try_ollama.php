@@ -78,7 +78,17 @@ if ($agentId <= 0) {
     return;
 }
 
-$nha = new NHA(['token' => '', 'logger' => new NullLogger(), 'loop' => $loop]);
+// `observe` is a public NHA endpoint, but NHA extends the Discord client and its
+// bootstrap fires an authenticated `applications/@me` fetch that 401s with the
+// empty token used here. That rejection is unrelated to the LLM pipeline under
+// test — swallow it so it doesn't bury the output in a stack trace.
+\React\Promise\set_rejection_handler(static function (\Throwable $e): void {
+    if (! $e instanceof \Discord\Http\Exceptions\InvalidTokenException) {
+        fwrite(STDERR, 'unhandled rejection: ' . $e->getMessage() . "\n");
+    }
+});
+
+$nha = new NHA(['nha_token' => getenv('NHA_TOKEN') ?: '', 'token' => '', 'logger' => new NullLogger(), 'loop' => $loop]);
 $nha->emit('init', [$nha]);
 $brain = new AgentBrain($ollama);
 
