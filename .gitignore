@@ -34,3 +34,6 @@ phpunit.log
 /coverage
 /.tools
 openapi.json
+
+# runner logs from nohup
+*.nohup.out
