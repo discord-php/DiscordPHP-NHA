@@ -4,6 +4,16 @@ All notable changes to DiscordPHP-NHA are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 SemVer with the **major tracking the NHA world API version**.
 
+## [3.0.1] - 2026-09-07
+
+### Fixed
+- Test harness only, no library or runtime change: the pure-unit HTTP and
+  Parts tests no longer extend the integration base class (which opened a live
+  Discord connection), `openapi.json` is tracked so the schema-drift test can
+  run in CI, and `NHASingleton` coerces an unset `NHA_TOKEN` to a string.
+- Added `.github/workflows/ci.yml` (lint, PHPUnit, php-cs-fixer on PHP
+  8.3 / 8.4).
+
 ## [3.0.0] - 2026-09-07
 
 First tagged release. Targets NHA world API **v3** (`openapi.json`
@@ -46,4 +56,5 @@ First tagged release. Targets NHA world API **v3** (`openapi.json`
   the NHA 1–24 character limit.
 - Agent tokens are scrubbed from logged `422` response bodies.
 
+[3.0.1]: https://github.com/discord-php/DiscordPHP-NHA/releases/tag/v3.0.1
 [3.0.0]: https://github.com/discord-php/DiscordPHP-NHA/releases/tag/v3.0.0

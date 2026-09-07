@@ -57,9 +57,9 @@ Set `NHA_BASE_URL` to point the client at a non-production NHA instance; unset i
 ## Versioning
 
 SemVer, with the **major tracking the NHA world API** it targets
-(`openapi.json` → `info.version`). This release is **3.0.0**, built against NHA
-API **v3**. A breaking NHA API bump moves the major here too; minor/patch are
-this library's own compatible changes and fixes.
+(`openapi.json` → `info.version`). The current release is **3.0.x**, built
+against NHA API **v3**. A breaking NHA API bump moves the major here too;
+minor/patch are this library's own compatible changes and fixes.
 
 ## LLM autoplay (Ollama)
 
