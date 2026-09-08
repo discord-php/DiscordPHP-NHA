@@ -510,7 +510,7 @@ final class AutoPlayer
             $best = null;
             $bestQty = 0;
             foreach ($inv as $res => $qty) {
-                if ($res === 'credits' || ! is_numeric($qty)) {
+                if ($res === 'credits' || ! is_numeric($qty) || ! in_array((string) $res, Ladder::DEPOT_TRADEABLE, true)) {
                     continue;
                 }
                 if ((int) $qty >= 15 && (int) $qty > $bestQty) {
@@ -527,6 +527,13 @@ final class AutoPlayer
         if ($objective === 'build') {
             if ($offGround) {
                 return ['verb' => 'land', 'args' => [], 'reason' => "{$lead}: land so you can build"];
+            }
+            $raw = json_decode(json_encode($observation->jsonSerialize()), true);
+            $raw = is_array($raw) ? $raw : [];
+            if (Ladder::cellOccupied($raw)) {
+                $step = Ladder::stepToClearGround($raw);
+
+                return ['verb' => $step['verb'], 'args' => $step['args'], 'reason' => "{$lead}: {$step['why']}"];
             }
             if ((int) ($inv['composite'] ?? 0) >= 2 && (int) ($inv['metal'] ?? 0) >= 8) {
                 $shape = ['box', 'cylinder', 'pyramid', 'cone', 'sphere'][$tick % 5];
@@ -869,6 +876,18 @@ final class AutoPlayer
                             $verb = (string) ($decision['verb'] ?? '');
                         }
                     }
+                }
+
+                // A `construct` on a cell that already holds a structure is
+                // rejected every time ("a structure already stands on this
+                // cell"). Step to clear ground first.
+                if ($verb === 'construct'
+                    && in_array((string) ($decision['args']['shape'] ?? ''), ['box', 'cylinder', 'sphere', 'cone', 'pyramid', 'road', 'city', 'monument', 'ziggurat'], true)
+                    && Ladder::cellOccupied($rawObs)
+                ) {
+                    $step = Ladder::stepToClearGround($rawObs);
+                    $decision = ['verb' => $step['verb'], 'args' => $step['args'], 'reason' => $step['why']];
+                    $verb = 'move';
                 }
 
                 // In orbit with a fuelled ship and no window open, the model

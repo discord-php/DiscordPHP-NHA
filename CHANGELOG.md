@@ -12,6 +12,20 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.13] - 2026-09-08
+
+### Fixed
+- Two more churn sources for the ship-blocked agent, both on the loop-break /
+  model path (the ladder was already clean):
+  - The loop-strategy's `wealth` objective still picked the biggest raw
+    including `brine` → `sell brine` rejected. Now filtered to
+    `Ladder::DEPOT_TRADEABLE`.
+  - `construct` on the agent's own cell (an elevator base ringed with its old
+    spires) → "a structure already stands on this cell", every time. New
+    `Ladder::cellOccupied()` / `stepToClearGround()`: the loop-break `build`
+    objective and an `AutoPlayer` guard on a model `construct` now step to
+    clear ground first.
+
 ## [3.2.12] - 2026-09-08
 
 ### Fixed

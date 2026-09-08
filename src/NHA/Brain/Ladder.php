@@ -63,6 +63,39 @@ final class Ladder
         'superalloy', 'energy_cell',
     ];
 
+    /**
+     * Whether a structure already occupies the agent's own cell — every
+     * `construct` there is rejected ("a structure already stands on this cell").
+     * Checks `nearby_structures` for one at distance 0 / the exact position.
+     *
+     * @param array<string,mixed> $raw
+     */
+    public static function cellOccupied(array $raw): bool
+    {
+        $pos = (array) ($raw['position'] ?? [0, 0]);
+        $x = (int) ($pos[0] ?? 0);
+        $y = (int) ($pos[1] ?? 0);
+        foreach ((array) ($raw['nearby_structures'] ?? []) as $s) {
+            $s = (array) $s;
+            if ((int) ($s['dist'] ?? 9) === 0 || ((int) ($s['x'] ?? -1) === $x && (int) ($s['y'] ?? -1) === $y)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** A short step to clear ground for a `construct`, biased by tick so it does not oscillate. */
+    public static function stepToClearGround(array $raw): array
+    {
+        $pos = (array) ($raw['position'] ?? [0, 0]);
+        $x = (int) ($pos[0] ?? 0);
+        $y = (int) ($pos[1] ?? 0);
+        [$dx, $dy] = [[4, 0], [0, 4], [-4, 0], [0, -4]][(int) ($raw['tick'] ?? 0) % 4];
+
+        return ['verb' => 'move', 'args' => ['x' => max(0, min(219, $x + $dx)), 'y' => max(0, min(219, $y + $dy))], 'why' => 'this cell is built on — step to clear ground before constructing'];
+    }
+
     /** The biggest hoard the depot will actually buy, or `null`. `$raws` is sorted desc. */
     private static function sellableBiggest(array $raws): ?string
     {
