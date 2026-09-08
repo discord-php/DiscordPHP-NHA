@@ -549,54 +549,48 @@ final class Ladder
             }
 
             // On the ground and NOT flight-ready → GEAR UP, do not ride/launch.
-            // Drive the flight-prep recipes whose ingredient sets are fixed;
-            // `build`-ing the hull parts is left to the model (the prompt covers
-            // it). This runs ahead of the generic ladder's tower rung.
+            // The depot sells `ion_thruster`, `cryo_fuel` and `superalloy`
+            // outright, so the fast path is just to BUY them with the credits
+            // the agent has been banking; `combine` is the low-credit fallback.
+            // This runs ahead of the generic ladder's tower rung.
             if ($onGround && ! $flightReady) {
                 if (count((array) ($raw['loose_parts'] ?? [])) >= 3) {
                     return ['verb' => 'finalize', 'args' => [], 'why' => 'expansionist — assemble the parts you have into a ship'];
                 }
-                // ion_thruster = fusion fuel (helium3/iridium) + motor + semiconductor.
-                if ($has('ion_thruster') === 0 && $has('motor') > 0 && $has('silicon') > 0
-                    && ($has('helium3') > 0 || $has('iridium') > 0)) {
-                    $fusion = $has('helium3') > 0 ? 'helium3' : 'iridium';
-
-                    return ['verb' => 'combine', 'args' => ['ingredients' => [$fusion => 1, 'motor' => 1, 'silicon' => 1]], 'why' => 'expansionist — combine an ion_thruster (fusion fuel + motor + semiconductor)'];
+                // The orbital engine.
+                if ($has('ion_thruster') === 0) {
+                    if ($credits >= 150) {
+                        return ['verb' => 'buy', 'args' => ['resource' => 'ion_thruster', 'n' => 1], 'why' => 'expansionist — buy the ion_thruster the depot stocks'];
+                    }
+                    // magnet + conductor + battery — approximate with what a
+                    // grounded agent can hold: magnet + copper + energy_cell.
+                    if ($has('magnet') > 0 && $has('copper') > 0 && $has('energy_cell') > 0) {
+                        return ['verb' => 'combine', 'args' => ['ingredients' => ['magnet' => 1, 'copper' => 1, 'energy_cell' => 1]], 'why' => 'expansionist — combine a motor toward the ion_thruster'];
+                    }
                 }
-                // hydrogen = water electrolysed by a motor (no metal).
-                if (! $fuelled && $has('water') > 0 && $has('motor') > 0) {
-                    return ['verb' => 'combine', 'args' => ['ingredients' => ['water' => 1, 'motor' => 1]], 'why' => 'expansionist — combine hydrogen fuel (water + motor)'];
+                // Fuel.
+                if (! $fuelled) {
+                    if ($credits >= 60) {
+                        return ['verb' => 'buy', 'args' => ['resource' => 'cryo_fuel', 'n' => 3], 'why' => 'expansionist — buy cryo_fuel from the depot'];
+                    }
+                    if ($has('ice') > 0 && ($has('coal') > 0 || $has('oil') > 0)) {
+                        return ['verb' => 'combine', 'args' => ['ingredients' => ['ice' => 1, ($has('coal') > 0 ? 'coal' : 'oil') => 1]], 'why' => 'expansionist — combine cryo_fuel (ice + an energy source)'];
+                    }
                 }
-                // heat_shield = superalloy + composite (needed for Mars/Venus);
-                // superalloy = metal + wood, composite = aluminium + carbon.
+                // Re-entry shield for the Mars/Venus legs (moons do not need it,
+                // but it is cheap insurance and lets the depart rung fire).
                 if ($has('heat_shield') === 0) {
                     if ($has('superalloy') > 0 && $has('composite') > 0) {
                         return ['verb' => 'combine', 'args' => ['ingredients' => ['superalloy' => 1, 'composite' => 1]], 'why' => 'expansionist — combine a heat_shield for the Mars/Venus route'];
                     }
-                    if ($has('superalloy') === 0 && $has('metal') > 0 && $has('wood') > 0) {
-                        return ['verb' => 'combine', 'args' => ['ingredients' => ['metal' => 1, 'wood' => 1]], 'why' => 'expansionist — combine superalloy toward a heat_shield'];
+                    if ($has('superalloy') === 0 && $credits >= 60) {
+                        return ['verb' => 'buy', 'args' => ['resource' => 'superalloy', 'n' => 1], 'why' => 'expansionist — buy superalloy toward a heat_shield'];
                     }
                 }
-                // Missing an input for the above and can afford it → buy the
-                // next one rather than idle into a tower. A `buy` the depot does
-                // not stock is simply rejected and the ladder moves on.
-                if ($credits >= 60) {
-                    $want = ['silicon', 'motor', 'water'];
-                    if ($has('helium3') === 0 && $has('iridium') === 0) {
-                        $want[] = 'helium3';
-                    }
-                    if ($has('heat_shield') === 0 && $has('superalloy') === 0) {
-                        $want[] = 'metal'; // superalloy = metal + wood
-                    }
-                    foreach ($want as $res) {
-                        if ($has($res) === 0) {
-                            return ['verb' => 'buy', 'args' => ['resource' => $res, 'n' => 3], 'why' => "expansionist — buy {$res} toward the ship"];
-                        }
-                    }
-                }
-                // Nothing deterministic to do toward the ship this turn — let
-                // the generic ladder harvest/sell (it will NOT tower-spam
-                // because AutoPlayer's loop guard now catches that).
+                // Low on credits and can't craft yet → let the generic ladder
+                // earn (harvest / sell). It will NOT tower-spam: the tower rung
+                // is gated for a gearing expansionist and the loop guard catches
+                // a construct/move cycle.
                 return null;
             }
 

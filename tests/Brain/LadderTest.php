@@ -262,15 +262,25 @@ class LadderTest extends NHAUnitTestCase
         );
         $this->assertSame('finalize', $parts['verb']);
 
-        // Fusion fuel + motor + semiconductor → combine an ion_thruster.
-        $thruster = Ladder::suggestion($base(['helium3' => 2, 'motor' => 1, 'silicon' => 3]), [], [], false, 'expansionist');
-        $this->assertSame('combine', $thruster['verb']);
-        $this->assertSame(['helium3' => 1, 'motor' => 1, 'silicon' => 1], $thruster['args']['ingredients']);
+        // Credits, no ion_thruster → buy the one the depot stocks.
+        $thruster = Ladder::suggestion($base(['credits' => 4000]), [], [], false, 'expansionist');
+        $this->assertSame('buy', $thruster['verb']);
+        $this->assertSame('ion_thruster', $thruster['args']['resource']);
 
-        // Water + motor, no fuel yet → combine hydrogen.
-        $fuel = Ladder::suggestion($base(['water' => 3, 'motor' => 1, 'ion_thruster' => 1]), [], [], false, 'expansionist');
-        $this->assertSame('combine', $fuel['verb']);
-        $this->assertSame(['water' => 1, 'motor' => 1], $fuel['args']['ingredients']);
+        // Have the thruster, still no fuel → buy cryo_fuel.
+        $fuel = Ladder::suggestion($base(['credits' => 4000, 'ion_thruster' => 1]), [], [], false, 'expansionist');
+        $this->assertSame('buy', $fuel['verb']);
+        $this->assertSame('cryo_fuel', $fuel['args']['resource']);
+
+        // Thruster + fuel → flight-ready; no heat_shield is needed for a
+        // moon-first hop, so it heads for the elevator (it is standing on it).
+        $ready = Ladder::suggestion($base(['credits' => 4000, 'ion_thruster' => 1, 'cryo_fuel' => 3]), [], [], false, 'expansionist');
+        $this->assertSame('ride', $ready['verb']);
+
+        // Low on credits, not fuelled → combine cryo_fuel from ice + an energy source.
+        $poor = Ladder::suggestion($base(['ice' => 3, 'coal' => 3, 'ion_thruster' => 1]), [], [], false, 'expansionist');
+        $this->assertSame('combine', $poor['verb']);
+        $this->assertSame(['ice' => 1, 'coal' => 1], $poor['args']['ingredients']);
     }
 
     /**

@@ -12,6 +12,18 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.3] - 2026-09-08
+
+### Fixed
+- The 3.2.1/3.2.2 gear-up rung tried to `buy motor` — but `motor` is crafted,
+  not stocked, so the depot rejected it and the agent bought motor forever.
+  Rewritten against what the depot actually sells (probed live): `ion_thruster`,
+  `cryo_fuel` and `superalloy` are all buyable, so a credit-flush grounded
+  expansionist now just **buys the ion_thruster and cryo_fuel**, with `combine`
+  (motor from magnet+copper+energy_cell, cryo_fuel from ice+coal/oil) as the
+  low-credit fallback. `heat_shield` is only chased for the Mars/Venus legs —
+  a fuelled ion-thruster ship rides to orbit for a moon hop without one.
+
 ## [3.2.2] - 2026-09-08
 
 ### Fixed
