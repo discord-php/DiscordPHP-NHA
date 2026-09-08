@@ -263,9 +263,9 @@ class LadderTest extends NHAUnitTestCase
             'elevators' => [['x' => 10, 'y' => 10]], 'nearby_deposits' => [],
         ];
 
-        // Enough loose parts in hold (4+) → assemble the ship.
+        // 4+ loose parts INCLUDING a drive → assemble the ship.
         $parts = Ladder::suggestion(
-            ['tick' => 5, 'in_space' => false, 'altitude' => 0, 'inventory' => self::KIT, 'loose_parts' => ['a', 'b', 'c', 'd']],
+            ['tick' => 5, 'in_space' => false, 'altitude' => 0, 'inventory' => self::KIT, 'loose_parts' => ['propeller', 'wing', 'cockpit', 'landing_gear']],
             [],
             [],
             false,
@@ -273,15 +273,15 @@ class LadderTest extends NHAUnitTestCase
         );
         $this->assertSame('finalize', $parts['verb']);
 
-        // Too few parts (3) → keep building, don't finalize a stub.
-        $tooFew = Ladder::suggestion(
-            ['tick' => 5, 'in_space' => false, 'altitude' => 0, 'inventory' => self::KIT + ['ion_thruster' => 1, 'cryo_fuel' => 3, 'heat_shield' => 1], 'loose_parts' => ['a', 'b', 'c'], 'position' => [10, 10], 'nearby_deposits' => []],
+        // 4 parts but NO drive part → keep building, don't finalize a stub.
+        $noDrive = Ladder::suggestion(
+            ['tick' => 5, 'in_space' => false, 'altitude' => 0, 'inventory' => self::KIT + ['ion_thruster' => 1, 'cryo_fuel' => 3, 'heat_shield' => 1, 'metal' => 20], 'loose_parts' => ['wing', 'cockpit', 'landing_gear', 'tail'], 'position' => [10, 10], 'nearby_deposits' => []],
             [],
             [],
             false,
             'expansionist',
         );
-        $this->assertSame('build', $tooFew['verb']);
+        $this->assertSame('build', $noDrive['verb']);
 
         // Credits, no ion_thruster → buy the one the depot stocks.
         $thruster = Ladder::suggestion($base(['credits' => 4000]), [], [], false, 'expansionist');
@@ -293,10 +293,15 @@ class LadderTest extends NHAUnitTestCase
         $this->assertSame('buy', $fuel['verb']);
         $this->assertSame('cryo_fuel', $fuel['args']['resource']);
 
-        // Full kit (thruster + fuel + shield) but still NO vehicle → assemble
-        // one: `build` the thruster part (then `finalize`). A loose
-        // `ion_thruster` resource is cargo, not a ship — it must not ride yet.
-        $assemble = Ladder::suggestion($base(['credits' => 4000, 'ion_thruster' => 1, 'cryo_fuel' => 3, 'heat_shield' => 1]), [], [], false, 'expansionist');
+        // Full kit + no metal → buy metal (every ship part costs it).
+        $needMetal = Ladder::suggestion($base(['credits' => 4000, 'ion_thruster' => 1, 'cryo_fuel' => 3, 'heat_shield' => 1]), [], [], false, 'expansionist');
+        $this->assertSame('buy', $needMetal['verb']);
+        $this->assertSame('metal', $needMetal['args']['resource']);
+
+        // Full kit + metal stocked but still NO vehicle → `build` a part
+        // (then `finalize`). A loose `ion_thruster` resource is cargo, not a
+        // ship — it must not ride yet.
+        $assemble = Ladder::suggestion($base(['credits' => 4000, 'ion_thruster' => 1, 'cryo_fuel' => 3, 'heat_shield' => 1, 'metal' => 20]), [], [], false, 'expansionist');
         $this->assertSame('build', $assemble['verb']);
 
         // A finalized ship + fuel, standing on a tall elevator → NOW ride up.

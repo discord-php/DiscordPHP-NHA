@@ -92,7 +92,7 @@ final class AutoPlayer
      * `"unknown part X"`. The gear-up rotation skips these and
      * {@see self::step()} rewrites a model `build` that names one.
      */
-    private const DEAD_BUILD_PARTS = ['thruster', 'ion_thruster', 'chassis', 'hull', 'rotor', 'airframe'];
+    private const DEAD_BUILD_PARTS = ['thruster', 'ion_thruster', 'chassis', 'hull', 'rotor', 'airframe', 'wheels', 'body'];
 
     /**
      * `a+b => true` for every combine set the world has already invented, from
@@ -923,6 +923,34 @@ final class AutoPlayer
                     if ($gear !== null && ($gear['verb'] ?? '') !== 'deploy') {
                         $decision = $gear;
                         $verb = (string) ($decision['verb'] ?? '');
+                    }
+                }
+
+                // Stop the inert-hull pileup. The model keeps `finalize`-ing
+                // wing/cockpit/landing_gear sets that come out with no drive
+                // (drives=false, flies=false) — 10 dead vehicles and counting.
+                // A ship only moves if a DRIVE part is in the bundle, so hold
+                // `finalize` until loose_parts has 4+ entries including one of
+                // the drive archetypes. Junk already in `vehicles` is ignored
+                // (there is no scrap verb — gating on it would brick assembly
+                // forever). Buy the metal the parts cost, then keep building.
+                if ($verb === 'finalize') {
+                    $loose = array_map(
+                        static fn($p): string => is_array($p) ? (string) ($p['part'] ?? $p['name'] ?? '') : (string) $p,
+                        (array) ($rawObs['loose_parts'] ?? []),
+                    );
+                    $drives = ['propeller', 'engine', 'motor', 'wheel', 'wheels', 'rotor', 'turbine', 'drivetrain'];
+                    $hasDrivePart = array_intersect($loose, $drives) !== [];
+                    if (count($loose) < 4 || ! $hasDrivePart) {
+                        $held = (array) $observation->getInventory();
+                        $tickNow = (int) ($observation->get('tick') ?? 0);
+                        if ((int) ($held['metal'] ?? 0) < 12 && (int) ($held['credits'] ?? 0) >= 60) {
+                            $decision = ['verb' => 'buy', 'args' => ['resource' => 'metal', 'n' => 10], 'reason' => 'ship parts cost metal (landing_gear 3, cockpit 4, frame 5…) — stock it first'];
+                        } else {
+                            $part = Ladder::SHIP_PART_ARCHETYPES[$tickNow % count(Ladder::SHIP_PART_ARCHETYPES)];
+                            $decision = ['verb' => 'build', 'args' => ['part' => $part], 'reason' => "no drive part in the bundle yet — build a {$part}, don't finalize a stub"];
+                        }
+                        $verb = (string) $decision['verb'];
                     }
                 }
 

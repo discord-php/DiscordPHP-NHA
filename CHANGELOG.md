@@ -12,6 +12,26 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.10] - 2026-09-08
+
+### Fixed
+- The 3.2.9 run piled up **10 inert vehicles** — the model kept `finalize`-ing
+  driveless part bundles, and the 3.2.7-style "stop if inert hulls exist" gate
+  can't be used (no scrap verb → permanent brick). `finalize` is now gated on
+  the **bundle itself**: 4+ loose parts *and* one of the drive archetypes
+  (`propeller`/`engine`/`motor`/…) present (`Ladder::looseHasDrivePart()`),
+  enforced against the model's pick in `AutoPlayer`, not just the ladder's.
+- Ship parts **cost metal** (`landing_gear` 3, `cockpit` 4+crystal, `frame`
+  5+composite, `fuel_tank` 3, `tail` 2) — the agent was starving the build
+  rotation. Gear-up now stocks `metal` to 15 before building parts.
+
+### Changed
+- More `build` vocabulary from the live run: **valid** adds `fuel_tank`,
+  `propeller` (upgrades `bearing`/`alloy`), `tail`; **rejected** adds `wheels`,
+  `body`. `SHIP_PART_ARCHETYPES` / `DEAD_BUILD_PARTS` / `PART_UPGRADES` / the
+  Playbook hint updated. Where the `ion_thruster` orbital drive actually seats
+  is still unknown (`frame` and `propeller` both refuse it).
+
 ## [3.2.9] - 2026-09-08
 
 ### Changed

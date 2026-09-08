@@ -104,12 +104,11 @@ final class Ladder
             return $combat;
         }
 
-        // 1. Assemble crafted parts into a vehicle — once there are enough for a
-        //    working one (a lone part finalizes into an inert hull). Stop after
-        //    a couple of inert hulls: the recipe still lacks its drive part, so
-        //    hold the parts until the search turns one up.
-        if (count((array) ($raw['loose_parts'] ?? [])) >= 4 && self::inertVehicleCount($raw) < 2) {
-            return ['verb' => 'finalize', 'args' => [], 'why' => 'you have enough loose parts — assemble them into a vehicle'];
+        // 1. Assemble crafted parts into a vehicle — once there are 4+ AND a
+        //    DRIVE part is among them. `finalize` without a drive part just
+        //    mints another hull that neither drives nor flies.
+        if (count((array) ($raw['loose_parts'] ?? [])) >= 4 && self::looseHasDrivePart($raw)) {
+            return ['verb' => 'finalize', 'args' => [], 'why' => 'you have enough loose parts incl. a drive — assemble them into a vehicle'];
         }
 
         // 1b. Passive income: a finished vehicle that is not out working yet →
@@ -404,6 +403,27 @@ final class Ladder
         return $n;
     }
 
+    /** Drive-part `build` archetypes — a `finalize` bundle needs one or the ship comes out inert. */
+    public const DRIVE_PARTS = ['propeller', 'engine', 'motor', 'wheel', 'wheels', 'rotor', 'turbine', 'drivetrain'];
+
+    /**
+     * Whether the loose-part bundle already holds a drive part. `finalize`
+     * without one produces a hull that neither `drives` nor `flies`.
+     *
+     * @param array<string,mixed> $raw
+     */
+    public static function looseHasDrivePart(array $raw): bool
+    {
+        foreach ((array) ($raw['loose_parts'] ?? []) as $p) {
+            $name = is_array($p) ? (string) ($p['part'] ?? $p['name'] ?? '') : (string) $p;
+            if (in_array($name, self::DRIVE_PARTS, true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /**
      * The vehicle-part archetypes to feed `build`, minus the ones the engine
      * has already rejected as "unknown part". `build{part:landing_gear}` is a
@@ -416,10 +436,10 @@ final class Ladder
      */
     public const SHIP_PART_ARCHETYPES = [
         // Confirmed valid by the live engine.
-        'landing_gear', 'cockpit', 'wing', 'frame',
-        // Untested but plausible — a drive part is what an inert hull is
+        'propeller', 'frame', 'wing', 'cockpit', 'landing_gear', 'fuel_tank', 'tail',
+        // Still untested — likely a drive part, which is what an inert hull is
         // missing (drives / flies / fuel_cap all come out 0 without one).
-        'wheel', 'wheels', 'engine', 'motor', 'propeller', 'fuel_tank', 'body', 'tail',
+        'engine', 'motor', 'wheel', 'turbine',
     ];
 
     /**
@@ -432,6 +452,7 @@ final class Ladder
      */
     public const PART_UPGRADES = [
         'frame' => ['steel', 'alloy', 'composite', 'superalloy'],
+        'propeller' => ['bearing', 'alloy'],
     ];
 
     /**
@@ -779,12 +800,10 @@ final class Ladder
             // the agent has been banking; `combine` is the low-credit fallback.
             // This runs ahead of the generic ladder's tower rung.
             if ($onGround && ! $flightReady) {
-                // Enough loose parts for a working ship → bundle them. One
-                // stray part finalizes into an inert hull; and once a couple of
-                // those have piled up, stop — the recipe still lacks its drive
-                // part, so keep building parts until one lands.
-                if (count((array) ($raw['loose_parts'] ?? [])) >= 4 && self::inertVehicleCount($raw) < 2) {
-                    return ['verb' => 'finalize', 'args' => ['name' => 'accord_runner'], 'why' => 'expansionist — finalize the loose parts into a ship'];
+                // 4+ loose parts including a DRIVE → bundle them into a ship.
+                // Without a drive part `finalize` just adds another inert hull.
+                if (count((array) ($raw['loose_parts'] ?? [])) >= 4 && self::looseHasDrivePart($raw)) {
+                    return ['verb' => 'finalize', 'args' => ['name' => 'accord_runner'], 'why' => 'expansionist — finalize the loose parts (incl. a drive) into a ship'];
                 }
                 // The orbital engine.
                 if ($has('ion_thruster') === 0) {
@@ -816,6 +835,12 @@ final class Ladder
                         return ['verb' => 'buy', 'args' => ['resource' => 'superalloy', 'n' => 1], 'why' => 'expansionist — buy superalloy toward a heat_shield'];
                     }
                 }
+                // Every ship part costs metal (landing_gear 3, cockpit
+                // 4+crystal, frame 5+composite, fuel_tank 3, tail 2) — stock it
+                // before the build rotation starves.
+                if ($has('ion_thruster') > 0 && $has('metal') < 15 && $credits >= 60) {
+                    return ['verb' => 'buy', 'args' => ['resource' => 'metal', 'n' => 12], 'why' => 'expansionist — stock metal; every ship part costs it'];
+                }
                 // Kit in hand (ion_thruster + fuel + shield) but still no
                 // vehicle → `build` the airframe parts, then `finalize` bundles
                 // every loose part into one ship. The `part` vocabulary is not
@@ -834,9 +859,10 @@ final class Ladder
                             break;
                         }
                     }
-                    // A drive part is the one an inert hull lacks — try to seat
-                    // the ion_thruster on the propulsion archetypes.
-                    if (! isset($args['with']) && in_array($part, ['engine', 'motor', 'propeller'], true)) {
+                    // The ion_thruster (orbital drive) has to seat SOMEWHERE —
+                    // not on `frame` or `propeller` (their upgrade lists are
+                    // known and exclude it). Try it on the raw engine/motor.
+                    if (! isset($args['with']) && in_array($part, ['engine', 'motor', 'turbine'], true)) {
                         $args['with'] = ['ion_thruster' => 1];
                     }
 
