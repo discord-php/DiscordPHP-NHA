@@ -478,8 +478,12 @@ final class AgentBrain
         $tick = (int) ($raw['tick'] ?? 0);
         $onGround = ! ($raw['in_space'] ?? false) && (int) ($raw['altitude'] ?? 0) === 0;
 
-        // Raw resources on hand (drop currency + obvious craft outputs).
-        $skip = ['credits' => 1, 'engine' => 1, 'motor' => 1, 'chip' => 1, 'frame' => 1, 'fuel' => 1];
+        // Raw resources on hand (drop currency, craft outputs, combat kit).
+        $skip = array_fill_keys([
+            'credits', 'engine', 'motor', 'chip', 'frame', 'fuel',
+            'slug', 'energy_cell', 'kinetic_gun', 'energy_weapon', 'bomb',
+            'medkit', 'stimpack', 'salve', 'antidote', 'tincture',
+        ], 1);
         $raws = [];
         foreach ($inv as $k => $qty) {
             if (! isset($skip[$k]) && is_numeric($qty) && $qty > 0) {
@@ -490,6 +494,17 @@ final class AgentBrain
 
         $has = static fn(string $k): int => (int) ($inv[$k] ?? 0);
         $credits = $has('credits');
+        $x = (int) (((array) ($raw['position'] ?? [0, 0]))[0] ?? 0);
+        $y = (int) (((array) ($raw['position'] ?? [0, 0]))[1] ?? 0);
+        $hp = (float) ($raw['hp'] ?? $raw['health'] ?? 100);
+        $hpMax = (float) ($raw['hp_max'] ?? $raw['max_hp'] ?? 100) ?: 100;
+
+        // 0. DEFEND. A recent "attacked" alert, a known robber, or a hostile
+        //    close by while hurt = combat. Heal if badly hurt and able, shoot
+        //    back if armed and in range, otherwise break contact.
+        if ($combat = self::combatMove($raw, $inv, $hp, $hpMax, $x, $y, $tick)) {
+            return $combat;
+        }
 
         // 1. Assemble anything already crafted.
         if (count((array) ($raw['loose_parts'] ?? [])) > 0) {
@@ -503,6 +518,12 @@ final class AgentBrain
             if (empty($vehicle['deployed']) && empty($vehicle['roaming']) && empty($vehicle['out'])) {
                 return ['verb' => 'deploy', 'args' => [], 'why' => 'you have a finished vehicle — deploy it for passive mining income'];
             }
+        }
+
+        // 1c. ARM. Out of combat but with no way to survive the next ambush —
+        //     a medicine, a weapon and some ammo come before research / wealth.
+        if ($arm = self::armMove($inv, $credits)) {
+            return $arm;
         }
 
         // 2. One speculative combine: a pair of raws not submitted this session
@@ -636,6 +657,164 @@ final class AgentBrain
         }
         if ($wantXy !== null) {
             return ['verb' => 'move', 'args' => ['x' => $wantXy[0], 'y' => $wantXy[1]], 'why' => "stockpile low on {$wantRes} ({$wantHeld}/" . self::RESOURCE_TARGET . ') — walk to that deposit'];
+        }
+
+        return null;
+    }
+
+    /** Best self-heal medicine on hand, strongest first, or `null`. */
+    private static function bestMedicine(array $inv): ?string
+    {
+        foreach (['medkit', 'stimpack', 'salve', 'antidote'] as $m) {
+            if ((int) ($inv[$m] ?? 0) > 0) {
+                return $m;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * The defensive move when the agent is in (or just came out of) a fight:
+     * heal if badly hurt and able, shoot back if armed and the attacker is in
+     * range, otherwise break contact. Returns `null` when there is no threat.
+     *
+     * Public so {@see \NHA\Brain\AutoPlayer} can apply it as a hard override —
+     * combat defence never waits on the LLM.
+     *
+     * @param array<string,mixed> $raw The normalised observation.
+     *
+     * @return array{verb: string, args: array<string,mixed>, reason: string}|null
+     */
+    public static function defensiveAction(array $raw): ?array
+    {
+        $inv = (array) ($raw['inventory'] ?? []);
+        $pos = (array) ($raw['position'] ?? [0, 0]);
+        $move = self::combatMove(
+            $raw,
+            $inv,
+            (float) ($raw['hp'] ?? $raw['health'] ?? 100),
+            (float) ($raw['hp_max'] ?? $raw['max_hp'] ?? 100) ?: 100,
+            (int) ($pos[0] ?? 0),
+            (int) ($pos[1] ?? 0),
+            (int) ($raw['tick'] ?? 0),
+        );
+
+        return $move === null ? null : ['verb' => $move['verb'], 'args' => $move['args'], 'reason' => $move['why']];
+    }
+
+    /**
+     * The defensive move when the agent is in (or just came out of) a fight:
+     * heal if badly hurt and able, shoot back if armed and the attacker is in
+     * range, otherwise break contact. Returns `null` when there is no threat.
+     *
+     * @param array<string,mixed> $raw
+     * @param array<string,mixed> $inv
+     *
+     * @return array{verb: string, args: array<string,mixed>, why: string}|null
+     */
+    private static function combatMove(array $raw, array $inv, float $hp, float $hpMax, int $x, int $y, int $tick): ?array
+    {
+        $alerts = (array) ($raw['alerts'] ?? $raw['threats'] ?? []);
+        $recentlyHit = false;
+        $robber = $raw['last_robbed_by'] ?? null;
+        foreach ($alerts as $a) {
+            $a = (array) $a;
+            if (in_array((string) ($a['kind'] ?? ''), ['attacked', 'robbed', 'hit'], true) && $tick - (int) ($a['tick'] ?? 0) <= 20) {
+                $recentlyHit = true;
+                $robber ??= $a['by'] ?? null;
+            }
+        }
+
+        // Nearest other agent, and the nearest that is plausibly the aggressor.
+        $nearest = null;
+        $hostile = null;
+        foreach ((array) ($raw['nearby_agents'] ?? []) as $ag) {
+            $ag = (array) $ag;
+            $d = (int) ($ag['dist'] ?? 99);
+            if ($nearest === null || $d < (int) ($nearest['dist'] ?? 99)) {
+                $nearest = $ag;
+            }
+            if (($robber !== null && (string) ($ag['id'] ?? '') === (string) $robber) || ($recentlyHit && $d <= 6)) {
+                if ($hostile === null || $d < (int) ($hostile['dist'] ?? 99)) {
+                    $hostile = $ag;
+                }
+            }
+        }
+
+        $hurt = $hpMax > 0 && $hp / $hpMax < 0.6;
+        $inCombat = $recentlyHit || ($hostile !== null) || ($hurt && $nearest !== null && (int) ($nearest['dist'] ?? 99) <= 3);
+        if (! $inCombat) {
+            return null;
+        }
+
+        $badlyHurt = $hpMax > 0 && $hp / $hpMax < 0.35;
+        $med = self::bestMedicine($inv);
+
+        if ($badlyHurt && $med !== null) {
+            return ['verb' => 'heal', 'args' => ['item' => $med], 'why' => "under attack at {$hp}/{$hpMax} HP — heal with {$med}"];
+        }
+
+        // Armed and the attacker is in range → return fire.
+        $weapon = null;
+        foreach (['kinetic_gun' => 'slug', 'energy_weapon' => 'energy_cell', 'bomb' => null] as $w => $ammo) {
+            if ((int) ($inv[$w] ?? 0) > 0 && ($ammo === null || (int) ($inv[$ammo] ?? 0) > 0)) {
+                $weapon = $w;
+                break;
+            }
+        }
+        $target = $hostile ?? $nearest;
+        if ($weapon !== null && $target !== null && (int) ($target['dist'] ?? 99) <= 8 && ! $badlyHurt) {
+            return ['verb' => 'attack', 'args' => ['weapon' => $weapon, 'target' => (int) ($target['id'] ?? 0)], 'why' => "fighting back with {$weapon} against #" . (int) ($target['id'] ?? 0)];
+        }
+
+        // Otherwise break contact: step directly away from the threat.
+        if ($target !== null && isset($target['x'], $target['y'])) {
+            $dx = $x - (int) $target['x'];
+            $dy = $y - (int) $target['y'];
+            $mag = max(1, abs($dx) + abs($dy));
+            return [
+                'verb' => 'move',
+                'args' => [
+                    'x' => max(0, min(219, $x + (int) round($dx / $mag * 8))),
+                    'y' => max(0, min(219, $y + (int) round($dy / $mag * 8))),
+                ],
+                'why' => 'outgunned — break contact and put distance between you and the attacker',
+            ];
+        }
+
+        $d = [[9, 0], [0, 9], [-9, 0], [0, -9]][$tick % 4];
+
+        return ['verb' => 'move', 'args' => ['x' => max(0, min(219, $x + $d[0])), 'y' => max(0, min(219, $y + $d[1]))], 'why' => 'just took a hit — move to safer ground'];
+    }
+
+    /**
+     * Buy a minimum survival kit when out of combat and unequipped: a medicine
+     * first, then a weapon, then ammo for it. Returns `null` once the kit is
+     * covered or the credits are too thin.
+     *
+     * @param array<string,mixed> $inv
+     *
+     * @return array{verb: string, args: array<string,mixed>, why: string}|null
+     */
+    private static function armMove(array $inv, int $credits): ?array
+    {
+        $has = static fn(string $k): int => (int) ($inv[$k] ?? 0);
+
+        if (self::bestMedicine($inv) === null && $credits >= 60) {
+            return ['verb' => 'buy', 'args' => ['resource' => 'stimpack', 'n' => 1], 'why' => 'no medicine — buy a stimpack so the next ambush is survivable'];
+        }
+
+        $hasWeapon = $has('kinetic_gun') > 0 || $has('energy_weapon') > 0;
+        if (! $hasWeapon && $credits >= 60) {
+            return ['verb' => 'buy', 'args' => ['resource' => 'kinetic_gun', 'n' => 1], 'why' => 'unarmed — buy a kinetic_gun to defend yourself'];
+        }
+
+        if ($has('kinetic_gun') > 0 && $has('slug') < 5 && $credits >= 40) {
+            return ['verb' => 'buy', 'args' => ['resource' => 'slug', 'n' => 5], 'why' => 'a gun with no ammo is dead weight — buy slugs'];
+        }
+        if ($has('energy_weapon') > 0 && $has('energy_cell') < 3 && $credits >= 40) {
+            return ['verb' => 'buy', 'args' => ['resource' => 'energy_cell', 'n' => 3], 'why' => 'buy energy_cells for the energy_weapon'];
         }
 
         return null;

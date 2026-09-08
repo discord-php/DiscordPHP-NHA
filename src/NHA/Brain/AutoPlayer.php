@@ -537,6 +537,30 @@ final class AutoPlayer
                 return resolve("🩹 Agent #{$agent_id} is downed until tick {$downedUntil} — skipping.");
             }
 
+            // Combat overrides everything — defend before consulting the brain
+            // or the loop guard. Heal, shoot back, or break contact.
+            $rawObs = json_decode(json_encode($observation->jsonSerialize()), true);
+            if (is_array($rawObs) && ($defence = AgentBrain::defensiveAction($rawObs)) !== null) {
+                $altNow = (int) ($observation->get('altitude') ?? 0);
+
+                return $this->nha->intentWithToken($agent_id, $token, $defence['verb'], $defence['args'])
+                    ->then(function ($queued) use ($agent_id, $defence, $tick, $altNow) {
+                        $queuedId = ((array) $queued)['queued_intent'] ?? null;
+                        $this->state->recordDecision($agent_id, [
+                            'verb' => $defence['verb'],
+                            'args' => $defence['args'],
+                            'reason' => $defence['reason'],
+                            'queued_intent' => $queuedId,
+                            'tick' => $tick,
+                            'alt' => $altNow,
+                        ]);
+                        $args = $defence['args'] === [] ? '' : ' ' . json_encode($defence['args'], JSON_UNESCAPED_SLASHES);
+                        $ref = $queuedId !== null ? " (queued #{$queuedId})" : '';
+
+                        return "🛡️ Agent #{$agent_id} → **{$defence['verb']}**{$args}{$ref}\n> {$defence['reason']}";
+                    });
+            }
+
             // World-known recipes plus the sets the Guild has rejected for this
             // agent — both mint nothing, so treat them the same everywhere.
             $dead = $this->state->getDeadCombines($agent_id);

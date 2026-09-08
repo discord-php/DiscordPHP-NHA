@@ -33,7 +33,9 @@ flowchart TD
     rules[knownCombines&#40;&#41;<br/>re-pull GET /rules &#8804; every 90s] --> obs[NHA::observe]
     obs --> downed{downed?}
     downed -- yes --> skipD[["&#129657; skip"]]
-    downed -- no --> ctx["build context:<br/>&#8226; known &#8746; dead combine sigs<br/>&#8226; tried sigs &#40;whole run&#41;<br/>&#8226; noteInventorPoints &#8594; researchPaying<br/>&#8226; recent 12 decisions"]
+    downed -- no --> combat{AgentBrain::defensiveAction<br/>&#40;recent attack / robber / hostile closing while hurt&#41;?}
+    combat -- yes --> defend[["&#128737;&#65039; heal / attack back / break contact<br/>&#8594; submit &amp; record, skip the brain entirely"]]
+    combat -- no --> ctx["build context:<br/>&#8226; known &#8746; dead combine sigs<br/>&#8226; tried sigs &#40;whole run&#41;<br/>&#8226; noteInventorPoints &#8594; researchPaying<br/>&#8226; recent 12 decisions"]
     ctx --> detect["detectLoop recent<br/>&#40;a 'stuck land/launch' bypasses the cooldown&#41;"]
     detect --> isloop{loop found &amp;<br/>not in cooldown?}
     isloop -- yes --> peek["state.peekNextForcedObjective<br/>&#40;name it for the prompt; do NOT commit yet&#41;"]
@@ -75,11 +77,15 @@ as the `SUGGESTED next action` line.
 
 ```mermaid
 flowchart TD
-    s([suggestion raw, tried, known, allowSpeculation]) --> r1{"&#40;1&#41; loose_parts &gt; 0?"}
+    s([suggestion raw, tried, known, allowSpeculation]) --> r0{"&#40;0&#41; in combat? &#40;recent attack /<br/>robber / hostile close while hurt&#41;"}
+    r0 -- yes --> defend[["heal if &lt; 35% HP · else attack back if armed &amp; in range · else break contact"]]
+    r0 -- no --> r1{"&#40;1&#41; loose_parts &gt; 0?"}
     r1 -- yes --> finalize[["finalize — assemble a vehicle"]]
     r1 -- no --> r1b{"&#40;1b&#41; a finished vehicle<br/>not out working?"}
     r1b -- yes --> deploy[["deploy — passive mining income"]]
-    r1b -- no --> r2{"&#40;2&#41; allowSpeculation AND &#8805; 2 raws<br/>AND &#40;&#8804; 1 tried OR inventor_points &gt; 0&#41;<br/>AND a fresh untried/unknown pair exists"}
+    r1b -- no --> r1c{"&#40;1c&#41; out of combat AND<br/>no medicine / weapon / ammo?"}
+    r1c -- yes --> arm[["buy stimpack &#8594; buy kinetic_gun &#8594; buy slug &#215;5"]]
+    r1c -- no --> r2{"&#40;2&#41; allowSpeculation AND &#8805; 2 raws<br/>AND &#40;&#8804; 1 tried OR inventor_points &gt; 0&#41;<br/>AND a fresh untried/unknown pair exists"}
     r2 -- yes --> combine[["combine &#123;a,b&#125; — inventor-point gamble"]]
     r2 -- no --> r2b{"&#40;2b&#41; off the ground<br/>AND no asteroid to work?"}
     r2b -- yes --> land[["land"]]

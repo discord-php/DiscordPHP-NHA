@@ -331,6 +331,29 @@ class AutoPlayerTest extends NHAUnitTestCase
 
     /**
      * @covers \NHA\Brain\AutoPlayer
+     * @covers \NHA\Brain\AgentBrain::defensiveAction
+     */
+    public function testStepDefendsBeforeConsultingTheBrain(): void
+    {
+        // The brain would mine; a fresh attack alert overrides it.
+        $nha = $this->nhaWith([
+            'tick' => 500, 'downed_until' => 0, 'position' => [40, 40], 'hp' => 22, 'hp_max' => 100,
+            'inventory' => ['stimpack' => 1, 'iron' => 30],
+            'alerts' => [['tick' => 495, 'kind' => 'attacked', 'by' => 9, 'dmg' => 78]],
+            'nearby_agents' => [['id' => 9, 'x' => 41, 'y' => 40, 'dist' => 1]],
+        ]);
+        $line = null;
+        (new AutoPlayer($nha, $this->brainReturning('{"verb":"mine","args":{"n":5}}'), new StateStore($this->statePath)))
+            ->step(142287, 'tok')->then(function ($l) use (&$line) {
+                $line = $l;
+            });
+
+        $this->assertSame('heal', $this->posts[0][1]['verb'], 'defends instead of mining');
+        $this->assertStringContainsString('🛡️', (string) $line);
+    }
+
+    /**
+     * @covers \NHA\Brain\AutoPlayer
      */
     public function testDetectLoopFlagsADominantAction(): void
     {
@@ -514,10 +537,11 @@ class AutoPlayerTest extends NHAUnitTestCase
     public function testACombineThatDipsBelowTheTowerMaterialReserveIsRefused(): void
     {
         // metal held == reserve (8): spending 1 on research would drop under it.
+        // (combat kit present so the arm rung is already satisfied.)
         $state = new StateStore($this->statePath);
         $nha = $this->nhaWith([
             'tick' => 5, 'downed_until' => 0, 'position' => [1, 1],
-            'inventory' => ['credits' => 5000, 'metal' => 8, 'water' => 5],
+            'inventory' => ['credits' => 5000, 'metal' => 8, 'water' => 5, 'stimpack' => 1, 'kinetic_gun' => 1, 'slug' => 5],
         ]);
         $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"combine","args":{"ingredients":{"metal":1,"water":1}}}'), $state);
 

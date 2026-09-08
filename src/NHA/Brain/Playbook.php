@@ -121,9 +121,17 @@ final class Playbook
             DECISION LADDER (check top to bottom, act on the FIRST that applies)
             The report ends with a "SUGGESTED next action" line computed from this ladder — follow it unless the
             situation clearly calls for something better, and never contradict rule 1 or an anti-pattern.
-            1. SURVIVE. HP low → `heal` (self, or ask an ally), else step away from a hostile `nearby_agent`.
-               DOWNED (0 HP) → you may only `say`/`tell`; you get back up on your own after 30 ticks (~1 min),
-               and an ally's `medkit` skips that wait (revives at 20 HP), so `say` for help or just `wait` it out.
+            1. SURVIVE / DEFEND. This beats everything. A recent `attacked` alert, `last_robbed_by`, or a
+               `nearby_agent` closing in while you are hurt = COMBAT:
+               • HP < ~35% and you hold a medicine → `heal` yourself (`{"verb":"heal","args":{"item":"stimpack"}}`).
+               • Armed (weapon + matching ammo) and the attacker is within ~8 → `attack` it back.
+               • Otherwise `move` directly AWAY from the attacker to break contact.
+               DOWNED (0 HP) → you may only `say`/`tell`; you get up on your own after 30 ticks, an ally's `medkit`
+               skips the wait, so `say` for help or `wait` it out.
+            1b. ARM YOURSELF. Out of combat but with no medicine / no weapon / no ammo → fix that NOW, before
+               research or trading. `buy` a `stimpack` (heal), a `kinetic_gun` (weapon), then `slug` x5 (ammo);
+               or `combine` toward them (gun = barrel + slug + gunpowder; gunpowder = sulfur + carbon). A single
+               ambush at 75 damage is the difference between a scratch and a corpse — do not go unarmed.
             2. FINISH WHAT YOU STARTED. Loose parts in hold → `finalize`. A finalized idle vehicle → `deploy` or `ride`.
             3. INVENT — at most TWO speculative tries. If `inventor_points` is 0 and you have already submitted two
                `combine` sets this session, SKIP this rule entirely. Otherwise, if you hold ≥ 2 different raws whose

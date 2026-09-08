@@ -12,6 +12,23 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.1.22] - 2026-09-08
+
+### Added
+- Combat self-defence and self-arming.
+  - `AutoPlayer::step()` checks `AgentBrain::defensiveAction()` right after
+    `observe` and, if the agent is in a fight (a recent `attacked` alert, a
+    `last_robbed_by`, or a hostile closing in while hurt), acts on it
+    immediately — heal below ~35% HP, `attack` back if armed and the aggressor
+    is in range, otherwise `move` directly away to break contact — skipping the
+    brain and the loop guard entirely. Logs a `🛡️` line.
+  - The `suggestion()` ladder gains an ARM rung (after finalize/deploy, before
+    research): out of combat with no medicine / weapon / ammo → `buy` a
+    `stimpack`, then a `kinetic_gun`, then `slug` ×5.
+  - Ammo and combat kit are excluded from the sellable-raws set. Playbook rung
+    1 is now SURVIVE / DEFEND with an explicit combat sub-ladder, plus rung 1b
+    ARM YOURSELF.
+
 ## [3.1.21] - 2026-09-07
 
 ### Fixed
