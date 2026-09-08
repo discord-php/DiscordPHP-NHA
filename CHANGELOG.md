@@ -12,6 +12,17 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.1.31] - 2026-09-08
+
+### Changed
+- `Commands` split: the how-to-play guide — the ~110-line `HELP` content block
+  plus `help()` / `resolveHelpKey()` / the private `helpContainer()` select-menu
+  wiring — moved to a new `NHA\HelpGuide` (`HelpGuide::SECTIONS`,
+  `HelpGuide::render()`, `HelpGuide::resolveKey()`). `Commands` drops from 1052
+  to 891 lines. `Commands::HELP` aliases `HelpGuide::SECTIONS` and
+  `Commands::help()` / `Commands::resolveHelpKey()` are thin delegators, so
+  `SlashCommands`, `ChatCommands` and every caller are unchanged.
+
 ## [3.1.30] - 2026-09-08
 
 ### Changed
