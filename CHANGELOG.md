@@ -12,6 +12,16 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.12] - 2026-09-08
+
+### Fixed
+- With ship-building circuit-broken (3.2.11), the agent dropped to the generic
+  ladder and immediately wedged on **`sell brine` × 12** — "depot doesn't trade
+  brine". The sell rungs picked the biggest hoard blindly, and `brine` (a mining
+  byproduct the Earth depot won't buy, 99 held) was it. Both sell rungs now pick
+  the biggest **depot-tradeable** raw (`Ladder::DEPOT_TRADEABLE`, probed from
+  `GET /depot`), skipping `brine` and off-world body resources.
+
 ## [3.2.11] - 2026-09-08
 
 ### Fixed

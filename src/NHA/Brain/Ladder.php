@@ -51,6 +51,31 @@ final class Ladder
     public const RESEARCH_SURPLUS = 60;
 
     /**
+     * Raw materials the Earth depot actually trades (probed from `GET /depot`).
+     * `sell` of anything outside this set is rejected ("depot doesn't trade X")
+     * — `brine` and the off-world body resources are the common offenders, and
+     * the biggest hoard is often exactly one of them, wedging the sell rung.
+     */
+    public const DEPOT_TRADEABLE = [
+        'ice', 'oil', 'ore', 'coal', 'herb', 'iron', 'salt', 'slug', 'wood', 'algae',
+        'metal', 'water', 'carbon', 'copper', 'fungus', 'lichen', 'nickel', 'sulfur',
+        'crystal', 'extract', 'iridium', 'silicon', 'aluminum', 'titanium', 'gunpowder',
+        'superalloy', 'energy_cell',
+    ];
+
+    /** The biggest hoard the depot will actually buy, or `null`. `$raws` is sorted desc. */
+    private static function sellableBiggest(array $raws): ?string
+    {
+        foreach (array_keys($raws) as $res) {
+            if (in_array((string) $res, self::DEPOT_TRADEABLE, true)) {
+                return (string) $res;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * A deterministic "what would the ladder do" pick, surfaced to anchor a weak
      * model. Mirrors {@see Playbook}'s priorities: finish parts → gamble one
      * novel combine → build for reliable points → sell a glut → harvest only
@@ -162,8 +187,6 @@ final class Ladder
             }
         }
 
-        $biggest = $raws === [] ? null : array_key_first($raws);
-
         // 2b. Off the ground with no orbital work to do (no asteroid to dock and
         //     mine) — descend. `construct` and most harvesting need solid ground;
         //     bouncing on the elevator or idling in orbit scores nothing.
@@ -260,20 +283,23 @@ final class Ladder
         // 4. SELL — only to keep credits working, or to shed an absurd hoard.
         //    A healthy agent keeps its raws for building; it does not dump them
         //    for cash it does not need. Never dips below the stockpile target
-        //    except in a genuine credit emergency (then keep a token 10).
-        if ($biggest !== null) {
+        //    except in a genuine credit emergency (then keep a token 10). Only
+        //    sell what the depot will actually buy — the biggest hoard is often
+        //    `brine` (untradeable), which otherwise wedges this rung.
+        $sellRes = self::sellableBiggest($raws);
+        if ($sellRes !== null) {
             $needCredits = $credits < self::CREDIT_FLOOR;
-            $overHoardCap = $raws[$biggest] >= self::HOARD_CAP;
+            $overHoardCap = $raws[$sellRes] >= self::HOARD_CAP;
             if ($needCredits || $overHoardCap) {
-                $keep = ($needCredits && $raws[$biggest] <= self::RESOURCE_TARGET) ? 10 : self::RESOURCE_TARGET;
-                $n = min($raws[$biggest] - $keep, 20);
+                $keep = ($needCredits && $raws[$sellRes] <= self::RESOURCE_TARGET) ? 10 : self::RESOURCE_TARGET;
+                $n = min($raws[$sellRes] - $keep, 20);
                 if ($n >= 1) {
                     return [
                         'verb' => 'sell',
-                        'args' => ['resource' => $biggest, 'n' => $n],
+                        'args' => ['resource' => $sellRes, 'n' => $n],
                         'why' => $needCredits
-                            ? "credits {$credits} below the " . self::CREDIT_FLOOR . " floor — sell {$n} {$biggest}"
-                            : "hoarding {$raws[$biggest]} {$biggest} (cap " . self::HOARD_CAP . ") — sell {$n} of the excess",
+                            ? "credits {$credits} below the " . self::CREDIT_FLOOR . " floor — sell {$n} {$sellRes}"
+                            : "hoarding {$raws[$sellRes]} {$sellRes} (cap " . self::HOARD_CAP . ") — sell {$n} of the excess",
                     ];
                 }
             }
@@ -719,10 +745,10 @@ final class Ladder
                     return ['verb' => 'fulfill', 'args' => ['contract_id' => (int) $c['id']], 'why' => 'capitalist stance — fulfil a contract you already cover'];
                 }
             }
-            // Convert any raw above the stockpile target straight to credits.
-            $biggest = $raws === [] ? null : array_key_first($raws);
-            if ($biggest !== null && $raws[$biggest] > self::RESOURCE_TARGET + 10) {
-                return ['verb' => 'sell', 'args' => ['resource' => $biggest, 'n' => min($raws[$biggest] - self::RESOURCE_TARGET, 20)], 'why' => "capitalist stance — bank the {$biggest} surplus"];
+            // Convert any depot-tradeable raw above the stockpile target to credits.
+            $sellRes = self::sellableBiggest($raws);
+            if ($sellRes !== null && $raws[$sellRes] > self::RESOURCE_TARGET + 10) {
+                return ['verb' => 'sell', 'args' => ['resource' => $sellRes, 'n' => min($raws[$sellRes] - self::RESOURCE_TARGET, 20)], 'why' => "capitalist stance — bank the {$sellRes} surplus"];
             }
         }
 
