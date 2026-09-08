@@ -4,6 +4,20 @@ All notable changes to DiscordPHP-NHA are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 SemVer with the **major tracking the NHA world API version**.
 
+## [3.1.14] - 2026-09-07
+
+### Fixed
+- The loop guard thrashed once it engaged. A live audit showed it firing every
+  single turn — the loop-break `move`s it issued kept the "no productive
+  action" window full, so it re-triggered on its own output and rotated through
+  all four objectives in four turns.
+  - A 24-tick cooldown (`StateStore::loopBreakCooldownActive()`) after each
+    break: no re-break until the forced objective and the brain turns after it
+    have had a chance to change the situation.
+  - A stuck `wealth` / `build` / `research` objective now harvests a deposit it
+    is standing on before falling through to a `move`, so the break itself is a
+    productive turn instead of more repositioning.
+
 ## [3.1.13] - 2026-09-07
 
 ### Fixed

@@ -479,6 +479,9 @@ class StateStore
     /** A forced objective sticks for this many world ticks after a loop break. */
     private const FORCED_OBJECTIVE_TTL_TICKS = 45;
 
+    /** After a loop break, do not break again for this many ticks — let it play out. */
+    private const LOOP_BREAK_COOLDOWN_TICKS = 24;
+
     /** Objectives cycled through, in order, each time the agent is caught looping. */
     public const OBJECTIVE_ROTATION = ['explore', 'wealth', 'build', 'research'];
 
@@ -522,6 +525,25 @@ class StateStore
         }
 
         return ((string) ($entry['objective'] ?? '')) ?: null;
+    }
+
+    /**
+     * Whether a loop break happened too recently to break again — the forced
+     * objective (and the brain turns after it) need a few ticks to actually
+     * change the situation before the loop detector is allowed to fire once more.
+     * Without this the loop-break moves themselves keep the "no productive
+     * action" window full and it thrashes every turn.
+     *
+     * @since 3.1.14
+     */
+    public function loopBreakCooldownActive(int $agent_id, int $tick): bool
+    {
+        $entry = $this->data['agent_forced_objective'][(string) $agent_id] ?? null;
+        if (! is_array($entry) || $tick <= 0) {
+            return false;
+        }
+
+        return ($tick - (int) ($entry['tick'] ?? 0)) < self::LOOP_BREAK_COOLDOWN_TICKS;
     }
 
     /** Research counts as "paying" for this long after the last inventor-point gain. */

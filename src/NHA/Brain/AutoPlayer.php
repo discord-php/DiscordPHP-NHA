@@ -347,9 +347,28 @@ final class AutoPlayer
             }
         }
 
-        // explore — and the fallthrough for every objective with nothing to do:
-        // a long step in a direction that rotates over time, far enough to clear
-        // whatever the agent was circling so the next observation is fresh.
+        // Before wandering: if standing on a deposit, harvest it — that is a
+        // productive turn (raw → credits, or a build input) and it breaks the
+        // "nothing productive" window the loop detector keys on. Skipped for
+        // `explore`, whose whole point is to relocate.
+        if ($objective !== 'explore' && ! $offGround) {
+            foreach ((array) ($raw['nearby_deposits'] ?? []) as $deposit) {
+                $deposit = (array) $deposit;
+                $res = (string) ($deposit['resource'] ?? '');
+                if ($res === '' || (int) ($deposit['dist'] ?? 9) !== 0) {
+                    continue;
+                }
+                $verb = $res === 'wood'
+                    ? 'chop'
+                    : (in_array($res, ['herb', 'lichen', 'fungus', 'algae'], true) ? 'gather' : 'mine');
+
+                return ['verb' => $verb, 'args' => ['n' => min((int) ($deposit['amount'] ?? 10), 15)], 'reason' => "{$lead}: harvest the {$res} you are standing on"];
+            }
+        }
+
+        // explore — and the fallthrough for every objective with nothing else to
+        // do: a long step in a direction that rotates over time, far enough to
+        // clear whatever the agent was circling so the next observation is fresh.
         $dirs = [[28, 0], [0, 28], [-28, 0], [0, -28], [20, 20], [-20, -20], [20, -20], [-20, 20]];
         $d = $dirs[intdiv(max(0, $tick), 6) % count($dirs)];
 
@@ -458,11 +477,12 @@ final class AutoPlayer
 
             $recent = $this->state->getRecentDecisions($agent_id, 12);
 
-            // Loop guard: if the last several turns are one action on repeat or a
-            // short repeating cycle, force a *different kind* of objective this
-            // turn (rotating explore → wealth → build → research) and act on it
-            // deterministically, whatever the brain says.
-            $loop = self::detectLoop($recent);
+            // Loop guard: if the last several turns are one action on repeat, a
+            // short repeating cycle, or nothing but repositioning, force a
+            // *different kind* of objective this turn (rotating explore → wealth
+            // → build → research) and act on it deterministically. A cooldown
+            // after each break stops it thrashing every turn on its own moves.
+            $loop = $this->state->loopBreakCooldownActive($agent_id, $tick) ? null : self::detectLoop($recent);
             $loopObjective = $loop !== null ? $this->state->bumpForcedObjective($agent_id, $tick) : null;
 
             $context = ($last ?? []);

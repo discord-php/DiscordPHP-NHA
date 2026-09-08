@@ -416,6 +416,35 @@ class AutoPlayerTest extends NHAUnitTestCase
 
     /**
      * @covers \NHA\Brain\AutoPlayer
+     * @covers \NHA\StateStore
+     */
+    public function testLoopBreakIsSuppressedDuringItsCooldownThenResumes(): void
+    {
+        $seedLoop = static function (StateStore $s): void {
+            for ($i = 1; $i <= 8; $i++) {
+                $s->recordDecision(142287, ['verb' => 'chop', 'args' => ['n' => 1], 'reason' => '', 'queued_intent' => null, 'tick' => $i]);
+            }
+        };
+
+        // A break already happened at tick 50; the agent is still looping now.
+        $state = new StateStore($this->statePath);
+        $state->bumpForcedObjective(142287, 50);
+        $seedLoop($state);
+
+        $withinCooldown = $this->nhaWith(['tick' => 55, 'downed_until' => 0, 'position' => [40, 40], 'inventory' => ['wood' => 25]]);
+        (new AutoPlayer($withinCooldown, $this->brainReturning('{"verb":"chop","args":{"n":1}}'), $state))->step(142287, 'tok');
+        $this->assertSame('chop', $this->posts[0][1]['verb'], 'no re-break inside the cooldown');
+
+        // Far enough past the break — the guard fires again and rotates on.
+        $this->posts = [];
+        $afterCooldown = $this->nhaWith(['tick' => 90, 'downed_until' => 0, 'position' => [40, 40], 'inventory' => ['wood' => 25]]);
+        (new AutoPlayer($afterCooldown, $this->brainReturning('{"verb":"chop","args":{"n":1}}'), $state))->step(142287, 'tok');
+        $this->assertNotSame('chop', $this->posts[0][1]['verb'], 'cooldown over — loop broken again');
+        $this->assertSame('wealth', $state->getForcedObjective(142287, 90), 'rotated explore → wealth');
+    }
+
+    /**
+     * @covers \NHA\Brain\AutoPlayer
      */
     public function testStepAllowsAProductionCombineEvenWhenWorldKnown(): void
     {

@@ -452,4 +452,17 @@ class StateStoreTest extends NHAUnitTestCase
         $this->assertSame('research', $store->bumpForcedObjective(7, 210));
         $this->assertSame('explore', $store->bumpForcedObjective(7, 215));
     }
+
+    /**
+     * @covers \NHA\StateStore
+     */
+    public function testLoopBreakCooldown(): void
+    {
+        $store = new StateStore($this->path);
+
+        $this->assertFalse($store->loopBreakCooldownActive(7, 100), 'no break yet');
+        $store->bumpForcedObjective(7, 100);
+        $this->assertTrue($store->loopBreakCooldownActive(7, 110), 'within 24 ticks of the break');
+        $this->assertFalse($store->loopBreakCooldownActive(7, 130), 'past the cooldown');
+    }
 }
