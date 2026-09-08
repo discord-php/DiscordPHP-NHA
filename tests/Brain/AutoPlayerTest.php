@@ -230,6 +230,52 @@ class AutoPlayerTest extends NHAUnitTestCase
 
     /**
      * @covers \NHA\Brain\AutoPlayer
+     * @covers \NHA\Brain\AgentBrain
+     */
+    public function testFallbackLandsWhenStuckOffTheGroundWithNothingToDo(): void
+    {
+        $state = new StateStore($this->statePath);
+        $state->recordCombineSignature(142287, 'glass+lens');
+
+        // In orbit, points stalled, no asteroid, no build materials, nothing to
+        // sell — the ladder should send it back to the ground, not skip.
+        $nha = $this->nhaWith([
+            'tick' => 9, 'downed_until' => 0, 'position' => [32, 114],
+            'in_space' => true, 'altitude' => 16, 'inventor_points' => 72,
+            'inventory' => ['salt' => 8, 'lens' => 4],
+            'asteroids' => [],
+        ]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"combine","args":{"ingredients":{"lens":1,"glass":1}}}'), $state);
+
+        $player->step(142287, 'tok');
+
+        $this->assertSame('land', $this->posts[0][1]['verb']);
+    }
+
+    /**
+     * @covers \NHA\Brain\AutoPlayer
+     */
+    public function testStepBreaksTheRideBounceLoop(): void
+    {
+        $state = new StateStore($this->statePath);
+        $state->recordDecision(142287, ['verb' => 'ride', 'args' => [], 'reason' => '', 'queued_intent' => null, 'tick' => 1]);
+
+        $nha = $this->nhaWith([
+            'tick' => 9, 'downed_until' => 0, 'position' => [32, 114],
+            'in_space' => true, 'altitude' => 30,
+            'inventory' => ['salt' => 20],
+            'asteroids' => [],
+        ]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"ride","args":{}}'), $state);
+
+        $player->step(142287, 'tok');
+
+        $this->assertNotSame('ride', $this->posts[0][1]['verb'], 'a second ride straight after riding is swapped out');
+        $this->assertSame('land', $this->posts[0][1]['verb']);
+    }
+
+    /**
+     * @covers \NHA\Brain\AutoPlayer
      */
     public function testStepAllowsAProductionCombineEvenWhenWorldKnown(): void
     {

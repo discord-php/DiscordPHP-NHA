@@ -143,20 +143,20 @@ final class AutoPlayer
     }
 
     /**
-     * The move for when the brain insisted on a spent research `combine`: run the
-     * shared ladder ({@see AgentBrain::suggestion()}) with the entire tried +
-     * world-known combine space marked exhausted.
+     * The move for when the brain's pick is a dead end — a spent research
+     * `combine`, or riding the elevator in circles. Runs the shared ladder
+     * ({@see AgentBrain::suggestion()}) with the entire tried + world-known
+     * combine space marked exhausted.
      *
-     * If `inventor_points` are already moving the ladder may offer a *fresh*
-     * (untried, uninvented) pair — research is still paying, so that is allowed
-     * through. Once points have stalled at 0 the ladder's speculation rung gates
-     * itself off and it drops to infrastructure — `finalize` loose parts,
-     * `construct` a tower when `composite` + `metal` are in hand, otherwise sell
-     * a glut, harvest a shortage, or move toward the materials a build needs.
-     * Returns `null` only when the ladder has nothing either, so the caller can
-     * pass the tick instead of forcing a bad action.
+     * If `inventor_points` rose recently the ladder may offer a *fresh* (untried,
+     * uninvented) pair — research is still paying, so that is allowed through.
+     * Otherwise it drops to infrastructure — `finalize` loose parts, `land` when
+     * there is nothing to do off the ground, `construct` when `composite` +
+     * `metal` are in hand, else sell a surplus, harvest a shortage, or move
+     * toward the materials a build needs. Returns `null` only when the ladder
+     * has nothing either.
      *
-     * @param string              $spentSig       The set that was refused, for the decision reason.
+     * @param string              $reasonLead     Prefix for the decision reason (why the brain's pick was dropped).
      * @param list<string>        $tried          Combine signatures already submitted this run.
      * @param array<string, bool> $known          `a+b => true` for world-known sets.
      * @param bool                $researchPaying Whether inventor points rose recently — if so a fresh
@@ -164,7 +164,7 @@ final class AutoPlayer
      *
      * @return array{verb: string, args: array<string, mixed>, reason: string}|null
      */
-    private function fallbackDecision(AgentObservation $observation, string $spentSig, array $tried, array $known, bool $researchPaying): ?array
+    private function fallbackDecision(AgentObservation $observation, string $reasonLead, array $tried, array $known, bool $researchPaying): ?array
     {
         $raw = json_decode(json_encode($observation->jsonSerialize()), true);
         $raw = is_array($raw) ? $raw : [];
@@ -192,7 +192,7 @@ final class AutoPlayer
         return [
             'verb' => (string) $suggestion['verb'],
             'args' => (array) ($suggestion['args'] ?? []),
-            'reason' => "research set `{$spentSig}` spent — {$suggestion['why']}",
+            'reason' => "{$reasonLead} — {$suggestion['why']}",
         ];
     }
 
@@ -277,35 +277,50 @@ final class AutoPlayer
             $tried = $this->state->getTriedCombineSignatures($agent_id);
             $researchPaying = $this->state->noteInventorPoints($agent_id, (int) ($observation->get('inventor_points') ?? 0));
 
+            $recent = $this->state->getRecentDecisions($agent_id, 10);
+
             $context = ($last ?? []);
             if (($pre['outcome'] ?? null) !== null) {
                 $context['outcome'] = $pre['outcome'];
             }
-            $context['recent'] = $this->state->getRecentDecisions($agent_id, 10);
+            $context['recent'] = $recent;
             $context['known_combines'] = array_keys($known);
             $context['tried_combines'] = $tried;
 
-            return $this->brain->decide($observation, $context ?: null)->then(function (?array $decision) use ($agent_id, $token, $tick, $observation, $known, $tried, $researchPaying) {
+            return $this->brain->decide($observation, $context ?: null)->then(function (?array $decision) use ($agent_id, $token, $tick, $observation, $known, $tried, $researchPaying, $recent) {
                 if ($decision === null) {
                     return "💤 Agent #{$agent_id}: brain chose to wait (tick {$tick}).";
                 }
+
+                $verb = (string) ($decision['verb'] ?? '');
+                $recentVerbs = array_map(static fn($r): string => (string) ($r['verb'] ?? ''), array_slice($recent, -4));
 
                 // Deterministic guardrail: never submit a research `combine` set
                 // the world has already invented or that this agent already tried
                 // this run — a repeat mints nothing and the model loops here
                 // badly. Production recipes (see PRODUCTION_COMBINES) are exempt.
-                // When one is refused, fall through to the infrastructure ladder
-                // (finalize → construct → wealth → harvest) rather than idle.
-                if (($decision['verb'] ?? '') === 'combine') {
+                // When one is refused, fall through to the ladder (fresh pair if
+                // research still pays, else land / construct / sell) rather than idle.
+                if ($verb === 'combine') {
                     $sig = self::combineSignature((array) ($decision['args'] ?? []));
                     $spent = $sig !== ''
                         && ! isset(self::PRODUCTION_COMBINES[$sig])
                         && (isset($known[$sig]) || in_array($sig, $tried, true));
                     if ($spent) {
-                        $decision = $this->fallbackDecision($observation, $sig, $tried, $known, $researchPaying);
+                        $decision = $this->fallbackDecision($observation, "research set `{$sig}` spent", $tried, $known, $researchPaying);
                         if ($decision === null) {
                             return "🔁 Agent #{$agent_id}: no research left and no infrastructure move available — skipped `{$sig}` (tick {$tick}).";
                         }
+                    }
+                }
+
+                // Anti-bounce: the brain likes to ride the elevator up, find
+                // nothing to do off the ground, ride back down, and repeat. If it
+                // picks `ride` right after riding, take the ladder's move instead.
+                if ($verb === 'ride' && in_array('ride', $recentVerbs, true)) {
+                    $alt = $this->fallbackDecision($observation, 'riding the elevator in circles', $tried, $known, $researchPaying);
+                    if ($alt !== null) {
+                        $decision = $alt;
                     }
                 }
 

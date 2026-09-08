@@ -481,6 +481,14 @@ final class AgentBrain
         $biggest = $raws === [] ? null : array_key_first($raws);
         $has = static fn(string $k): int => (int) ($inv[$k] ?? 0);
 
+        // 2b. Off the ground with no orbital work to do (no asteroid to dock and
+        //     mine) — descend. `construct` and most harvesting need solid ground;
+        //     bouncing on the elevator or idling in orbit scores nothing.
+        $offGround = ($raw['in_space'] ?? false) || (int) ($raw['altitude'] ?? 0) > 0;
+        if ($offGround && (array) ($raw['asteroids'] ?? []) === []) {
+            return ['verb' => 'land', 'args' => [], 'why' => 'nothing to do off the ground — land and build where the materials are'];
+        }
+
         // 3. Build for RELIABLE points — but a `construct` tower costs metal
         //    (= size) plus `composite` (= ceil(height/14)), and `composite` is
         //    aluminium+carbon, not something most ground agents hold. Only
@@ -496,7 +504,10 @@ final class AgentBrain
             ];
         }
 
-        // 4. Turn a genuine glut into credits (the depot buys raws from anywhere).
+        // 4. Turn a glut into credits (the depot buys raws from anywhere). A real
+        //    stockpile (30+) sells 20; when nothing better is on the table, a
+        //    smaller surplus (12+) still beats idling — sell it down toward a
+        //    working buffer.
         if ($biggest !== null && $raws[$biggest] >= 30) {
             return ['verb' => 'sell', 'args' => ['resource' => $biggest, 'n' => 20], 'why' => "you are sitting on {$raws[$biggest]} {$biggest} with nothing to craft — sell 20 for credits"];
         }
@@ -515,15 +526,13 @@ final class AgentBrain
             }
         }
 
-        // 6. On the ground with stock but nothing to do here — head for a finished
-        //    elevator to `ride` to space, where funding the station pays points now.
-        if ($onGround && $biggest !== null && $raws[$biggest] >= 15) {
-            foreach ((array) ($raw['elevators'] ?? []) as $e) {
-                $e = (array) $e;
-                if (isset($e['x'], $e['y'])) {
-                    return ['verb' => 'move', 'args' => ['x' => (int) $e['x'], 'y' => (int) $e['y']], 'why' => 'stocked up but idle here — walk to the elevator base to ride to space and build the station'];
-                }
-            }
+        // 6. Nothing to build and no shortage to fix — sell down a modest surplus
+        //    rather than skip the turn. (An elevator ride to space is deliberately
+        //    NOT suggested here: with no station/asteroid work lined up it just
+        //    bounces the agent between ground and orbit.)
+        if ($biggest !== null && $raws[$biggest] >= 12) {
+            $n = min($raws[$biggest] - 2, 15);
+            return ['verb' => 'sell', 'args' => ['resource' => $biggest, 'n' => $n], 'why' => "idle with {$raws[$biggest]} {$biggest} and nothing to craft — sell {$n} for credits"];
         }
 
         // 7. Nothing here — head toward the nearest deposit of something scarce.

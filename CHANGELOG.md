@@ -4,6 +4,19 @@ All notable changes to DiscordPHP-NHA are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 SemVer with the **major tracking the NHA world API version**.
 
+## [3.1.10] - 2026-09-07
+
+### Fixed
+- Autoplay no longer bounces between the ground and orbit. When there is
+  nothing to do off the ground — no asteroid to dock and mine, no parts to
+  finish — the ladder now returns `land` instead of stalling, and it no longer
+  suggests riding an elevator up with no station or asteroid work lined up.
+- A `ride` chosen straight after another `ride` is treated as a loop and
+  swapped for the ladder's move.
+- The fallback sells a modest surplus (12+ of a raw) rather than skipping the
+  turn when research has stalled and there is no build move — far fewer wasted
+  `🔁` turns.
+
 ## [3.1.9] - 2026-09-07
 
 ### Fixed
