@@ -12,6 +12,7 @@ falls back on, and the loop guard that overrides it.
 > | The ladder | [`AgentBrain::suggestion()`](../src/NHA/Brain/AgentBrain.php) |
 > | Loop guard | [`AutoPlayer::detectLoop()`](../src/NHA/Brain/AutoPlayer.php) + [`StateStore`](../src/NHA/StateStore.php) objective/cooldown helpers |
 > | Prose strategy | [`Playbook::systemPrompt()`](../src/NHA/Brain/Playbook.php) — the LLM system prompt; the ladder mirrors its rungs |
+> | Situation digest | [`PromptBuilder::build()`](../src/NHA/Brain/PromptBuilder.php) — the LLM user turn |
 
 ---
 
@@ -225,7 +226,10 @@ classDiagram
         +decide(observation, context?) Promise
         +static suggestion(raw, tried, known, allowSpeculation) ?array
         +static parseDecision(content) ?array
-        -summarize(observation, context?) string
+        +summarize(observation, context?) string
+    }
+    class PromptBuilder {
+        +static build(observation, context?) string
     }
     class Playbook {
         +const VERBS
@@ -253,6 +257,8 @@ classDiagram
     AutoPlayer --> StateStore : reads / writes durable state
     AutoPlayer --> NHA : observe / intentWithToken
     AgentBrain --> Playbook : system prompt + verb catalogue
+    AgentBrain --> PromptBuilder : user turn (situation digest)
     AgentBrain --> OllamaClient : one chat per decision
+    PromptBuilder ..> AgentBrain : surfaces suggestion() as the SUGGESTED line
     AgentBrain ..> AutoPlayer : suggestion() reused as the fallback ladder
 ```

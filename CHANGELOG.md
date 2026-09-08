@@ -12,6 +12,18 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.1.30] - 2026-09-08
+
+### Changed
+- `Brain\AgentBrain` split: the ~300-line situation-digest builder
+  (`summarize()` plus its `pairs` / `rows` / `compactArgs` formatters) moved
+  to a new `Brain\PromptBuilder` (`PromptBuilder::build()`). `AgentBrain` is
+  now decide / parse / the deterministic `suggestion()` ladder, 948 → 600
+  lines. `AgentBrain::summarize()` stays as a thin delegator, so callers and
+  tests are unchanged; `PromptBuilder` calls back to `AgentBrain::suggestion()`
+  for the "SUGGESTED next action" line. `docs/PLAYBOOK.md` component diagram
+  and anchor table updated.
+
 ## [3.1.29] - 2026-09-08
 
 ### Changed
