@@ -92,7 +92,7 @@ final class AutoPlayer
      * `"unknown part X"`. The gear-up rotation skips these and
      * {@see self::step()} rewrites a model `build` that names one.
      */
-    private const DEAD_BUILD_PARTS = ['thruster', 'ion_thruster', 'chassis', 'hull', 'rotor', 'airframe', 'wheels', 'body'];
+    private const DEAD_BUILD_PARTS = ['thruster', 'ion_thruster', 'chassis', 'hull', 'rotor', 'airframe', 'wheels', 'body', 'motor', 'turbine'];
 
     /**
      * `a+b => true` for every combine set the world has already invented, from
@@ -939,9 +939,16 @@ final class AutoPlayer
                         static fn($p): string => is_array($p) ? (string) ($p['part'] ?? $p['name'] ?? '') : (string) $p,
                         (array) ($rawObs['loose_parts'] ?? []),
                     );
-                    $drives = ['propeller', 'engine', 'motor', 'wheel', 'wheels', 'rotor', 'turbine', 'drivetrain'];
-                    $hasDrivePart = array_intersect($loose, $drives) !== [];
-                    if (count($loose) < 4 || ! $hasDrivePart) {
+                    $hasDrivePart = array_intersect($loose, Ladder::DRIVE_PARTS) !== [];
+                    $stuck = Ladder::inertVehicleCount($rawObs) >= 3;
+                    if ($stuck) {
+                        // 3+ driveless hulls already — the recipe is unsolved and
+                        // there is no scrap verb. Stop finalizing; let the ladder
+                        // score with towers / co-op invest instead.
+                        $alt = $this->fallbackDecision($observation, 'ship assembly is a dead end (3+ inert hulls) — score elsewhere until the drive recipe is known', $tried, $known, $researchPaying, $stance);
+                        $decision = $alt ?? self::idle($rawObs, 'ship assembly stuck — nothing else to do this turn');
+                        $verb = (string) ($decision['verb'] ?? '');
+                    } elseif (count($loose) < 4 || ! $hasDrivePart) {
                         $held = (array) $observation->getInventory();
                         $tickNow = (int) ($observation->get('tick') ?? 0);
                         if ((int) ($held['metal'] ?? 0) < 12 && (int) ($held['credits'] ?? 0) >= 60) {

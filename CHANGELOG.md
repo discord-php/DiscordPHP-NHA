@@ -12,6 +12,27 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.11] - 2026-09-08
+
+### Fixed
+- The 3.2.10 run still piled up hulls (15 now) — the drive-part heuristic was
+  wrong (a `propeller` bundle *still* finalizes `drives=false`), and the
+  loop-strategy's forced `finalize` bypassed the guard. **Circuit-breaker:**
+  once the agent has **3+ inert hulls** and no orbital ship, the expansionist
+  `stanceMove` skips the whole gear-up/build/finalize block (`$shipBuildStuck`)
+  and `AutoPlayer` refuses any `finalize` (model- or loop-forced) — the agent
+  drops to the generic ladder (towers / co-op invest / stockpile) so it scores
+  while the assembly recipe stays unsolved. Rungs re-arm automatically if a
+  real ship ever appears.
+
+### Changed
+- Vocabulary: `engine` is a **valid** part (upgrades `engine`/`motor`/`steel`);
+  `motor`, `turbine` are **not** parts (they're combine outputs / upgrade
+  items). `cockpit` upgrades: `chip`/`glass`/`lens`/`casing`. **No known part
+  accepts `ion_thruster` as a `with:` item** — `frame`, `propeller`, `engine`,
+  `cockpit` all enumerate their upgrades and none include it; where the orbital
+  drive seats is unsolved. Removed the ion_thruster-on-engine guess.
+
 ## [3.2.10] - 2026-09-08
 
 ### Fixed

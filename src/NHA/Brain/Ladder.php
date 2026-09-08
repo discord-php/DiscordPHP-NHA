@@ -106,8 +106,11 @@ final class Ladder
 
         // 1. Assemble crafted parts into a vehicle — once there are 4+ AND a
         //    DRIVE part is among them. `finalize` without a drive part just
-        //    mints another hull that neither drives nor flies.
-        if (count((array) ($raw['loose_parts'] ?? [])) >= 4 && self::looseHasDrivePart($raw)) {
+        //    mints another hull that neither drives nor flies; and once 3 such
+        //    hulls exist the recipe is clearly unsolved — stop feeding it.
+        if (count((array) ($raw['loose_parts'] ?? [])) >= 4 && self::looseHasDrivePart($raw)
+            && self::inertVehicleCount($raw) < 3
+        ) {
             return ['verb' => 'finalize', 'args' => [], 'why' => 'you have enough loose parts incl. a drive — assemble them into a vehicle'];
         }
 
@@ -404,7 +407,7 @@ final class Ladder
     }
 
     /** Drive-part `build` archetypes — a `finalize` bundle needs one or the ship comes out inert. */
-    public const DRIVE_PARTS = ['propeller', 'engine', 'motor', 'wheel', 'wheels', 'rotor', 'turbine', 'drivetrain'];
+    public const DRIVE_PARTS = ['engine', 'propeller', 'wheel', 'axle', 'nacelle', 'drive'];
 
     /**
      * Whether the loose-part bundle already holds a drive part. `finalize`
@@ -436,10 +439,9 @@ final class Ladder
      */
     public const SHIP_PART_ARCHETYPES = [
         // Confirmed valid by the live engine.
-        'propeller', 'frame', 'wing', 'cockpit', 'landing_gear', 'fuel_tank', 'tail',
-        // Still untested — likely a drive part, which is what an inert hull is
-        // missing (drives / flies / fuel_cap all come out 0 without one).
-        'engine', 'motor', 'wheel', 'turbine',
+        'propeller', 'engine', 'frame', 'wing', 'cockpit', 'landing_gear', 'fuel_tank', 'tail',
+        // Still untested.
+        'wheel', 'axle', 'nacelle', 'drive',
     ];
 
     /**
@@ -453,6 +455,8 @@ final class Ladder
     public const PART_UPGRADES = [
         'frame' => ['steel', 'alloy', 'composite', 'superalloy'],
         'propeller' => ['bearing', 'alloy'],
+        'cockpit' => ['chip', 'glass', 'lens', 'casing'],
+        'engine' => ['engine', 'motor', 'steel'],
     ];
 
     /**
@@ -729,6 +733,15 @@ final class Ladder
             $inSpace = (bool) ($raw['in_space'] ?? false);
             $onGround = ! $inSpace && $alt === 0;
 
+            // Ship assembly is a dead end for this agent: 3+ `finalize`d hulls
+            // all came out driveless (the `build`/`finalize` drive recipe is
+            // undocumented and unsolved), and there is no scrap verb to clear
+            // them. Stop pouring metal and turns into more junk — drop to the
+            // generic ladder (towers / co-op invest / stockpile) so the agent
+            // at least scores while the recipe stays unknown. Flight/at-body
+            // rungs below still fire if a real ship ever appears.
+            $shipBuildStuck = $onGround && self::inertVehicleCount($raw) >= 3 && ! self::hasOrbitalShip($raw);
+
             // Arrived at a body but still in its orbit → put down.
             if ($atBody !== null && $alt > 0) {
                 $verb = in_array((string) $atBody, ['moon', 'luna'], true) ? 'land_moon' : 'land_body';
@@ -799,7 +812,7 @@ final class Ladder
             // outright, so the fast path is just to BUY them with the credits
             // the agent has been banking; `combine` is the low-credit fallback.
             // This runs ahead of the generic ladder's tower rung.
-            if ($onGround && ! $flightReady) {
+            if ($onGround && ! $flightReady && ! $shipBuildStuck) {
                 // 4+ loose parts including a DRIVE → bundle them into a ship.
                 // Without a drive part `finalize` just adds another inert hull.
                 if (count((array) ($raw['loose_parts'] ?? [])) >= 4 && self::looseHasDrivePart($raw)) {
@@ -853,17 +866,13 @@ final class Ladder
                     $part = self::SHIP_PART_ARCHETYPES[(int) ($raw['tick'] ?? 0) % count(self::SHIP_PART_ARCHETYPES)];
                     $args = ['part' => $part];
                     // Fit a legal upgrade if this part takes one and we hold it.
+                    // No known part accepts `ion_thruster` as a `with:` item —
+                    // where the orbital drive seats is still unsolved.
                     foreach (self::PART_UPGRADES[$part] ?? [] as $up) {
                         if ($has($up) > 0) {
                             $args['with'] = [$up => 1];
                             break;
                         }
-                    }
-                    // The ion_thruster (orbital drive) has to seat SOMEWHERE —
-                    // not on `frame` or `propeller` (their upgrade lists are
-                    // known and exclude it). Try it on the raw engine/motor.
-                    if (! isset($args['with']) && in_array($part, ['engine', 'motor', 'turbine'], true)) {
-                        $args['with'] = ['ion_thruster' => 1];
                     }
 
                     return ['verb' => 'build', 'args' => $args, 'why' => "expansionist — build a {$part} toward the ship (rotating archetypes; \"unknown part\" just means try the next), then finalize"];
