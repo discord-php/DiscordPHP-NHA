@@ -47,7 +47,7 @@ flowchart TD
     lbd --> g1
     g1{verb == combine?}
     g1 -- yes --> spent{"dead sig?<br/>OR &#40;not aluminium+carbon AND<br/>&#40;dips a build material below its reserve<br/>OR world-known OR already tried&#41;&#41;"}
-    spent -- yes --> fb[fallbackDecision &#8594; the ladder]
+    spent -- yes --> fb["record the blocked sig as tried,<br/>then fallbackDecision &#8594; the ladder"]
     spent -- no --> g2
     g1 -- no --> g2{verb == ride AND<br/>rode in the last 4 turns?}
     g2 -- yes --> fb2[fallbackDecision<br/>&quot;riding the elevator in circles&quot;]
@@ -108,12 +108,12 @@ toward the target.
 
 ## Loop guard — `detectLoop()` + forced objectives
 
-`land` / `launch` decisions are transparent — a multi-turn descent/climb is
-bounded progress, not a loop.
-
 ```mermaid
 flowchart TD
-    d([detectLoop &#8212; last &#8804; 12 decisions,<br/>land / launch filtered out]) --> n{&#8805; 6 decisions?}
+    d([detectLoop &#8212; last &#8804; 12 decisions]) --> c0{&#8805; 4 of last 5 are<br/>land &#40;or launch&#41; AND<br/>recorded altitude barely moved?}
+    c0 -- yes --> hit0([loop: &quot;stuck land/launch at altitude N&quot;<br/><i>bypasses the cooldown</i>])
+    c0 -- no --> f["drop land / launch from the window<br/>&#40;a real descent repeats them for many turns&#41;"]
+    f --> n{&#8805; 6 decisions left?}
     n -- no --> ok([no loop])
     n -- yes --> c1{one exact action<br/>&#8805; max&#40;4, 55% of window&#41;?}
     c1 -- yes --> hit([loop: &quot;repeating &#60;verb&#62;&quot;])
@@ -126,8 +126,12 @@ flowchart TD
     c4 -- no --> ok
 ```
 
-On a hit (and not within the 24-tick cooldown after the previous break),
-`bumpForcedObjective` advances one step round the ring:
+Altitude is recorded on every decision (`StateStore::recordDecision`), so a
+still-dropping descent is distinguished from one wedged on a structure.
+
+On a hit (and not within the 24-tick cooldown after the previous break — a
+`stuck` hit ignores the cooldown), `bumpForcedObjective` advances one step
+round the ring:
 
 ```mermaid
 stateDiagram-v2
@@ -143,8 +147,9 @@ Each objective's deterministic action for that turn (`loopBreakDecision`):
 
 | objective | action |
 |---|---|
+| _any_, aloft at altitude &#8804; 5 | step off the current cell — the agent is wedged on a structure `land` can't pass |
 | `explore` | a long step (~28 cells) in a direction that rotates over time |
-| `wealth`  | sell the biggest stack |
+| `wealth`  | sell the biggest stack (keep a working 10) |
 | `build`   | `land` if aloft, else `construct` if it holds composite + metal |
 | `research`| one genuinely fresh pair (untried, undead, not world-known) |
 | any of the above with nothing to do, on the ground | harvest a deposit it is standing on, else fall through to an explore-move |

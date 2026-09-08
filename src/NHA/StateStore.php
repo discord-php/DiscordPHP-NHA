@@ -336,6 +336,7 @@ class StateStore
             'reason' => (string) ($decision['reason'] ?? ''),
             'queued_intent' => isset($decision['queued_intent']) ? (int) $decision['queued_intent'] : null,
             'tick' => isset($decision['tick']) ? (int) $decision['tick'] : null,
+            'alt' => isset($decision['alt']) ? (int) $decision['alt'] : null,
             'at' => time(),
         ];
 
@@ -344,7 +345,7 @@ class StateStore
         // Also keep a rolling history so the brain (and the loop detector in
         // AutoPlayer) can see repetition beyond just the last turn.
         $log = (array) ($this->data['agent_decision_log'][(string) $agent_id] ?? []);
-        $log[] = ['verb' => $entry['verb'], 'args' => $entry['args'], 'tick' => $entry['tick']];
+        $log[] = ['verb' => $entry['verb'], 'args' => $entry['args'], 'tick' => $entry['tick'], 'alt' => $entry['alt']];
         $this->data['agent_decision_log'][(string) $agent_id] = array_slice($log, -24);
 
         $this->save();
@@ -621,6 +622,7 @@ class StateStore
                 'verb' => (string) $e['verb'],
                 'args' => (array) ($e['args'] ?? []),
                 'tick' => isset($e['tick']) ? (int) $e['tick'] : null,
+                'alt' => isset($e['alt']) ? (int) $e['alt'] : null,
             ];
         }
 

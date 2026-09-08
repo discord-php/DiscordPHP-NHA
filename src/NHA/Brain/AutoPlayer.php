@@ -170,27 +170,47 @@ final class AutoPlayer
 
     /**
      * Looks at the recent decision history for an infinite loop:
+     *  - a `land` / `launch` run that is NOT changing altitude (stuck, e.g. on
+     *    a structure `land` cannot get past),
      *  - one exact action dominating the window,
      *  - a short 2-4 move pattern repeated three times,
      *  - the same `move` target chosen three or more times,
-     *  - nothing but traversal (move / ride / land / …) for most of the window —
-     *    no `chop` / `mine` / `combine` / `sell` / `construct` progress.
+     *  - nothing but traversal for most of the window — no `chop` / `mine` /
+     *    `combine` / `sell` / `construct` progress.
+     *
+     * `land` / `launch` are excluded from the last four checks (a real descent
+     * repeats them for many turns) but caught by the first, which uses the
+     * recorded altitude to tell a stuck agent from one that is still moving.
+     *
      * Returns a short description, or `null` when the play looks varied enough.
      *
-     * @param list<array{verb: string, args: array, tick: ?int}> $recent Oldest first.
+     * @param list<array{verb: string, args: array, tick: ?int, alt: ?int}> $recent Oldest first.
      */
     public static function detectLoop(array $recent): ?string
     {
+        // Stuck climb / descent: the last 4+ decisions are all `land` (or all
+        // `launch`) and the altitude has barely moved across them.
+        $tailVerbs = array_map(static fn($r): string => (string) ($r['verb'] ?? ''), array_slice($recent, -5));
+        foreach (['land', 'launch'] as $climbVerb) {
+            $run = array_filter(array_slice($recent, -5), static fn($r): bool => (string) ($r['verb'] ?? '') === $climbVerb);
+            if (count($run) >= 4) {
+                $alts = array_values(array_filter(array_map(static fn($r) => $r['alt'] ?? null, $run), 'is_int'));
+                if (count($alts) >= 2 && abs($alts[0] - end($alts)) <= 3) {
+                    return "stuck {$climbVerb} at altitude " . end($alts);
+                }
+                if ($alts === [] && count(array_unique($tailVerbs)) === 1) {
+                    return "stuck {$climbVerb} (no altitude change)";
+                }
+            }
+        }
+
         $fingerprints = [];
         $verbs = [];
         $moveTargets = [];
         foreach ($recent as $r) {
             $verb = (string) ($r['verb'] ?? '');
-            // `land` / `launch` are bounded, self-terminating climbs/descents —
-            // repeating them is progress toward the ground/altitude gate, not a
-            // loop. Treat them as transparent so a multi-turn descent is not
-            // flagged (and the loop-break for `build`, which is itself `land`
-            // while aloft, does not fight it).
+            // Excluded from the pattern checks below — a genuine descent repeats
+            // `land` for many turns; the altitude check above handles a stuck one.
             if ($verb === '' || $verb === 'land' || $verb === 'launch') {
                 continue;
             }
@@ -319,8 +339,20 @@ final class AutoPlayer
         $pos = (array) ($raw['position'] ?? [0, 0]);
         $x = (int) ($pos[0] ?? 0);
         $y = (int) ($pos[1] ?? 0);
-        $offGround = ($raw['in_space'] ?? false) || (int) ($raw['altitude'] ?? 0) > 0;
+        $altitude = (int) ($raw['altitude'] ?? 0);
+        $offGround = ($raw['in_space'] ?? false) || $altitude > 0;
         $lead = "loop broken → {$objective}";
+
+        // Aloft but barely off the ground and `land` is not helping — the agent
+        // is stuck on a structure it built. Step off the cell so `land` (or the
+        // ground rungs) can work next turn. This wins over every objective.
+        if ($offGround && $altitude <= 5) {
+            return [
+                'verb' => 'move',
+                'args' => ['x' => max(0, min(219, $x + [3, -3, 0, 0][$tick % 4])), 'y' => max(0, min(219, $y + [0, 0, 3, -3][$tick % 4]))],
+                'reason' => "{$lead}: step off the structure so you can land",
+            ];
+        }
 
         if ($objective === 'wealth') {
             $best = null;
@@ -515,7 +547,12 @@ final class AutoPlayer
             // *different kind* of objective this turn (rotating explore → wealth
             // → build → research) and act on it deterministically. A cooldown
             // after each break stops it thrashing every turn on its own moves.
-            $loop = $this->state->loopBreakCooldownActive($agent_id, $tick) ? null : self::detectLoop($recent);
+            // A "stuck land/launch" always breaks (a hard wedged state);
+            // everything else respects the post-break cooldown.
+            $loopRaw = self::detectLoop($recent);
+            $loop = ($loopRaw !== null && (str_starts_with($loopRaw, 'stuck ') || ! $this->state->loopBreakCooldownActive($agent_id, $tick)))
+                ? $loopRaw
+                : null;
             $loopObjective = $loop !== null ? $this->state->bumpForcedObjective($agent_id, $tick) : null;
 
             $context = ($last ?? []);
@@ -575,6 +612,13 @@ final class AutoPlayer
                         && ($dipsReserve !== null || isset($known[$sig]) || in_array($sig, $tried, true))
                     ));
                     if ($spent) {
+                        // Record it as tried even though it never went out, so the
+                        // brain stops re-picking a set it cannot submit (e.g. the
+                        // "combine composite + ice" fixation against the reserve).
+                        if (! $isProduction) {
+                            $this->state->recordCombineSignature($agent_id, $sig);
+                        }
+
                         $lead = match (true) {
                             $isDead => "combine `{$sig}` was rejected by the Guild",
                             $dipsReserve !== null => "combine `{$sig}` would dip below the {$dipsReserve} reserve",
@@ -601,8 +645,10 @@ final class AutoPlayer
                     $this->state->recordCombineSignature($agent_id, self::combineSignature((array) ($decision['args'] ?? [])));
                 }
 
+                $altNow = (int) ($observation->get('altitude') ?? 0);
+
                 return $this->nha->intentWithToken($agent_id, $token, $decision['verb'], $decision['args'])
-                    ->then(function ($queued) use ($agent_id, $decision, $tick, $loop, $loopObjective) {
+                    ->then(function ($queued) use ($agent_id, $decision, $tick, $altNow, $loop, $loopObjective) {
                         $queued = (array) $queued;
                         $queuedId = $queued['queued_intent'] ?? null;
 
@@ -612,6 +658,7 @@ final class AutoPlayer
                             'reason' => $decision['reason'],
                             'queued_intent' => $queuedId,
                             'tick' => $tick,
+                            'alt' => $altNow,
                         ]);
 
                         $ref = $queuedId !== null ? " (queued #{$queuedId})" : '';

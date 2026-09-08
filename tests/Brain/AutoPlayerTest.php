@@ -361,10 +361,24 @@ class AutoPlayerTest extends NHAUnitTestCase
     /**
      * @covers \NHA\Brain\AutoPlayer
      */
-    public function testDetectLoopIgnoresAMultiTurnDescent(): void
+    public function testDetectLoopIgnoresAMultiTurnDescentThatIsStillDropping(): void
     {
-        // `land` repeated is a bounded descent, not a loop.
-        $this->assertNull(AutoPlayer::detectLoop(array_fill(0, 9, ['verb' => 'land', 'args' => [], 'tick' => 0])));
+        $recent = [];
+        for ($a = 100; $a >= 20; $a -= 10) {
+            $recent[] = ['verb' => 'land', 'args' => [], 'tick' => $a, 'alt' => $a];
+        }
+
+        $this->assertNull(AutoPlayer::detectLoop($recent), 'altitude is still falling — a real descent');
+    }
+
+    /**
+     * @covers \NHA\Brain\AutoPlayer
+     */
+    public function testDetectLoopFlagsAStuckLandRunWhereAltitudeIsNotMoving(): void
+    {
+        $recent = array_fill(0, 6, ['verb' => 'land', 'args' => [], 'tick' => 1, 'alt' => 2]);
+
+        $this->assertStringContainsString('stuck land at altitude 2', (string) AutoPlayer::detectLoop($recent));
     }
 
     /**

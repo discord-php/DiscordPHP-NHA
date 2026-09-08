@@ -12,6 +12,19 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.1.20] - 2026-09-07
+
+### Fixed
+- The 3.1.19 `land`/`launch` filter created a blind spot: an agent wedged on a
+  structure `land` cannot get past would `land`-spam forever undetected.
+  `detectLoop()` now records altitude on every decision and flags a `land` /
+  `launch` run where the altitude has not moved (`stuck land at altitude N`) —
+  which also bypasses the loop-break cooldown. `loopBreakDecision` steps the
+  agent off its cell when it is aloft at altitude ≤ 5.
+- A `combine` refused by the guardrail (dips a reserve, world-known, …) is now
+  recorded as tried even though it never went out, so the brain stops
+  re-picking a set it cannot submit (the "combine composite + ice" fixation).
+
 ## [3.1.19] - 2026-09-07
 
 ### Fixed
