@@ -110,10 +110,13 @@ final class Ladder
         }
 
         // 1b. Passive income: a finished vehicle that is not out working yet →
-        //     `deploy` it to roam and mine autonomously.
+        //     `deploy` it to roam and mine autonomously. An expansionist keeps
+        //     an orbital-engine ship to FLY, not to deploy for mining.
         foreach ((array) ($raw['vehicles'] ?? []) as $vehicle) {
             $vehicle = (array) $vehicle;
-            if (empty($vehicle['deployed']) && empty($vehicle['roaming']) && empty($vehicle['out'])) {
+            $isOrbital = ! empty($vehicle['orbital_engine']) || ! empty($vehicle['ion_thruster']);
+            if (empty($vehicle['deployed']) && empty($vehicle['roaming']) && empty($vehicle['out'])
+                && ! ($stance === Stance::Expansionist->value && $isOrbital)) {
                 return ['verb' => 'deploy', 'args' => [], 'why' => 'you have a finished vehicle — deploy it for passive mining income'];
             }
         }
@@ -157,8 +160,15 @@ final class Ladder
         // 2b. Off the ground with no orbital work to do (no asteroid to dock and
         //     mine) — descend. `construct` and most harvesting need solid ground;
         //     bouncing on the elevator or idling in orbit scores nothing.
+        //     EXCEPTION: an expansionist holding a fuelled orbital ship should
+        //     HOLD in orbit for a transfer window, not land — dropping down
+        //     just means climbing back up.
         $offGround = ($raw['in_space'] ?? false) || (int) ($raw['altitude'] ?? 0) > 0;
-        if ($offGround && (array) ($raw['asteroids'] ?? []) === []) {
+        $holdingForWindow = $stance === Stance::Expansionist->value
+            && (int) ($raw['altitude'] ?? 0) >= 300
+            && ($raw['expansion']['at_body'] ?? null) === null
+            && self::hasOrbitalShip($raw);
+        if ($offGround && (array) ($raw['asteroids'] ?? []) === [] && ! $holdingForWindow) {
             return ['verb' => 'land', 'args' => [], 'why' => 'nothing to do off the ground — land and build where the materials are'];
         }
 
@@ -300,6 +310,27 @@ final class Ladder
         );
 
         return $move === null ? null : ['verb' => $move['verb'], 'args' => $move['args'], 'reason' => $move['why']];
+    }
+
+    /**
+     * Whether the agent holds a `finalize`d ship that can fly to orbit — a
+     * vehicle with an orbital engine (and, where the field is present, one that
+     * still `flies`). Used so gear-up / depart logic recognises a ship whose
+     * `ion_thruster` was consumed into it.
+     *
+     * @param array<string,mixed> $raw
+     */
+    public static function hasOrbitalShip(array $raw): bool
+    {
+        foreach ((array) ($raw['vehicles'] ?? []) as $v) {
+            $v = (array) $v;
+            $engine = ! empty($v['orbital_engine']) || ! empty($v['ion_thruster']) || ($v['orbital_engine'] ?? null) === 1;
+            if ($engine && ($v['flies'] ?? true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** Best self-heal medicine on hand, strongest first, or `null`. */
@@ -527,8 +558,10 @@ final class Ladder
 
             // In Earth orbit, flight-ready, a window open you can afford → depart
             // (a moon first — a Forward Base discounts every later route).
+            // "flight-ready" = fuel + an orbital engine, whether that engine is
+            // still a loose `ion_thruster` or already `finalize`d into a ship.
             $fuelled = $has('hydrogen') > 0 || $has('cryo_fuel') > 0 || $has('helium3') > 0;
-            $flightReady = $has('ion_thruster') > 0 && $fuelled;
+            $flightReady = $fuelled && ($has('ion_thruster') > 0 || self::hasOrbitalShip($raw));
             if ($inSpace && $alt >= 300 && $atBody === null && $flightReady) {
                 $order = ['deimos' => 50, 'phobos' => 55, 'mars' => 100, 'venus' => 130];
                 foreach ($order as $dest => $dv) {

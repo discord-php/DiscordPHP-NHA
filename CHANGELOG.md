@@ -12,6 +12,21 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.4] - 2026-09-08
+
+### Fixed
+- 3.2.3 got the agent to `finalize` its first ship — then stalled: `finalize`
+  consumes the loose `ion_thruster` into the vehicle, so `$has('ion_thruster')`
+  went back to 0 and every "flight-ready?" check said no. Now a `finalize`d
+  vehicle with an `orbital_engine` counts as flight-ready
+  (`Ladder::hasOrbitalShip()`), in the ladder and in `AutoPlayer`'s overrides.
+- An expansionist ship in orbit no longer `land`s back to Earth when no
+  transfer window is open — rung 2b is suppressed for it, and `AutoPlayer`
+  swaps a model `land` for `depart` (window open) / `dock` (asteroid) /
+  `wait` (hold for the window).
+- Rung 1b (`deploy` an idle vehicle for passive mining) skips an expansionist's
+  orbital ship — that one is for flying, not deploying.
+
 ## [3.2.3] - 2026-09-08
 
 ### Fixed

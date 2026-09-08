@@ -305,6 +305,34 @@ class LadderTest extends NHAUnitTestCase
     }
 
     /**
+     * A `finalize`d ship counts as flight-ready even though its `ion_thruster`
+     * was consumed into the vehicle — and a ship in orbit with no open window
+     * HOLDS instead of landing back to Earth.
+     *
+     * @covers \NHA\Brain\Ladder::suggestion
+     * @covers \NHA\Brain\Ladder::hasOrbitalShip
+     */
+    public function testAFinalizedShipInOrbitDepartsOnAWindowAndOtherwiseHolds(): void
+    {
+        $orbit = static fn(array $windows): array => [
+            'tick' => 5, 'in_space' => true, 'altitude' => 400,
+            'inventory' => self::KIT + ['cryo_fuel' => 4],
+            'vehicles' => [['name' => 'skiff', 'flies' => true, 'orbital_engine' => true]],
+            'expansion' => ['at_body' => null, 'windows' => $windows],
+            'asteroids' => [],
+        ];
+
+        // Deimos window open → depart (no ion_thruster in inventory).
+        $go = Ladder::suggestion($orbit(['deimos' => ['open' => true]]), [], [], false, 'expansionist');
+        $this->assertSame('depart', $go['verb']);
+        $this->assertSame('deimos', $go['args']['dest']);
+
+        // No window → it must NOT `land` (rung 2b is suppressed for a ship holding orbit).
+        $wait = Ladder::suggestion($orbit(['deimos' => ['open' => false]]), [], [], false, 'expansionist');
+        $this->assertNotSame('land', $wait['verb'] ?? null);
+    }
+
+    /**
      * @covers \NHA\Brain\Ladder::suggestion
      */
     public function testExpansionistHeadsForTheElevatorWhenFlightReadyOnTheGround(): void

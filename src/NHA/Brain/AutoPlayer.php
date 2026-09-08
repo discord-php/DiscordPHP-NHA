@@ -737,7 +737,7 @@ final class AutoPlayer
 
             $altNow = (int) ($observation->get('altitude') ?? 0);
 
-            return $this->brain->decide($observation, $context ?: null, $stance)->then(function (?array $decision) use ($agent_id, $token, $tick, $altNow, $observation, $known, $tried, $dead, $researchPaying, $recent, $loop, $loopObjective, $stance) {
+            return $this->brain->decide($observation, $context ?: null, $stance)->then(function (?array $decision) use ($agent_id, $token, $tick, $altNow, $observation, $rawObs, $known, $tried, $dead, $researchPaying, $recent, $loop, $loopObjective, $stance) {
                 if ($decision === null && $loopObjective === null) {
                     // Record the pass so a wait-streak is visible to detectLoop.
                     $this->state->recordDecision($agent_id, ['verb' => 'wait', 'args' => [], 'reason' => '', 'queued_intent' => null, 'tick' => $tick, 'alt' => $altNow]);
@@ -825,12 +825,34 @@ final class AutoPlayer
                 ) {
                     $held = (array) $observation->getInventory();
                     $fuelled = ($held['hydrogen'] ?? 0) > 0 || ($held['cryo_fuel'] ?? 0) > 0 || ($held['helium3'] ?? 0) > 0;
-                    if (! (($held['ion_thruster'] ?? 0) > 0 && $fuelled)) {
+                    $ready = $fuelled && (($held['ion_thruster'] ?? 0) > 0 || Ladder::hasOrbitalShip($rawObs));
+                    if (! $ready) {
                         $gear = $this->fallbackDecision($observation, 'stay on the mission — gear the ship, do not ' . ($vanityTower ? 'raise another spire' : 'ride to an empty orbit'), $tried, $known, $researchPaying, $stance);
                         if ($gear !== null && ($gear['verb'] ?? '') !== $verb) {
                             $decision = $gear;
                             $verb = (string) ($decision['verb'] ?? '');
                         }
+                    }
+                }
+
+                // In orbit with a fuelled ship and no window open, the model
+                // often picks `land` — dropping to Earth just to climb back.
+                // Hold: substitute the expansionist ladder's pick (depart if a
+                // window opened, dock an asteroid, else wait in orbit).
+                if ($verb === 'land'
+                    && $loopObjective === null
+                    && $stance === Stance::Expansionist->value
+                    && (int) ($observation->get('altitude') ?? 0) >= 300
+                    && ($rawObs['expansion']['at_body'] ?? null) === null
+                    && Ladder::hasOrbitalShip($rawObs)
+                ) {
+                    $hold = Ladder::suggestion($rawObs, $tried, $known, false, $stance);
+                    if ($hold !== null && ($hold['verb'] ?? '') !== 'land') {
+                        $decision = $hold;
+                        $verb = (string) ($decision['verb'] ?? '');
+                    } else {
+                        $decision = ['verb' => 'wait', 'args' => [], 'reason' => 'in orbit with a ship — holding for a transfer window'];
+                        $verb = 'wait';
                     }
                 }
 
