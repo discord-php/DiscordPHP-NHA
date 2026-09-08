@@ -12,6 +12,18 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.8] - 2026-09-08
+
+### Fixed
+- 3.2.7's "don't `finalize` while an inert hull sits in `vehicles`" gate
+  **deadlocked** the assembly: the junk `ship_v1` from the earlier one-part
+  finalize is already in the live agent's `vehicles`, and there is no `scrap`
+  verb, so `finalize` would have been suppressed forever. Dropped the
+  `hasDeadHull()` guard from the `finalize` rungs — the **3+ loose-parts**
+  threshold alone stops the one-part junk, and `finalize` on a fuller set can
+  now supersede the dead hull. `hasDeadHull()` is kept only for the `deploy`
+  skip / override.
+
 ## [3.2.7] - 2026-09-08
 
 ### Fixed

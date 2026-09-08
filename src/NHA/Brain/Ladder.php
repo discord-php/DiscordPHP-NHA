@@ -108,7 +108,7 @@ final class Ladder
         //    enough for a working one. A lone `landing_gear` finalizes into an
         //    inert hull (drives=false, flies=false, fuel_cap=0) that then jams
         //    the `deploy` rung; wait for 3+ parts.
-        if (count((array) ($raw['loose_parts'] ?? [])) >= 3 && ! self::hasDeadHull($raw)) {
+        if (count((array) ($raw['loose_parts'] ?? [])) >= 3) {
             return ['verb' => 'finalize', 'args' => [], 'why' => 'you have enough loose parts — assemble them into a vehicle'];
         }
 
@@ -751,7 +751,7 @@ final class Ladder
             if ($onGround && ! $flightReady) {
                 // Enough loose parts for a working ship → bundle them. One
                 // stray part finalizes into an inert hull, so hold at 3+.
-                if (count((array) ($raw['loose_parts'] ?? [])) >= 3 && ! self::hasDeadHull($raw)) {
+                if (count((array) ($raw['loose_parts'] ?? [])) >= 3) {
                     return ['verb' => 'finalize', 'args' => ['name' => 'accord_runner'], 'why' => 'expansionist — finalize the loose parts into a ship'];
                 }
                 // The orbital engine.
