@@ -426,8 +426,54 @@ class StateStore
         }
 
         $sigs[] = $signature;
-        $this->data['agent_combine_sigs'][$key] = array_slice($sigs, -400);
+        $this->data['agent_combine_sigs'][$key] = array_slice($sigs, -2000);
         $this->save();
+    }
+
+    /**
+     * Records a `combine` set the world has PROVEN cannot make anything — the
+     * Inventors' Guild rejected the submission. Unlike {@see recordCombineSignature()}
+     * (every set the agent tried), this is the confirmed-dead subset: it is never
+     * worth another intent, ever, so {@see \NHA\Brain\AutoPlayer} treats it like a
+     * world-known recipe and never lets it through — not even a production recipe.
+     *
+     * @since 3.1.11
+     */
+    public function recordDeadCombine(int $agent_id, string $signature): void
+    {
+        $signature = trim($signature);
+        if ($signature === '') {
+            return;
+        }
+
+        $key = (string) $agent_id;
+        $sigs = array_values(array_filter(
+            (array) ($this->data['agent_dead_combines'][$key] ?? []),
+            'is_string',
+        ));
+        if (in_array($signature, $sigs, true)) {
+            return;
+        }
+
+        $sigs[] = $signature;
+        $this->data['agent_dead_combines'][$key] = array_slice($sigs, -5000);
+        $this->save();
+    }
+
+    /**
+     * Every `combine` signature the Guild has rejected for this agent — sets
+     * proven to make nothing. Oldest first.
+     *
+     * @return list<string>
+     *
+     * @since 3.1.11
+     */
+    public function getDeadCombines(int $agent_id): array
+    {
+        return array_values(array_filter(
+            (array) ($this->data['agent_dead_combines'][(string) $agent_id] ?? []),
+            'is_string',
+        ));
     }
 
     /** Research counts as "paying" for this long after the last inventor-point gain. */

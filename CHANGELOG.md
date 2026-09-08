@@ -4,6 +4,18 @@ All notable changes to DiscordPHP-NHA are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 SemVer with the **major tracking the NHA world API version**.
 
+## [3.1.11] - 2026-09-07
+
+### Added
+- A durable dead-combine list. When a `combine` intent comes back `rejected`
+  (the Inventors' Guild ruled the tag-set makes nothing), its signature is
+  recorded in `state.json` via `StateStore::recordDeadCombine()` and never
+  submitted again by that agent — it overrides even the production-recipe
+  exemption, survives restarts, and is fed to the brain as an explicit
+  "NEVER pick these" line.
+- The per-run "already submitted" list (`agent_combine_sigs`) cap is raised
+  400 → 2000 so a long-running agent does not FIFO-evict an old set and retry it.
+
 ## [3.1.10] - 2026-09-07
 
 ### Fixed

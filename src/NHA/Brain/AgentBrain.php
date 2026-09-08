@@ -355,6 +355,15 @@ final class AgentBrain
                 . implode(', ', array_slice(array_keys($tried), -40)) . '.';
         }
 
+        $dead = array_values(array_filter(
+            is_array($lastDecision['dead_combines'] ?? null) ? $lastDecision['dead_combines'] : [],
+            'is_string',
+        ));
+        if ($dead !== []) {
+            $lines[] = 'combine sets the Inventors\' Guild has REJECTED — proven to make nothing, NEVER pick these again: '
+                . implode(', ', array_slice($dead, -40)) . '.';
+        }
+
         // Combine sets the whole world has ALREADY invented (from /rules) that
         // you could make right now with what you hold — these mint no points, so
         // skip them; anything else is potentially novel.

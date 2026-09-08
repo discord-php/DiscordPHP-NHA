@@ -276,6 +276,49 @@ class AutoPlayerTest extends NHAUnitTestCase
 
     /**
      * @covers \NHA\Brain\AutoPlayer
+     * @covers \NHA\StateStore
+     */
+    public function testAGuildRejectionIsRecordedDeadAndNeverResubmitted(): void
+    {
+        $state = new StateStore($this->statePath);
+        $state->recordDecision(142287, ['verb' => 'combine', 'args' => ['ingredients' => ['glass' => 1, 'wood' => 1]], 'reason' => '', 'queued_intent' => 999, 'tick' => 1]);
+
+        // Last turn's combine comes back rejected; the brain immediately tries it again.
+        $nha = $this->nhaWith([
+            'tick' => 5, 'downed_until' => 0, 'position' => [1, 1],
+            'inventory' => ['wood' => 40],
+            'status' => 'rejected',
+        ]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"combine","args":{"ingredients":{"glass":1,"wood":1}}}'), $state);
+
+        $player->step(142287, 'tok');
+
+        $this->assertContains('glass+wood', $state->getDeadCombines(142287), 'the rejection was recorded');
+        $this->assertSame('sell', $this->posts[0][1]['verb'], 'the dead set was not resubmitted');
+    }
+
+    /**
+     * @covers \NHA\Brain\AutoPlayer
+     * @covers \NHA\StateStore
+     */
+    public function testADeadSetIsBlockedEvenIfItIsAProductionRecipe(): void
+    {
+        $state = new StateStore($this->statePath);
+        $state->recordDeadCombine(142287, 'aluminium+carbon'); // the Guild said no, so it is not production after all
+
+        $nha = $this->nhaWith([
+            'tick' => 5, 'downed_until' => 0, 'position' => [1, 1],
+            'inventory' => ['carbon' => 40],
+        ]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"combine","args":{"ingredients":{"aluminium":1,"carbon":1}}}'), $state);
+
+        $player->step(142287, 'tok');
+
+        $this->assertNotSame('combine', $this->posts[0][1]['verb'], 'a dead set overrides the production-recipe exemption');
+    }
+
+    /**
+     * @covers \NHA\Brain\AutoPlayer
      */
     public function testStepAllowsAProductionCombineEvenWhenWorldKnown(): void
     {

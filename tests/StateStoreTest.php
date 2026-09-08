@@ -405,16 +405,31 @@ class StateStoreTest extends NHAUnitTestCase
     /**
      * @covers \NHA\StateStore
      */
-    public function testCombineSignatureListIsCappedAt400(): void
+    public function testCombineSignatureListIsCappedAt2000(): void
     {
         $store = new StateStore($this->path);
-        for ($i = 0; $i < 450; $i++) {
+        for ($i = 0; $i < 2050; $i++) {
             $store->recordCombineSignature(7, "sig{$i}");
         }
 
         $kept = $store->getTriedCombineSignatures(7);
-        $this->assertCount(400, $kept);
-        $this->assertSame('sig449', end($kept), 'newest is kept');
+        $this->assertCount(2000, $kept);
+        $this->assertSame('sig2049', end($kept), 'newest is kept');
         $this->assertSame('sig50', $kept[0], 'oldest 50 were dropped');
+    }
+
+    /**
+     * @covers \NHA\StateStore
+     */
+    public function testDeadCombinesAreRecordedDeduplicatedPersistedAndPerAgent(): void
+    {
+        $store = new StateStore($this->path);
+        $store->recordDeadCombine(7, 'glass+wood');
+        $store->recordDeadCombine(7, 'lens+salt');
+        $store->recordDeadCombine(7, 'glass+wood'); // dupe
+        $store->recordDeadCombine(7, '  ');         // blank ignored
+
+        $this->assertSame(['glass+wood', 'lens+salt'], (new StateStore($this->path))->getDeadCombines(7));
+        $this->assertSame([], $store->getDeadCombines(999), 'scoped per agent');
     }
 }

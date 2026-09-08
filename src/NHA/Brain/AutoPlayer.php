@@ -251,11 +251,20 @@ final class AutoPlayer
                         $this->state->clearQueuedIntent($agent_id, $lastQueued);
                     }
 
-                    // A combine that landed is now a world-known set — merge it
-                    // straight into the known list so it is refused from here on,
-                    // without waiting for the next GET /rules.
-                    if ($status === 'applied' && $lastCombineSig !== '' && is_array($this->knownCombines)) {
-                        $this->knownCombines[$lastCombineSig] = true;
+                    if ($lastCombineSig !== '') {
+                        // A combine that landed is now a world-known set — merge it
+                        // straight into the known list so it is refused from here
+                        // on, without waiting for the next GET /rules.
+                        if ($status === 'applied' && is_array($this->knownCombines)) {
+                            $this->knownCombines[$lastCombineSig] = true;
+                        }
+
+                        // The Guild rejected it: this tag-set makes NOTHING and
+                        // never will. Record it as proven-dead so it is never
+                        // submitted again by this agent, not even once.
+                        if ($status === 'rejected') {
+                            $this->state->recordDeadCombine($agent_id, $lastCombineSig);
+                        }
                     }
 
                     return ['status' => $status, 'result' => (string) ($s->result ?? '')];
@@ -273,7 +282,13 @@ final class AutoPlayer
                 return resolve("🩹 Agent #{$agent_id} is downed until tick {$downedUntil} — skipping.");
             }
 
+            // World-known recipes plus the sets the Guild has rejected for this
+            // agent — both mint nothing, so treat them the same everywhere.
+            $dead = $this->state->getDeadCombines($agent_id);
             $known = (array) ($pre['known'] ?? []);
+            foreach ($dead as $sig) {
+                $known[$sig] = true;
+            }
             $tried = $this->state->getTriedCombineSignatures($agent_id);
             $researchPaying = $this->state->noteInventorPoints($agent_id, (int) ($observation->get('inventor_points') ?? 0));
 
@@ -286,8 +301,9 @@ final class AutoPlayer
             $context['recent'] = $recent;
             $context['known_combines'] = array_keys($known);
             $context['tried_combines'] = $tried;
+            $context['dead_combines'] = $dead;
 
-            return $this->brain->decide($observation, $context ?: null)->then(function (?array $decision) use ($agent_id, $token, $tick, $observation, $known, $tried, $researchPaying, $recent) {
+            return $this->brain->decide($observation, $context ?: null)->then(function (?array $decision) use ($agent_id, $token, $tick, $observation, $known, $tried, $dead, $researchPaying, $recent) {
                 if ($decision === null) {
                     return "💤 Agent #{$agent_id}: brain chose to wait (tick {$tick}).";
                 }
@@ -295,19 +311,22 @@ final class AutoPlayer
                 $verb = (string) ($decision['verb'] ?? '');
                 $recentVerbs = array_map(static fn($r): string => (string) ($r['verb'] ?? ''), array_slice($recent, -4));
 
-                // Deterministic guardrail: never submit a research `combine` set
-                // the world has already invented or that this agent already tried
-                // this run — a repeat mints nothing and the model loops here
-                // badly. Production recipes (see PRODUCTION_COMBINES) are exempt.
-                // When one is refused, fall through to the ladder (fresh pair if
-                // research still pays, else land / construct / sell) rather than idle.
+                // Deterministic guardrail: never submit a `combine` set the world
+                // has already invented, that the Guild has rejected for this
+                // agent, or that this agent already tried this run — all mint
+                // nothing and the model loops here badly. A production recipe
+                // (PRODUCTION_COMBINES) is exempt UNLESS it is on the dead list.
+                // When one is refused, fall through to the ladder rather than idle.
                 if ($verb === 'combine') {
                     $sig = self::combineSignature((array) ($decision['args'] ?? []));
-                    $spent = $sig !== ''
-                        && ! isset(self::PRODUCTION_COMBINES[$sig])
-                        && (isset($known[$sig]) || in_array($sig, $tried, true));
+                    $isDead = $sig !== '' && in_array($sig, $dead, true);
+                    $spent = $sig !== '' && ($isDead || (
+                        ! isset(self::PRODUCTION_COMBINES[$sig])
+                        && (isset($known[$sig]) || in_array($sig, $tried, true))
+                    ));
                     if ($spent) {
-                        $decision = $this->fallbackDecision($observation, "research set `{$sig}` spent", $tried, $known, $researchPaying);
+                        $lead = $isDead ? "combine `{$sig}` was rejected by the Guild" : "research set `{$sig}` spent";
+                        $decision = $this->fallbackDecision($observation, $lead, $tried, $known, $researchPaying);
                         if ($decision === null) {
                             return "🔁 Agent #{$agent_id}: no research left and no infrastructure move available — skipped `{$sig}` (tick {$tick}).";
                         }
