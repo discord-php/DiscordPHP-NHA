@@ -4,6 +4,19 @@ All notable changes to DiscordPHP-NHA are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 SemVer with the **major tracking the NHA world API version**.
 
+## [3.1.13] - 2026-09-07
+
+### Fixed
+- The loop detector missed noisy loops. A live audit caught the agent
+  oscillating `land ↔ move (elevator base) ↔ ride` for ~15 turns without
+  `detectLoop()` firing — the doubled steps and the odd `chop` kept any single
+  action under the dominance bar and broke the exact-cycle match. Added two
+  checks: the same `move` target chosen 3+ times in the window, and a window
+  that is 6-of-8 traversal verbs (`move`/`ride`/`land`/…) with nothing
+  productive. Lowered the exact-dominance bar 60% → 55%.
+- A forced `explore` now steps ~28 cells (was 13) so it actually clears
+  whatever the agent was circling.
+
 ## [3.1.12] - 2026-09-07
 
 ### Added

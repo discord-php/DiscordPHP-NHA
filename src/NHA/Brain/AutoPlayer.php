@@ -142,17 +142,25 @@ final class AutoPlayer
         return implode('+', $tokens);
     }
 
+    /** Verbs that only reposition the agent — a window full of these is "going nowhere". */
+    private const TRAVERSAL_VERBS = ['move', 'ride', 'land', 'launch', 'wait'];
+
     /**
-     * Looks at the recent decision history for an infinite loop: one action
-     * dominating the window, or a short 2-4 move pattern repeated three times.
-     * Returns a short description of the loop, or `null` when the play looks
-     * varied enough.
+     * Looks at the recent decision history for an infinite loop:
+     *  - one exact action dominating the window,
+     *  - a short 2-4 move pattern repeated three times,
+     *  - the same `move` target chosen three or more times,
+     *  - nothing but traversal (move / ride / land / …) for most of the window —
+     *    no `chop` / `mine` / `combine` / `sell` / `construct` progress.
+     * Returns a short description, or `null` when the play looks varied enough.
      *
      * @param list<array{verb: string, args: array, tick: ?int}> $recent Oldest first.
      */
     public static function detectLoop(array $recent): ?string
     {
         $fingerprints = [];
+        $verbs = [];
+        $moveTargets = [];
         foreach ($recent as $r) {
             $verb = (string) ($r['verb'] ?? '');
             if ($verb === '') {
@@ -161,6 +169,10 @@ final class AutoPlayer
             $args = (array) ($r['args'] ?? []);
             ksort($args);
             $fingerprints[] = $verb . ($args === [] ? '' : ':' . json_encode($args));
+            $verbs[] = $verb;
+            if ($verb === 'move' && isset($args['x'], $args['y'])) {
+                $moveTargets[] = $args['x'] . ',' . $args['y'];
+            }
         }
 
         $n = count($fingerprints);
@@ -168,11 +180,11 @@ final class AutoPlayer
             return null;
         }
 
-        // One action dominates the window.
+        // One exact action dominates the window.
         $counts = array_count_values($fingerprints);
         arsort($counts);
         $top = (string) array_key_first($counts);
-        if ($counts[$top] >= max(4, (int) ceil($n * 0.6))) {
+        if ($counts[$top] >= max(4, (int) ceil($n * 0.55))) {
             return 'repeating ' . explode(':', $top)[0];
         }
 
@@ -186,6 +198,20 @@ final class AutoPlayer
             if (array_slice($tail, $p, $p) === $unit && array_slice($tail, $p * 2, $p) === $unit) {
                 return $p . '-move cycle: ' . implode(' → ', array_map(static fn($s): string => explode(':', $s)[0], $unit));
             }
+        }
+
+        // The same cell targeted again and again — walking to one spot on repeat.
+        $targetCounts = array_count_values($moveTargets);
+        arsort($targetCounts);
+        if ($targetCounts !== [] && reset($targetCounts) >= 3) {
+            return 'move loop to (' . (string) array_key_first($targetCounts) . ')';
+        }
+
+        // Nothing productive in the last 8 turns — only repositioning.
+        $window = array_slice($verbs, -8);
+        $traversal = count(array_filter($window, static fn(string $v): bool => in_array($v, self::TRAVERSAL_VERBS, true)));
+        if (count($window) >= 8 && $traversal >= 6) {
+            return 'no productive action for ' . $traversal . '/' . count($window) . ' turns';
         }
 
         return null;
@@ -322,9 +348,9 @@ final class AutoPlayer
         }
 
         // explore — and the fallthrough for every objective with nothing to do:
-        // a long step in a direction that rotates over time, so the agent walks
-        // off the cell it was stuck on and the next observation is fresh.
-        $dirs = [[13, 0], [0, 13], [-13, 0], [0, -13], [10, 10], [-10, -10], [10, -10], [-10, 10]];
+        // a long step in a direction that rotates over time, far enough to clear
+        // whatever the agent was circling so the next observation is fresh.
+        $dirs = [[28, 0], [0, 28], [-28, 0], [0, -28], [20, 20], [-20, -20], [20, -20], [-20, 20]];
         $d = $dirs[intdiv(max(0, $tick), 6) % count($dirs)];
 
         return [

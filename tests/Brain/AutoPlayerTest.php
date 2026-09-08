@@ -344,6 +344,42 @@ class AutoPlayerTest extends NHAUnitTestCase
     /**
      * @covers \NHA\Brain\AutoPlayer
      */
+    public function testDetectLoopFlagsRepeatedMoveTarget(): void
+    {
+        $recent = [
+            ['verb' => 'chop', 'args' => ['n' => 5], 'tick' => 0],
+            ['verb' => 'move', 'args' => ['x' => 33, 'y' => 114], 'tick' => 0],
+            ['verb' => 'land', 'args' => [], 'tick' => 0],
+            ['verb' => 'move', 'args' => ['x' => 33, 'y' => 114], 'tick' => 0],
+            ['verb' => 'ride', 'args' => [], 'tick' => 0],
+            ['verb' => 'move', 'args' => ['x' => 33, 'y' => 114], 'tick' => 0],
+        ];
+
+        $this->assertStringContainsString('move loop to (33,114)', (string) AutoPlayer::detectLoop($recent));
+    }
+
+    /**
+     * @covers \NHA\Brain\AutoPlayer
+     */
+    public function testDetectLoopFlagsATraversalOnlyStretch(): void
+    {
+        $recent = [
+            ['verb' => 'move', 'args' => ['x' => 1, 'y' => 1], 'tick' => 0],
+            ['verb' => 'ride', 'args' => [], 'tick' => 0],
+            ['verb' => 'land', 'args' => [], 'tick' => 0],
+            ['verb' => 'move', 'args' => ['x' => 2, 'y' => 2], 'tick' => 0],
+            ['verb' => 'land', 'args' => [], 'tick' => 0],
+            ['verb' => 'ride', 'args' => [], 'tick' => 0],
+            ['verb' => 'land', 'args' => [], 'tick' => 0],
+            ['verb' => 'move', 'args' => ['x' => 3, 'y' => 3], 'tick' => 0],
+        ];
+
+        $this->assertStringContainsString('no productive action', (string) AutoPlayer::detectLoop($recent));
+    }
+
+    /**
+     * @covers \NHA\Brain\AutoPlayer
+     */
     public function testDetectLoopPassesVariedPlayAndShortHistory(): void
     {
         $this->assertNull(AutoPlayer::detectLoop([
