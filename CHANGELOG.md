@@ -12,6 +12,11 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.1.26] - 2026-09-08
+
+### Fixed
+- Bump the `Http::VERSION` / `NHA @version` markers that were missed in 3.1.25.
+
 ## [3.1.25] - 2026-09-08
 
 ### Added
