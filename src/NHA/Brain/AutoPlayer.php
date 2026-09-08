@@ -55,16 +55,27 @@ final class AutoPlayer
     ];
 
     /**
-     * Refined inputs a tower / vehicle needs. A research `combine` that consumes
-     * any of these is refused — they are bought and mined to be BUILT with, not
-     * burned on an invention gamble. (`aluminium+carbon → composite` is the one
-     * allowed use, handled by {@see self::PRODUCTION_COMBINES}.)
+     * Refined inputs a tower / vehicle needs, each mapped to the amount to keep
+     * in reserve. A research `combine` may consume one of these — but only the
+     * surplus above its reserve; if spending it would leave the agent below the
+     * reserve the combine is refused and it goes back to buying / building.
+     * (`aluminium+carbon → composite` is exempt, via {@see self::PRODUCTION_COMBINES}.)
      *
-     * @var list<string>
+     * @var array<string, int>
      *
      * @since 3.1.16
      */
-    private const BUILD_MATERIALS = ['metal', 'alloy', 'steel', 'aluminum', 'aluminium', 'carbon', 'composite', 'titanium', 'superalloy'];
+    private const BUILD_MATERIAL_RESERVE = [
+        'metal' => 8,   // a tower's `size`
+        'composite' => 2,
+        'aluminum' => 4,
+        'aluminium' => 4,
+        'carbon' => 4,
+        'alloy' => 4,
+        'steel' => 4,
+        'titanium' => 4,
+        'superalloy' => 4,
+    ];
 
     /**
      * `a+b => true` for every combine set the world has already invented, from
@@ -531,25 +542,36 @@ final class AutoPlayer
                 // Deterministic guardrail: never submit a `combine` set the world
                 // has already invented, that the Guild has rejected for this
                 // agent, that this agent already tried this run, or that would
-                // burn tower materials (metal / aluminium / carbon / composite)
-                // on a research gamble. A production recipe (PRODUCTION_COMBINES,
-                // i.e. aluminium+carbon → composite) is exempt UNLESS it is dead.
+                // dip a tower material below its reserve (research spends only
+                // the surplus). A production recipe (PRODUCTION_COMBINES, i.e.
+                // aluminium+carbon → composite) is exempt UNLESS it is dead.
                 // When one is refused, fall through to the ladder rather than idle.
                 if ($verb === 'combine') {
                     $sig = self::combineSignature((array) ($decision['args'] ?? []));
-                    $ingredients = array_map('strval', array_keys((array) ($decision['args']['ingredients'] ?? [])));
+                    $ingredients = (array) ($decision['args']['ingredients'] ?? []);
                     $isDead = $sig !== '' && in_array($sig, $dead, true);
                     $isProduction = isset(self::PRODUCTION_COMBINES[$sig]);
-                    $burnsBuildMats = ! $isProduction
-                        && array_intersect($ingredients, self::BUILD_MATERIALS) !== [];
+
+                    $dipsReserve = null;
+                    if (! $isProduction) {
+                        $held = (array) $observation->getInventory();
+                        foreach ($ingredients as $res => $qty) {
+                            $reserve = self::BUILD_MATERIAL_RESERVE[strtolower((string) $res)] ?? null;
+                            if ($reserve !== null && (int) ($held[$res] ?? 0) < $reserve + max(1, (int) $qty)) {
+                                $dipsReserve = (string) $res;
+                                break;
+                            }
+                        }
+                    }
+
                     $spent = $sig !== '' && ($isDead || (
                         ! $isProduction
-                        && ($burnsBuildMats || isset($known[$sig]) || in_array($sig, $tried, true))
+                        && ($dipsReserve !== null || isset($known[$sig]) || in_array($sig, $tried, true))
                     ));
                     if ($spent) {
                         $lead = match (true) {
                             $isDead => "combine `{$sig}` was rejected by the Guild",
-                            $burnsBuildMats => "combine `{$sig}` would burn tower materials",
+                            $dipsReserve !== null => "combine `{$sig}` would dip below the {$dipsReserve} reserve",
                             default => "research set `{$sig}` spent",
                         };
                         $decision = $this->fallbackDecision($observation, $lead, $tried, $known, $researchPaying);

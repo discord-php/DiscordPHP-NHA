@@ -12,6 +12,17 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.1.17] - 2026-09-07
+
+### Changed
+- Tower materials are no longer banned from research combines — they are
+  reserved. A research `combine` may spend `metal` / `aluminum` / `carbon` /
+  `composite` / `alloy` / `steel` / `titanium` / `superalloy`, but only the
+  surplus above a per-material reserve (`metal` 8, `composite` 2, the rest 4);
+  if the spend would drop the agent below the reserve the combine is refused
+  and it goes back to buying / building. `aluminium + carbon → composite`
+  stays exempt.
+
 ## [3.1.16] - 2026-09-07
 
 ### Fixed

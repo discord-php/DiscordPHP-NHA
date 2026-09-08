@@ -46,7 +46,7 @@ flowchart TD
     forced -- no --> g1
     lbd --> g1
     g1{verb == combine?}
-    g1 -- yes --> spent{"dead sig?<br/>OR &#40;not aluminium+carbon AND<br/>&#40;burns build materials<br/>OR world-known OR already tried&#41;&#41;"}
+    g1 -- yes --> spent{"dead sig?<br/>OR &#40;not aluminium+carbon AND<br/>&#40;dips a build material below its reserve<br/>OR world-known OR already tried&#41;&#41;"}
     spent -- yes --> fb[fallbackDecision &#8594; the ladder]
     spent -- no --> g2
     g1 -- no --> g2{verb == ride AND<br/>rode in the last 4 turns?}

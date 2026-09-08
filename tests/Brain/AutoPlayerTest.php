@@ -447,20 +447,40 @@ class AutoPlayerTest extends NHAUnitTestCase
      * @covers \NHA\Brain\AutoPlayer
      * @covers \NHA\Brain\AgentBrain
      */
-    public function testStepRefusesACombineThatWouldBurnTowerMaterialsAndBuysInstead(): void
+    public function testACombineThatDipsBelowTheTowerMaterialReserveIsRefused(): void
     {
+        // metal held == reserve (8): spending 1 on research would drop under it.
         $state = new StateStore($this->statePath);
         $nha = $this->nhaWith([
             'tick' => 5, 'downed_until' => 0, 'position' => [1, 1],
-            'inventory' => ['credits' => 5000, 'metal' => 10, 'water' => 5],
+            'inventory' => ['credits' => 5000, 'metal' => 8, 'water' => 5],
         ]);
         $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"combine","args":{"ingredients":{"metal":1,"water":1}}}'), $state);
 
         $player->step(142287, 'tok');
 
-        $this->assertNotSame('combine', $this->posts[0][1]['verb'], 'metal is not spent on a research gamble');
-        $this->assertSame('buy', $this->posts[0][1]['verb'], 'the credits go toward composite instead');
+        $this->assertNotSame('combine', $this->posts[0][1]['verb'], 'the metal reserve is protected');
+        $this->assertSame('buy', $this->posts[0][1]['verb'], 'credits go toward composite instead');
         $this->assertContains($this->posts[0][1]['args']['resource'], ['aluminum', 'carbon']);
+    }
+
+    /**
+     * @covers \NHA\Brain\AutoPlayer
+     */
+    public function testACombineIsAllowedToSpendMaterialSurplusAboveTheReserve(): void
+    {
+        // 20 metal, reserve 8 — a research combine may spend the surplus.
+        $state = new StateStore($this->statePath);
+        $nha = $this->nhaWith([
+            'tick' => 5, 'downed_until' => 0, 'position' => [1, 1],
+            'inventory' => ['credits' => 50, 'metal' => 20, 'water' => 5],
+        ]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"combine","args":{"ingredients":{"metal":1,"water":1}}}'), $state);
+
+        $player->step(142287, 'tok');
+
+        $this->assertSame('combine', $this->posts[0][1]['verb'], 'surplus above the reserve is fair game for research');
+        $this->assertSame(['metal' => 1, 'water' => 1], $this->posts[0][1]['args']['ingredients']);
     }
 
     /**
