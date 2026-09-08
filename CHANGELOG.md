@@ -12,6 +12,22 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.1.28] - 2026-09-08
+
+### Changed
+- Autoplay: the brain no longer rides the elevator (`launch` / `ride` up /
+  `depart`) whenever it feels like it. After any location change, a
+  `TRANSIT_DWELL_TICKS` (8-turn) window makes `AutoPlayer::step()` substitute a
+  local ladder action for a "leave" pick — unless the ladder is genuinely
+  exhausted here (its fallback is the same transit verb) or a loop-break
+  objective wants to explore. `land` (coming home) is never gated. This
+  replaces the narrower "ride straight after riding" anti-bounce check.
+- `Brain\Playbook` system prompt gains an **ELEVATOR ABUSE** anti-pattern:
+  exhaust `mine`/`chop`/`gather`/`combine`/`construct`/`sell` where you stand
+  before changing location; never ride up, find nothing, and ride back.
+- `docs/PLAYBOOK.md` — the one-turn flow diagram now shows the transit-dwell
+  guardrail in place of the old ride check.
+
 ## [3.1.27] - 2026-09-08
 
 ### Changed

@@ -56,10 +56,13 @@ flowchart TD
     fbnull -- yes --> recW
     fbnull -- no --> rec
     spent -- no --> g2
-    g1 -- no --> g2{verb == ride AND<br/>rode in the last 4 turns?}
-    g2 -- yes --> fb2[fallbackDecision<br/>&quot;riding the elevator in circles&quot;]
+    g1 -- no --> g2{"verb in launch/ride/depart<br/>AND a transit verb in the<br/>last TRANSIT_DWELL_TICKS &#40;8&#41;<br/>AND no forced objective?"}
+    g2 -- yes --> fb2["fallbackDecision<br/>&quot;work this spot before<br/>riding the elevator again&quot;"]
+    fb2 --> stay{ladder pick != the<br/>same transit verb?}
+    stay -- yes --> useStay[take the local action]
+    stay -- no --> rec
+    useStay --> rec
     g2 -- no --> rec
-    fb2 --> rec
     rec[if final verb == combine:<br/>state.recordCombineSignature] --> submit[NHA::intentWithToken<br/>state.recordDecision &#40;with altitude&#41;]
     submit --> done([&#129302; &#91;stance&#93; / &#128737;&#65039; / &#9851;&#65039; / &#128260; status line])
 ```

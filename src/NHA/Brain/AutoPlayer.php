@@ -169,6 +169,22 @@ final class AutoPlayer
     private const TRAVERSAL_VERBS = ['move', 'ride', 'land', 'launch', 'wait'];
 
     /**
+     * Verbs that move the agent between the ground and orbit / another body — an
+     * "elevator trip". Each one has a real cost (fuel, a wasted turn, leaving
+     * behind local work), so the agent should not take two in quick succession.
+     *
+     * @see self::TRANSIT_DWELL_TICKS
+     */
+    private const TRANSIT_VERBS = ['ride', 'launch', 'land', 'land_moon', 'land_body', 'depart', 'dock'];
+
+    /**
+     * Minimum turns to spend working a location after arriving before the brain
+     * is allowed to leave it again (via `launch` / `ride` up / `depart`). Coming
+     * home (`land`) is always allowed — that ends a bounce, it does not start one.
+     */
+    private const TRANSIT_DWELL_TICKS = 8;
+
+    /**
      * Looks at the recent decision history for an infinite loop:
      *  - a `land` / `launch` run that is NOT changing altitude (stuck, e.g. on
      *    a structure `land` cannot get past),
@@ -629,7 +645,6 @@ final class AutoPlayer
                 }
 
                 $verb = (string) ($decision['verb'] ?? '');
-                $recentVerbs = array_map(static fn($r): string => (string) ($r['verb'] ?? ''), array_slice($recent, -4));
 
                 // Deterministic guardrail: never submit a `combine` set the world
                 // has already invented, that the Guild has rejected for this
@@ -683,13 +698,32 @@ final class AutoPlayer
                     }
                 }
 
-                // Anti-bounce: the brain likes to ride the elevator up, find
-                // nothing to do off the ground, ride back down, and repeat. If it
-                // picks `ride` right after riding, take the ladder's move instead.
-                if ($verb === 'ride' && in_array('ride', $recentVerbs, true)) {
-                    $alt = $this->fallbackDecision($observation, 'riding the elevator in circles', $tried, $known, $researchPaying, $stance);
-                    if ($alt !== null) {
-                        $decision = $alt;
+                // Anti-elevator: leaving the current location — `launch`, `ride`
+                // up, or `depart` — is expensive, and the brain likes to ride up,
+                // find nothing to do, come back, and repeat. If the agent changed
+                // location within the last TRANSIT_DWELL_TICKS turns, make it work
+                // the current spot instead; only let it leave once the ladder has
+                // no local move left (genuinely exhausted). `land` is exempt —
+                // coming home ends a bounce rather than starting one. A forced
+                // loop-break objective (which may legitimately want to explore)
+                // is left alone.
+                if (($verb === 'launch' || $verb === 'depart' || $verb === 'ride') && $loopObjective === null) {
+                    $lastTransitTick = null;
+                    foreach (array_reverse($recent) as $r) {
+                        if (in_array((string) ($r['verb'] ?? ''), self::TRANSIT_VERBS, true)) {
+                            $lastTransitTick = (int) ($r['tick'] ?? 0);
+                            break;
+                        }
+                    }
+                    if ($lastTransitTick !== null && ($tick - $lastTransitTick) <= self::TRANSIT_DWELL_TICKS) {
+                        // The ladder prefers local work and only falls back to a
+                        // transit verb (`land`) when the current spot is truly
+                        // exhausted. Take its pick unless it just agrees with the
+                        // brain (same verb) or has nothing at all.
+                        $stay = $this->fallbackDecision($observation, 'just changed location — work this spot before riding the elevator again', $tried, $known, $researchPaying, $stance);
+                        if ($stay !== null && (string) ($stay['verb'] ?? '') !== $verb) {
+                            $decision = $stay;
+                        }
                     }
                 }
 

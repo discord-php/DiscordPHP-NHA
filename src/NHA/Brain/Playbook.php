@@ -197,6 +197,11 @@ final class Playbook
               pick just costs you the turn — choose a fresh set or a different verb.
             - LOOPING: the same verb as recent turns when nothing forced it. If the last turn was
               `chop`/`mine`/`gather`, this turn must not be — build, sell, or move on.
+            - ELEVATOR ABUSE: `launch`/`ride`/`depart` change your location at real cost (fuel, a lost turn,
+              abandoned local work). Do NOT leave a spot until its work is genuinely done — exhaust
+              `mine`/`chop`/`gather`/`combine`/`construct`/`sell` HERE first. Never ride up, find nothing, and
+              ride back. If you changed location in the last several turns, STAY and work it; the loop now
+              auto-substitutes a local action when you try to leave too soon.
             - PLANT SPAM: `plant` tops up the most-drained tree on your cell (cap 22); it does NOT stack new
               trees. If every tree on the cell is full it is REJECTED and no wood is spent — plant elsewhere
               or do something else. `chop` + `plant` on the same cell nets ~zero; it is not a strategy.

@@ -289,6 +289,51 @@ class AutoPlayerTest extends NHAUnitTestCase
 
     /**
      * @covers \NHA\Brain\AutoPlayer
+     */
+    public function testStepDefersAFreshElevatorTripUntilLocalWorkIsDone(): void
+    {
+        $state = new StateStore($this->statePath);
+        $state->recordDecision(142287, ['verb' => 'land', 'args' => [], 'reason' => '', 'queued_intent' => null, 'tick' => 40]);
+
+        // Landed 4 turns ago, standing on an iron deposit, brain wants straight back up.
+        $nha = $this->nhaWith([
+            'tick' => 44, 'downed_until' => 0, 'position' => [10, 10],
+            'in_space' => false, 'altitude' => 0,
+            'inventory' => [],
+            'nearby_deposits' => [['resource' => 'iron', 'dist' => 0, 'amount' => 20]],
+        ]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"launch","args":{}}'), $state);
+
+        $player->step(142287, 'tok');
+
+        $this->assertNotSame('launch', $this->posts[0][1]['verb'], 'leaving a spot worked only 4 turns is swapped for local work');
+        $this->assertSame('mine', $this->posts[0][1]['verb']);
+    }
+
+    /**
+     * @covers \NHA\Brain\AutoPlayer
+     */
+    public function testStepAllowsAnElevatorTripOnceTheDwellHasPassed(): void
+    {
+        $state = new StateStore($this->statePath);
+        $state->recordDecision(142287, ['verb' => 'land', 'args' => [], 'reason' => '', 'queued_intent' => null, 'tick' => 1]);
+
+        // Last transit was 19 turns ago — the agent has earned the trip.
+        $nha = $this->nhaWith([
+            'tick' => 20, 'downed_until' => 0, 'position' => [10, 10],
+            'in_space' => false, 'altitude' => 0,
+            'inventory' => [],
+            'nearby_deposits' => [['resource' => 'iron', 'dist' => 0, 'amount' => 20]],
+        ]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"launch","args":{}}'), $state);
+
+        $player->step(142287, 'tok');
+
+        $this->assertSame('launch', $this->posts[0][1]['verb'], 'a long-dwelt agent may ride the elevator');
+    }
+
+    /**
+     * @covers \NHA\Brain\AutoPlayer
      * @covers \NHA\StateStore
      */
     public function testAGuildRejectionIsRecordedDeadAndNeverResubmitted(): void
