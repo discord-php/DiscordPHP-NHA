@@ -186,7 +186,12 @@ final class AutoPlayer
         $moveTargets = [];
         foreach ($recent as $r) {
             $verb = (string) ($r['verb'] ?? '');
-            if ($verb === '') {
+            // `land` / `launch` are bounded, self-terminating climbs/descents —
+            // repeating them is progress toward the ground/altitude gate, not a
+            // loop. Treat them as transparent so a multi-turn descent is not
+            // flagged (and the loop-break for `build`, which is itself `land`
+            // while aloft, does not fight it).
+            if ($verb === '' || $verb === 'land' || $verb === 'launch') {
                 continue;
             }
             $args = (array) ($r['args'] ?? []);

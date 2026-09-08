@@ -108,9 +108,12 @@ toward the target.
 
 ## Loop guard — `detectLoop()` + forced objectives
 
+`land` / `launch` decisions are transparent — a multi-turn descent/climb is
+bounded progress, not a loop.
+
 ```mermaid
 flowchart TD
-    d([detectLoop &#8212; last &#8804; 12 decisions]) --> n{&#8805; 6 decisions?}
+    d([detectLoop &#8212; last &#8804; 12 decisions,<br/>land / launch filtered out]) --> n{&#8805; 6 decisions?}
     n -- no --> ok([no loop])
     n -- yes --> c1{one exact action<br/>&#8805; max&#40;4, 55% of window&#41;?}
     c1 -- yes --> hit([loop: &quot;repeating &#60;verb&#62;&quot;])

@@ -12,6 +12,15 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.1.19] - 2026-09-07
+
+### Fixed
+- The loop guard no longer flags a descent. `land` / `launch` are bounded,
+  self-terminating altitude changes — `detectLoop()` now ignores them, so a
+  multi-turn descent from the elevator is not mistaken for "repeating land"
+  (and the `build` loop-break, which is itself `land` while aloft, no longer
+  fights it). PLAYBOOK loop-guard diagram updated.
+
 ## [3.1.18] - 2026-09-07
 
 ### Changed

@@ -349,7 +349,7 @@ class AutoPlayerTest extends NHAUnitTestCase
         $recent = [
             ['verb' => 'chop', 'args' => ['n' => 5], 'tick' => 0],
             ['verb' => 'move', 'args' => ['x' => 33, 'y' => 114], 'tick' => 0],
-            ['verb' => 'land', 'args' => [], 'tick' => 0],
+            ['verb' => 'mine', 'args' => ['n' => 1], 'tick' => 0],
             ['verb' => 'move', 'args' => ['x' => 33, 'y' => 114], 'tick' => 0],
             ['verb' => 'ride', 'args' => [], 'tick' => 0],
             ['verb' => 'move', 'args' => ['x' => 33, 'y' => 114], 'tick' => 0],
@@ -361,17 +361,26 @@ class AutoPlayerTest extends NHAUnitTestCase
     /**
      * @covers \NHA\Brain\AutoPlayer
      */
+    public function testDetectLoopIgnoresAMultiTurnDescent(): void
+    {
+        // `land` repeated is a bounded descent, not a loop.
+        $this->assertNull(AutoPlayer::detectLoop(array_fill(0, 9, ['verb' => 'land', 'args' => [], 'tick' => 0])));
+    }
+
+    /**
+     * @covers \NHA\Brain\AutoPlayer
+     */
     public function testDetectLoopFlagsATraversalOnlyStretch(): void
     {
         $recent = [
             ['verb' => 'move', 'args' => ['x' => 1, 'y' => 1], 'tick' => 0],
             ['verb' => 'ride', 'args' => [], 'tick' => 0],
-            ['verb' => 'land', 'args' => [], 'tick' => 0],
             ['verb' => 'move', 'args' => ['x' => 2, 'y' => 2], 'tick' => 0],
-            ['verb' => 'land', 'args' => [], 'tick' => 0],
             ['verb' => 'ride', 'args' => [], 'tick' => 0],
-            ['verb' => 'land', 'args' => [], 'tick' => 0],
             ['verb' => 'move', 'args' => ['x' => 3, 'y' => 3], 'tick' => 0],
+            ['verb' => 'ride', 'args' => [], 'tick' => 0],
+            ['verb' => 'move', 'args' => ['x' => 4, 'y' => 4], 'tick' => 0],
+            ['verb' => 'ride', 'args' => [], 'tick' => 0],
         ];
 
         $this->assertStringContainsString('no productive action', (string) AutoPlayer::detectLoop($recent));
