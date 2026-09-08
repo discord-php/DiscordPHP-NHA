@@ -104,18 +104,23 @@ final class Ladder
             return $combat;
         }
 
-        // 1. Assemble anything already crafted.
-        if (count((array) ($raw['loose_parts'] ?? [])) > 0) {
-            return ['verb' => 'finalize', 'args' => [], 'why' => 'you have loose parts — assemble them into a vehicle'];
+        // 1. Assemble crafted parts into a vehicle — but only once there are
+        //    enough for a working one. A lone `landing_gear` finalizes into an
+        //    inert hull (drives=false, flies=false, fuel_cap=0) that then jams
+        //    the `deploy` rung; wait for 3+ parts.
+        if (count((array) ($raw['loose_parts'] ?? [])) >= 3 && ! self::hasDeadHull($raw)) {
+            return ['verb' => 'finalize', 'args' => [], 'why' => 'you have enough loose parts — assemble them into a vehicle'];
         }
 
         // 1b. Passive income: a finished vehicle that is not out working yet →
         //     `deploy` it to roam and mine autonomously. An expansionist keeps
-        //     an orbital-engine ship to FLY, not to deploy for mining.
+        //     an orbital-engine ship to FLY, not to deploy for mining. Skip an
+        //     inert hull — `deploy` rejects "no vehicle that drives or flies".
         foreach ((array) ($raw['vehicles'] ?? []) as $vehicle) {
             $vehicle = (array) $vehicle;
             $isOrbital = ! empty($vehicle['orbital_engine']) || ! empty($vehicle['ion_thruster']);
-            if (empty($vehicle['deployed']) && empty($vehicle['roaming']) && empty($vehicle['out'])
+            $canWork = ! empty($vehicle['drives']) || ! empty($vehicle['flies']);
+            if ($canWork && empty($vehicle['deployed']) && empty($vehicle['roaming']) && empty($vehicle['out'])
                 && ! ($stance === Stance::Expansionist->value && $isOrbital)) {
                 return ['verb' => 'deploy', 'args' => [], 'why' => 'you have a finished vehicle — deploy it for passive mining income'];
             }
@@ -354,8 +359,50 @@ final class Ladder
      */
     public static function hasAnyVehicle(array $raw): bool
     {
-        return (array) ($raw['vehicles'] ?? []) !== [];
+        foreach ((array) ($raw['vehicles'] ?? []) as $v) {
+            $v = (array) $v;
+            if (! empty($v['drives']) || ! empty($v['flies'])) {
+                return true;
+            }
+        }
+
+        return false;
     }
+
+    /**
+     * A `finalize`d vehicle that came out inert — no drive, no flight, no
+     * orbital engine, zero fuel capacity (what a single stray `landing_gear`
+     * assembles into). It cannot `deploy`, `land` or fly; the fix is to build
+     * more parts and `finalize` again, not to keep poking this one.
+     *
+     * @param array<string,mixed> $raw
+     */
+    public static function hasDeadHull(array $raw): bool
+    {
+        foreach ((array) ($raw['vehicles'] ?? []) as $v) {
+            $v = (array) $v;
+            $useless = empty($v['drives']) && empty($v['flies']) && empty($v['orbital_engine']);
+            if ($useless && (int) ($v['fuel_cap'] ?? 0) === 0) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * The vehicle-part archetypes to feed `build`, minus the ones the engine
+     * has already rejected as "unknown part". `build{part:landing_gear}` is a
+     * confirmed hit; the rest are the documented hints (fuel_tank from the
+     * expansion notes) and standard airframe pieces. Rotated by tick so the
+     * deterministic path searches the (undocumented) vocabulary instead of
+     * hammering one name.
+     *
+     * @var list<string>
+     */
+    public const SHIP_PART_ARCHETYPES = [
+        'fuel_tank', 'landing_gear', 'wing', 'wheel', 'hull', 'frame', 'cockpit', 'rotor', 'airframe', 'body',
+    ];
 
     /**
      * A shipless way down from space: `ride` a completed elevator back to the
@@ -702,8 +749,9 @@ final class Ladder
             // the agent has been banking; `combine` is the low-credit fallback.
             // This runs ahead of the generic ladder's tower rung.
             if ($onGround && ! $flightReady) {
-                // Loose parts on hand → bundle them into the vehicle.
-                if (count((array) ($raw['loose_parts'] ?? [])) >= 1) {
+                // Enough loose parts for a working ship → bundle them. One
+                // stray part finalizes into an inert hull, so hold at 3+.
+                if (count((array) ($raw['loose_parts'] ?? [])) >= 3 && ! self::hasDeadHull($raw)) {
                     return ['verb' => 'finalize', 'args' => ['name' => 'accord_runner'], 'why' => 'expansionist — finalize the loose parts into a ship'];
                 }
                 // The orbital engine.
@@ -745,10 +793,14 @@ final class Ladder
                 // name; a hit lands in `loose_parts` and the rung above it
                 // finalizes. The live model explores the same space in parallel.
                 if ($has('ion_thruster') > 0) {
-                    $parts = ['fuel_tank', 'landing_gear', 'chassis', 'frame', 'hull', 'wing', 'wheel', 'cockpit'];
-                    $part = $parts[(int) ($raw['tick'] ?? 0) % count($parts)];
+                    $part = self::SHIP_PART_ARCHETYPES[(int) ($raw['tick'] ?? 0) % count(self::SHIP_PART_ARCHETYPES)];
+                    $args = ['part' => $part];
+                    // Fit the orbital drive onto the last structural part.
+                    if (in_array($part, ['hull', 'frame', 'body', 'airframe'], true)) {
+                        $args['with'] = ['ion_thruster' => 1];
+                    }
 
-                    return ['verb' => 'build', 'args' => ['part' => $part], 'why' => "expansionist — build a {$part} toward the ship (rotating archetypes; wrong ones reject harmlessly), then finalize"];
+                    return ['verb' => 'build', 'args' => $args, 'why' => "expansionist — build a {$part} toward the ship (rotating archetypes; \"unknown part\" just means try the next), then finalize"];
                 }
                 // Low on credits and can't craft yet → let the generic ladder
                 // earn (harvest / sell). It will NOT tower-spam: the tower rung

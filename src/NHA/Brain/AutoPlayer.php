@@ -75,7 +75,24 @@ final class AutoPlayer
         'steel' => 4,
         'titanium' => 4,
         'superalloy' => 4,
+        // Flight kit — a loop-break / research `combine` must never eat the
+        // last one (a forced `combine algae+ion_thruster` cost a real thruster).
+        'ion_thruster' => 1,
+        'heat_shield' => 1,
+        'acid_skin' => 1,
+        'cryo_fuel' => 1,
+        'helium3' => 1,
+        'hydrogen' => 1,
+        'landing_gear' => 1,
+        'fuel_tank' => 1,
     ];
+
+    /**
+     * `build{part:X}` values the engine has already answered with
+     * `"unknown part X"`. The gear-up rotation skips these and
+     * {@see self::step()} rewrites a model `build` that names one.
+     */
+    private const DEAD_BUILD_PARTS = ['thruster', 'ion_thruster', 'chassis', 'engine', 'motor'];
 
     /**
      * `a+b => true` for every combine set the world has already invented, from
@@ -887,16 +904,47 @@ final class AutoPlayer
                     $verb = (string) ($decision['verb'] ?? '');
                 }
 
-                // `build` is a forward verb the loop guard will not flag, so a
-                // wrong `part` argument can spin quietly. If the last three
-                // turns were all `build` and still no vehicle, the guess is not
-                // landing — break for a tick (the server also un-throttles) and
-                // let the next pass re-evaluate (parts made → `finalize`).
-                if ($verb === 'build' && ! Ladder::hasAnyVehicle($rawObs)) {
-                    $lastThree = array_slice(array_map(static fn($r): string => (string) ($r['verb'] ?? ''), $recent), -3);
-                    if ($lastThree === ['build', 'build', 'build']) {
-                        $decision = self::idle($rawObs, 'three build attempts with no vehicle — pausing a tick before retrying the assembly');
-                        $verb = (string) $decision['verb'];
+                // The model keeps asking for `build{part:"thruster"}` /
+                // `"chassis"` — parts the engine has already rejected as
+                // "unknown part". Swap a known-dead part for the ladder's
+                // rotated archetype so the search actually advances.
+                if ($verb === 'build'
+                    && in_array((string) ($decision['args']['part'] ?? ''), self::DEAD_BUILD_PARTS, true)
+                ) {
+                    $tickNow = (int) ($observation->get('tick') ?? 0);
+                    $part = Ladder::SHIP_PART_ARCHETYPES[$tickNow % count(Ladder::SHIP_PART_ARCHETYPES)];
+                    $decision = ['verb' => 'build', 'args' => ['part' => $part], 'reason' => "\"{$decision['args']['part']}\" is a rejected part — trying {$part} instead"];
+                }
+
+                // `deploy` on an inert finalized hull (drives=false, flies=false)
+                // is rejected forever. Fall back to gearing a real ship.
+                if ($verb === 'deploy' && ! Ladder::hasAnyVehicle($rawObs) && Ladder::hasDeadHull($rawObs)) {
+                    $gear = $this->fallbackDecision($observation, 'the finalized hull is inert — build more parts, not deploy', $tried, $known, $researchPaying, $stance);
+                    if ($gear !== null && ($gear['verb'] ?? '') !== 'deploy') {
+                        $decision = $gear;
+                        $verb = (string) ($decision['verb'] ?? '');
+                    }
+                }
+
+                // `build` is a forward verb the loop guard will not flag, so
+                // repeating the SAME `part` can spin quietly (rotating through
+                // different parts is fine — that is the search). If the last
+                // three turns were `build` with this exact part, pause a tick.
+                if ($verb === 'build') {
+                    $thisPart = (string) ($decision['args']['part'] ?? '');
+                    $lastThree = array_slice($recent, -3);
+                    $sameRun = count($lastThree) === 3 && array_reduce(
+                        $lastThree,
+                        static fn(bool $c, $r): bool => $c
+                            && (string) ($r['verb'] ?? '') === 'build'
+                            && (string) (((array) ($r['args'] ?? []))['part'] ?? '') === $thisPart,
+                        true,
+                    );
+                    if ($sameRun && $thisPart !== '') {
+                        $tickNow = (int) ($observation->get('tick') ?? 0);
+                        $next = Ladder::SHIP_PART_ARCHETYPES[($tickNow + 1) % count(Ladder::SHIP_PART_ARCHETYPES)];
+                        $next = $next === $thisPart ? Ladder::SHIP_PART_ARCHETYPES[($tickNow + 2) % count(Ladder::SHIP_PART_ARCHETYPES)] : $next;
+                        $decision = ['verb' => 'build', 'args' => ['part' => $next], 'reason' => "\"{$thisPart}\" tried three times — rotating to {$next}"];
                     }
                 }
 

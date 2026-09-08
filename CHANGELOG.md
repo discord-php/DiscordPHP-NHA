@@ -12,6 +12,32 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.7] - 2026-09-08
+
+### Fixed
+- The 3.2.6 live run found `build{part:landing_gear}` is a **confirmed hit**
+  (`chassis`/`thruster`/`ion_thruster` are not) — but then `finalize`d a ship
+  from that one part into an **inert hull** (`drives=false, flies=false,
+  fuel_cap=0`), and the agent spent the next dozen turns trying to `deploy` it
+  ("no vehicle that drives or flies") until the loop-breaker forced a
+  `combine algae+ion_thruster` that **spent a real ion_thruster** into the Guild.
+  - `finalize` now waits for **3+ loose parts** (rung 1 and the expansionist
+    gear-up), and is suppressed while an inert hull already sits in `vehicles`
+    (`Ladder::hasDeadHull()`).
+  - `Ladder::hasAnyVehicle()` now means a vehicle that actually `drives` or
+    `flies`; rung 1b `deploy` skips an inert hull.
+  - Flight-kit items (`ion_thruster`, `heat_shield`, `acid_skin`, `cryo_fuel`,
+    `helium3`, `hydrogen`, `landing_gear`, `fuel_tank`) join
+    `BUILD_MATERIAL_RESERVE` at 1, so a research / loop-break `combine` can
+    never consume the last one.
+  - `AutoPlayer` rewrites a model `build` that names a known-dead part
+    (`DEAD_BUILD_PARTS`) to the ladder's rotated archetype, and the
+    same-part-three-times guard rotates to the next archetype instead of
+    stalling (rotating *through* parts is the search, not a loop).
+  - Part rotation widened to `Ladder::SHIP_PART_ARCHETYPES`
+    (`fuel_tank, landing_gear, wing, wheel, hull, frame, cockpit, rotor,
+    airframe, body`), fitting `with:{ion_thruster:1}` on a structural part.
+
 ## [3.2.6] - 2026-09-08
 
 ### Fixed

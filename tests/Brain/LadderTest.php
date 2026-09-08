@@ -172,10 +172,19 @@ class LadderTest extends NHAUnitTestCase
         $suggestion = Ladder::suggestion([
             'tick' => 1,
             'inventory' => ['credits' => 100],
-            'vehicles' => [['name' => 'rover', 'deployed' => false]],
+            'vehicles' => [['name' => 'rover', 'deployed' => false, 'drives' => true]],
         ], [], [], false);
 
         $this->assertSame('deploy', $suggestion['verb']);
+
+        // An inert hull (no drive, no flight) is NOT deployed — `deploy`
+        // rejects it; the ladder moves on to other work.
+        $dead = Ladder::suggestion([
+            'tick' => 1,
+            'inventory' => ['credits' => 100],
+            'vehicles' => [['name' => 'ship_v1', 'drives' => false, 'flies' => false, 'fuel_cap' => 0]],
+        ], [], [], false);
+        $this->assertNotSame('deploy', $dead['verb'] ?? null);
     }
 
     // ── Expansionist stance — the Solar Accord flight chain ────────────
