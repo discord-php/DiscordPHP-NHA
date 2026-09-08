@@ -45,6 +45,22 @@ class StanceTest extends NHAUnitTestCase
     }
 
     /**
+     * On Earth, once minimally geared (weapon + ammo + a medicine), the drive
+     * is the Solar Accord mission — expansionist, not homestead.
+     *
+     * @covers \NHA\Brain\Stance
+     */
+    public function testRanksExpansionistOnceGearedOnEarth(): void
+    {
+        $geared = ['tick' => 100, 'inventory' => ['kinetic_gun' => 1, 'slug' => 6, 'stimpack' => 1]];
+        $this->assertSame(Stance::Expansionist, Stance::pick($geared, 'homestead', 0));
+
+        // Still unarmed → homestead (gear up first).
+        $bare = ['tick' => 100, 'inventory' => ['wood' => 20]];
+        $this->assertSame(Stance::Homestead, Stance::pick($bare, 'homestead', 0));
+    }
+
+    /**
      * A fat pile plus real market work to do (here: a raw stockpiled past the
      * hoard cap) ranks Capitalist.
      *

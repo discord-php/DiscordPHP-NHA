@@ -440,7 +440,7 @@ class StateStoreTest extends NHAUnitTestCase
     {
         $store = new StateStore($this->path);
 
-        $this->assertSame('explore', $store->bumpForcedObjective(7, 100));
+        $this->assertSame('expand', $store->bumpForcedObjective(7, 100)); // 'expand' now leads the rotation
         $this->assertSame('wealth', $store->bumpForcedObjective(7, 105));
         $this->assertSame('build', $store->bumpForcedObjective(7, 110));
 
@@ -450,7 +450,7 @@ class StateStoreTest extends NHAUnitTestCase
         $this->assertNull($store->getForcedObjective(7, 200));
         // Wraps back round.
         $this->assertSame('research', $store->bumpForcedObjective(7, 210));
-        $this->assertSame('explore', $store->bumpForcedObjective(7, 215));
+        $this->assertSame('expand', $store->bumpForcedObjective(7, 215));
     }
 
     /**

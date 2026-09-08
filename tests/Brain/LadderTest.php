@@ -177,4 +177,86 @@ class LadderTest extends NHAUnitTestCase
 
         $this->assertSame('deploy', $suggestion['verb']);
     }
+
+    // ── Expansionist stance — the Solar Accord flight chain ────────────
+
+    /**
+     * @covers \NHA\Brain\Ladder::suggestion
+     */
+    public function testExpansionistLandsOnceArrivedAtABody(): void
+    {
+        $inOrbitOfMars = [
+            'tick' => 5, 'in_space' => true, 'altitude' => 320,
+            'inventory' => self::KIT + ['credits' => 500],
+            'expansion' => ['at_body' => 'mars'],
+        ];
+        $pick = Ladder::suggestion($inOrbitOfMars, [], [], false, 'expansionist');
+        $this->assertSame('land_body', $pick['verb']);
+
+        $atMoon = $inOrbitOfMars;
+        $atMoon['expansion']['at_body'] = 'moon';
+        $this->assertSame('land_moon', Ladder::suggestion($atMoon, [], [], false, 'expansionist')['verb']);
+    }
+
+    /**
+     * @covers \NHA\Brain\Ladder::suggestion
+     */
+    public function testExpansionistFundsTheColonyOnTheBodySurface(): void
+    {
+        $onMars = [
+            'tick' => 5, 'in_space' => true, 'altitude' => 0,
+            'inventory' => self::KIT + ['credits' => 500, 'metal' => 10],
+            'expansion' => [
+                'at_body' => 'mars',
+                'colony' => ['complete' => false, 'next_module' => 'ares_base'],
+            ],
+        ];
+        $pick = Ladder::suggestion($onMars, [], [], false, 'expansionist');
+        $this->assertSame('construct', $pick['verb']);
+        $this->assertSame('colony', $pick['args']['shape']);
+        $this->assertSame('mars', $pick['args']['body']);
+        $this->assertSame('ares_base', $pick['args']['module']);
+    }
+
+    /**
+     * @covers \NHA\Brain\Ladder::suggestion
+     */
+    public function testExpansionistDepartsFromEarthOrbitWhenReadyAndAWindowIsOpen(): void
+    {
+        $earthOrbit = [
+            'tick' => 5, 'in_space' => true, 'altitude' => 320,
+            'inventory' => self::KIT + ['ion_thruster' => 1, 'hydrogen' => 4, 'heat_shield' => 1],
+            'expansion' => ['at_body' => null, 'windows' => [
+                'mars' => ['open' => true], 'venus' => ['open' => false],
+            ]],
+        ];
+        $pick = Ladder::suggestion($earthOrbit, [], [], false, 'expansionist');
+        $this->assertSame('depart', $pick['verb']);
+        $this->assertSame('mars', $pick['args']['dest']);
+
+        // Without the heat_shield Mars is off the table — no depart.
+        $noShield = $earthOrbit;
+        unset($noShield['inventory']['heat_shield']);
+        $pick2 = Ladder::suggestion($noShield, [], [], false, 'expansionist');
+        $this->assertNotSame('depart', $pick2['verb'] ?? null);
+    }
+
+    /**
+     * @covers \NHA\Brain\Ladder::suggestion
+     */
+    public function testExpansionistHeadsForTheElevatorWhenFlightReadyOnTheGround(): void
+    {
+        $onGround = [
+            'tick' => 5, 'in_space' => false, 'altitude' => 0, 'position' => [10, 10],
+            'inventory' => self::KIT + ['ion_thruster' => 1, 'hydrogen' => 4],
+            'elevators' => [['x' => 80, 'y' => 90]],
+            'nearby_deposits' => [],
+        ];
+        $walk = Ladder::suggestion($onGround, [], [], false, 'expansionist');
+        $this->assertSame('move', $walk['verb']);
+        $this->assertSame(['x' => 80, 'y' => 90], $walk['args']);
+
+        $onGround['position'] = [80, 90];
+        $this->assertSame('ride', Ladder::suggestion($onGround, [], [], false, 'expansionist')['verb']);
+    }
 }

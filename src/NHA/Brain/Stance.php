@@ -91,35 +91,31 @@ enum Stance: string
             }
         }
 
-        // 2. Off Earth, or able and cleared to leave it.
+        // 2. THE MISSION — expansion toward the Solar Accord is the default drive.
+        //    Off Earth or arrived at a body: obviously expansionist. On Earth:
+        //    expansionist the moment the agent is minimally geared (a weapon +
+        //    ammo AND a medicine), because from then on every turn should be a
+        //    step toward a body. Homestead is only the "not even survivable yet"
+        //    early phase.
         $expansion = (array) ($raw['expansion'] ?? []);
         if (($raw['in_space'] ?? false) || ($expansion['at_body'] ?? null) !== null) {
             return self::Expansionist;
         }
-        $windowOpen = false;
-        foreach ((array) ($expansion['windows'] ?? []) as $w) {
-            $windowOpen = $windowOpen || (is_array($w) && ($w['open'] ?? false));
-        }
-        if ($windowOpen && $has('ion_thruster') > 0 && ($has('cryo_fuel') > 0 || $has('helium3') > 0)) {
+        $hasMedicine = $has('medkit') > 0 || $has('stimpack') > 0 || $has('salve') > 0 || $has('antidote') > 0;
+        if ($armed && $hasMedicine) {
             return self::Expansionist;
         }
 
-        // 3. A fat credit pile, nothing to build with it right now, AND real
-        //    market work to do. The market-work clause is load-bearing: without
-        //    it the stance latches. Capitalist's own steer sells surplus and
-        //    never lets the agent assemble metal + composite, so `$canBuildSoon`
-        //    can never flip true and it is stuck day-trading forever (observed:
-        //    endless "buy carbon → combine aluminum+carbon → sell" with no
-        //    `construct`). On the ground a build is always fundable from a credit
-        //    pile, so only hold Capitalist while a contract or a genuine glut
-        //    actually needs working.
+        // 3. A fat credit pile with real market work to do (a covered contract or
+        //    a glut past the hoard cap) — bank it, then it funds the mission.
+        //    The market-work clause is load-bearing: without it the stance
+        //    latches (Capitalist sells surplus and never lets the agent gear up).
         $credits = $has('credits');
-        $canBuildSoon = $has('composite') >= 2 && $has('metal') >= 8;
-        if ($credits >= Ladder::CREDIT_FLOOR * 6 && ! $canBuildSoon && self::hasMarketWork($raw, $inv)) {
+        if ($credits >= Ladder::CREDIT_FLOOR * 6 && self::hasMarketWork($raw, $inv)) {
             return self::Capitalist;
         }
 
-        // 4. Dig in.
+        // 4. Early game — gear up on Earth first.
         return self::Homestead;
     }
 
@@ -172,10 +168,12 @@ enum Stance: string
             self::Capitalist => 'STANCE: CAPITALIST — credits are the game now. `sell` surplus raws high, `fulfill` '
                 . 'contracts whose `want` you cover, post `order`s to buy low / sell high, and only `construct` when '
                 . 'a tower is basically free. Bank the pile, then convert it to builder points later.',
-            self::Expansionist => 'STANCE: EXPANSIONIST — get off Earth and stay productive there. `move` to an '
-                . '`elevator` base and `ride` up; in orbit `dock` an asteroid and `mine` iridium/nickel; `invest` in '
-                . 'an open Station module; on a body `construct shape=extractor` and fund the `colony`/`terraform`. '
-                . 'Craft `heat_shield` / `acid_skin` / `hydrogen` on Earth BEFORE you `depart`.',
+            self::Expansionist => 'STANCE: EXPANSIONIST — drive for the Solar Accord (Mars terraformed, Venus held, a '
+                . 'Moon base). On a body: `land_body`/`land_moon`, then `construct{shape:colony|extractor|terraform}` '
+                . 'and fund the board — this is the win. In Earth orbit with a fuelled ion-thruster ship and an open '
+                . 'window: `depart` (a moon first — a Forward Base cheapens every later route). On the ground: gear a '
+                . 'ship (`build` parts → `finalize`), craft `heat_shield` / `acid_skin` / `hydrogen`, then `ride`/`launch` '
+                . 'up. `invest` spare credits in any open Station/colony/terraform board. Grind on Earth ONLY to pay for all this.',
         };
     }
 }

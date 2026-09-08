@@ -32,8 +32,12 @@ trait LoopStrategyStateTrait
     /** After a loop break, do not break again for this many ticks — let it play out. */
     private const LOOP_BREAK_COOLDOWN_TICKS = 24;
 
-    /** Objectives cycled through, in order, each time the agent is caught looping. */
-    public const OBJECTIVE_ROTATION = ['explore', 'wealth', 'build', 'research'];
+    /**
+     * Objectives cycled through, in order, each time the agent is caught
+     * looping. `expand` (progress the Solar Accord mission — reach a body, build
+     * a colony/extractor/terraform, or head for the elevator) is tried first.
+     */
+    public const OBJECTIVE_ROTATION = ['expand', 'wealth', 'build', 'research'];
 
     /** Research counts as "paying" for this long after the last inventor-point gain. */
     private const RESEARCH_PAYING_WINDOW = 900;

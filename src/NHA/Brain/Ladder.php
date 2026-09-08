@@ -484,22 +484,74 @@ final class Ladder
         }
 
         if ($stance === Stance::Expansionist->value) {
-            $onGround = ! ($raw['in_space'] ?? false) && (int) ($raw['altitude'] ?? 0) === 0;
-            // On a body → build an extractor for standing income.
-            if (! $onGround && ($raw['expansion']['at_body'] ?? null) !== null && $has('metal') >= 4) {
-                return ['verb' => 'construct', 'args' => ['shape' => 'extractor', 'kind' => 'mine'], 'why' => 'expansionist stance — an extractor keeps paying after you leave'];
+            $expansion = (array) ($raw['expansion'] ?? []);
+            $atBody = $expansion['at_body'] ?? null;
+            $alt = (int) ($raw['altitude'] ?? 0);
+            $inSpace = (bool) ($raw['in_space'] ?? false);
+            $onGround = ! $inSpace && $alt === 0;
+
+            // Arrived at a body but still in its orbit → put down.
+            if ($atBody !== null && $alt > 0) {
+                $verb = in_array((string) $atBody, ['moon', 'luna'], true) ? 'land_moon' : 'land_body';
+
+                return ['verb' => $verb, 'args' => [], 'why' => "expansionist — you have reached {$atBody}; land and build the base"];
             }
-            // In orbit near an asteroid → latch on.
-            if (($raw['in_space'] ?? false) && (array) ($raw['asteroids'] ?? []) !== []) {
-                return ['verb' => 'dock', 'args' => [], 'why' => 'expansionist stance — dock the asteroid, then mine it'];
+
+            // On a body → the mission itself: fund the colony, then the
+            // terraform stages; an extractor in between for standing income.
+            if ($atBody !== null && $alt === 0) {
+                $colony = (array) ($expansion['colony'] ?? []);
+                $terraform = (array) ($expansion['terraform'] ?? []);
+                if ($colony !== [] && empty($colony['complete']) && $credits >= 200) {
+                    $module = (string) ($colony['next_module'] ?? $colony['module'] ?? '');
+                    $args = array_filter(['shape' => 'colony', 'body' => (string) $atBody, 'module' => $module], 'strlen');
+
+                    return ['verb' => 'construct', 'args' => $args, 'why' => "expansionist — fund the {$atBody} colony ({$module})"];
+                }
+                if ($terraform !== [] && ! empty($colony['complete']) && $credits >= 200) {
+                    $stage = (string) ($terraform['next_stage'] ?? $terraform['stage'] ?? '');
+                    $args = array_filter(['shape' => 'terraform', 'body' => (string) $atBody, 'stage' => $stage], 'strlen');
+
+                    return ['verb' => 'construct', 'args' => $args, 'why' => "expansionist — fund the {$atBody} terraform stage {$stage}"];
+                }
+                if ($has('metal') >= 4) {
+                    return ['verb' => 'construct', 'args' => ['shape' => 'extractor', 'kind' => 'mine', 'body' => (string) $atBody], 'why' => "expansionist — an extractor on {$atBody} keeps paying after you fly home"];
+                }
             }
-            // On the ground and stocked → head for the elevator.
-            $stocked = $raws !== [] && (int) reset($raws) >= 15;
-            if ($onGround && $stocked) {
+
+            // In Earth orbit, flight-ready, a window open you can afford → depart
+            // (a moon first — a Forward Base discounts every later route).
+            $fuelled = $has('hydrogen') > 0 || $has('cryo_fuel') > 0 || $has('helium3') > 0;
+            $flightReady = $has('ion_thruster') > 0 && $fuelled;
+            if ($inSpace && $alt >= 300 && $atBody === null && $flightReady) {
+                $order = ['deimos' => 50, 'phobos' => 55, 'mars' => 100, 'venus' => 130];
+                foreach ($order as $dest => $dv) {
+                    $w = (array) (($expansion['windows'][$dest] ?? []));
+                    if (! empty($w['open'])) {
+                        $needShield = in_array($dest, ['mars', 'venus'], true);
+                        $needAcid = $dest === 'venus';
+                        if ((! $needShield || $has('heat_shield') > 0) && (! $needAcid || $has('acid_skin') > 0)) {
+                            return ['verb' => 'depart', 'args' => ['dest' => $dest], 'why' => "expansionist — {$dest} window is open and you are fuelled and shielded"];
+                        }
+                    }
+                }
+            }
+
+            // In orbit by an asteroid → grab space metals for parts.
+            if ($inSpace && (array) ($raw['asteroids'] ?? []) !== [] && ! ($raw['docked'] ?? false)) {
+                return ['verb' => 'dock', 'args' => [], 'why' => 'expansionist — dock the asteroid and mine iridium/nickel for ship parts'];
+            }
+
+            // On the ground and flight-ready → get to the elevator base.
+            if ($onGround && $flightReady) {
                 foreach ((array) ($raw['elevators'] ?? []) as $e) {
                     $e = (array) $e;
                     if (isset($e['x'], $e['y'])) {
-                        return ['verb' => 'move', 'args' => ['x' => (int) $e['x'], 'y' => (int) $e['y']], 'why' => 'expansionist stance — walk to the elevator and ride up'];
+                        $here = (int) $e['x'] === $x && (int) $e['y'] === $y;
+
+                        return $here
+                            ? ['verb' => 'ride', 'args' => [], 'why' => 'expansionist — ride the elevator to orbit and depart']
+                            : ['verb' => 'move', 'args' => ['x' => (int) $e['x'], 'y' => (int) $e['y']], 'why' => 'expansionist — walk to the elevator base, then ride up'];
                     }
                 }
             }

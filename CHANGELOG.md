@@ -12,6 +12,32 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.0] - 2026-09-08
+
+### Changed
+- The autoplay brain is re-pointed at the **Solar Accord** era meta-win
+  (Mars terraformed, Venus held, a Moon base) instead of grinding the
+  leaderboards. Points, towers and trades are now framed as *means to fund the
+  mission*, not the goal.
+  - `Brain\Playbook` system prompt: a `THE MISSION` block up top; `HOW YOU WIN`
+    rewritten as `HOW YOU MOVE THE MISSION` (reach a body & build there → invest
+    in co-op boards → fund it on Earth); the decision ladder re-ordered so
+    "build on a body" / "go" / "gear for departure" sit above towers, inventing
+    and wealth; the elevator anti-pattern relaxed so reaching orbit to `depart`
+    is encouraged. `VERBS` gains `depart`, `land_moon`, `land_body`, `distress`,
+    `assist` (the LLM could not pick them before) and the expansion `construct`
+    shapes.
+  - `Brain\Stance::rank()`: **expansionist** is now the default drive the moment
+    the agent is minimally geared (weapon + ammo + a medicine) on Earth, not
+    only once it is already in space. Homestead is just the pre-armed early
+    phase; capitalist keeps its market-work gate.
+  - `Brain\Ladder` expansionist `stanceMove`: a real flight chain — `land_*` on
+    arrival, `construct` colony/extractor/terraform on the surface, `depart`
+    from Earth orbit when fuelled/shielded and a window is open (moon first),
+    `dock` for space metals, or walk to the elevator and `ride`.
+  - Loop-break objective rotation leads with `expand` (run the expansionist
+    ladder) instead of `explore`.
+
 ## [3.1.37] - 2026-09-08
 
 ### Fixed

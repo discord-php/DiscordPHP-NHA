@@ -447,6 +447,17 @@ final class AutoPlayer
             ];
         }
 
+        if ($objective === 'expand') {
+            // Reuse the expansionist ladder — it encodes the whole flight chain
+            // (land + build on a body, depart from Earth orbit, head to the
+            // elevator). Take its pick unless it has nothing but `wait`.
+            $pick = Ladder::suggestion($raw, $tried, $known, false, Stance::Expansionist->value);
+            if ($pick !== null && ($pick['verb'] ?? '') !== 'wait') {
+                return ['verb' => (string) $pick['verb'], 'args' => (array) ($pick['args'] ?? []), 'reason' => "{$lead}: {$pick['why']}"];
+            }
+            // else fall through to a relocation step (toward fresh ground / the elevator).
+        }
+
         if ($objective === 'wealth') {
             $best = null;
             $bestQty = 0;
