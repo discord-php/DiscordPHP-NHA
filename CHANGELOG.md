@@ -12,6 +12,16 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.1.24] - 2026-09-08
+
+### Fixed
+- The Discord channel relay re-posted the full observation dashboard on every
+  poll. `AgentObservation::getThreats()` (the `alerts` list) lingers for many
+  ticks after a single hit, and the relay treated "any threat present" as "post
+  now" — so one old `attacked` alert spammed the dashboard every few seconds.
+  It now tracks the newest forwarded alert tick and relays only a genuinely new
+  threat (or a new world-chat message).
+
 ## [3.1.23] - 2026-09-08
 
 ### Added

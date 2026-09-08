@@ -725,19 +725,33 @@ $nha->once('application-init', function () use (&$application_init_called, $mayb
 
 if ($channel_id) {
     $seenMessageCount = 0;
+    // Alerts (`getThreats()`) linger in the observation for many ticks after a
+    // single hit, so track the newest tick already forwarded and only relay a
+    // GENUINELY new threat — otherwise one old alert re-posts the whole
+    // dashboard every poll.
+    $seenThreatTick = 0;
 
-    Loop::get()->addPeriodicTimer($poll_interval, function () use ($nha, $state, $channel_id, $text, &$seenMessageCount): void {
+    Loop::get()->addPeriodicTimer($poll_interval, function () use ($nha, $state, $channel_id, $text, &$seenMessageCount, &$seenThreatTick): void {
         $agent_id = $state->getDefaultAgent();
         if (! $agent_id) {
             return;
         }
 
-        $nha->observe($agent_id)->then(function ($obs) use ($nha, $channel_id, $text, &$seenMessageCount): void {
+        $nha->observe($agent_id)->then(function ($obs) use ($nha, $channel_id, $text, &$seenMessageCount, &$seenThreatTick): void {
             $messages = $obs->getMessages();
             $new = array_slice($messages, $seenMessageCount);
             $seenMessageCount = count($messages);
 
-            if (! $new && ! $obs->getThreats()) {
+            $newThreat = false;
+            foreach ($obs->getThreats() as $threat) {
+                $threatTick = (int) (((array) $threat)['tick'] ?? 0);
+                if ($threatTick > $seenThreatTick) {
+                    $seenThreatTick = $threatTick;
+                    $newThreat = true;
+                }
+            }
+
+            if (! $new && ! $newThreat) {
                 return;
             }
 
