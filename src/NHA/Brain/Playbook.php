@@ -33,7 +33,8 @@ final class Playbook
     /**
      * The verbs the brain may pick, each with a one-line argument hint. A
      * curated slice of the full intent vocabulary — enough to play every phase,
-     * small enough to keep the model on task. `wait` means "pass this tick".
+     * small enough to keep the model on task. To pass a tick use `deposit`
+     * (the engine has no `wait` verb — it rejects as "unknown verb").
      *
      * @var array<string, string>
      */
@@ -44,8 +45,8 @@ final class Playbook
         'gather' => 'n:int — forage the nearest plant within 8 (herb/lichen/fungus/algae → medicine)',
         'plant' => 'no args — spend 1 wood to top up the most-drained tree on your cell (cap 22); rejected if all full',
         'combine' => 'ingredients:{res:qty}, name?:string, n?:int — craft; matches the SET of physics tags, 1 of each per copy',
-        'build' => 'part:string, with?:{res:qty} — craft one vehicle part',
-        'finalize' => 'name?:string — assemble ALL loose parts into one vehicle',
+        'build' => 'part:string, with?:{res:qty ≤3 upgrades} — craft ONE vehicle part into loose_parts. part names are an undocumented enum; the engine answers a wrong one with "unknown part X". Known archetypes to try: fuel_tank, landing_gear, chassis/frame, hull, wing, wheel, cockpit. Add with:{ion_thruster:1} to fit the orbital drive. Vary the guess — do not repeat a rejected part',
+        'finalize' => 'name?:string — assemble ALL loose_parts into one vehicle (computes drive/fly/thrust/fuel_cap/gear). Needs ≥1 loose part first — build them',
         'deploy' => 'no args — send a finalized vehicle off to mine autonomously',
         'construct' => 'shape:string (box/cylinder/sphere/cone/pyramid/monument/extractor/colony/terraform/ziggurat/station), size?, height?, body?, module?, kind?, stage?, name? — raise a structure OR fund a co-op board',
         'ride' => 'no args — ride a completed orbital elevator up/down for free (stand on its base cell)',
@@ -70,7 +71,7 @@ final class Playbook
         'assist' => 'to:int, give:{res:qty} — gift resources to an ally (per-window cap; no credits)',
         'say' => 'text:string — world chat (≤280 chars, one per tick)',
         'tell' => 'to:int, text:string — private message one agent',
-        'wait' => 'no args — do nothing this tick',
+        'deposit' => 'resource:string, n?:int — self-scoped no-op (balance unchanged); use it to pass a tick, there is no `wait` verb',
     ];
 
     /**
@@ -156,7 +157,7 @@ final class Playbook
                • Armed (weapon + matching ammo) and the attacker is within ~8 → `attack` it back.
                • Otherwise `move` directly AWAY from the attacker to break contact.
                DOWNED (0 HP) → you may only `say`/`tell`; you get up on your own after 30 ticks, an ally's `medkit`
-               skips the wait, so `say` for help or `wait` it out.
+               skips it, so `say` for help or ride it out.
             1b. ARM YOURSELF. Out of combat but with no medicine / no weapon / no ammo → fix that NOW, before
                research or trading. `buy` a `stimpack` (heal), a `kinetic_gun` (weapon), then `slug` x5 (ammo);
                or `combine` toward them (gun = barrel + slug + gunpowder; gunpowder = sulfur + carbon). A single
@@ -172,11 +173,13 @@ final class Playbook
                first — a Forward Base cheapens every later route). If flight-ready but still on the ground → `ride` the
                elevator base (free) or `launch` toward orbit.
             5. GEAR FOR DEPARTURE. Grounded and NOT flight-ready → close the gap, one step per turn:
-               • No ship / not enough parts → `build` the cheapest ship part you can afford (need an `ion_thruster`),
-                 keep going until you can `finalize`.
                • No `heat_shield` → `combine` superalloy+composite; no `acid_skin` (Venus) → acid/sulfur+rubber;
-                 thin fuel → `combine` water+motor for `hydrogen`.
-               A rejected `build`/`combine` means you lack the inputs — harvest or `buy` them, don't repeat.
+                 thin fuel → `buy cryo_fuel` or `combine` water+motor for `hydrogen`.
+               • Have an `ion_thruster` + fuel + shield but `vehicles` is still empty → `build` the airframe:
+                 one part per turn into loose_parts, then `finalize`. `part` is an undocumented enum — try
+                 fuel_tank, landing_gear, chassis, frame, hull, wing, wheel, cockpit; "unknown part X" just
+                 means try the next name, do NOT repeat a rejected one. Fit the drive with with:{ion_thruster:1}.
+               A rejected `combine` means you lack the inputs — harvest or `buy` them, don't repeat.
             6. INVEST IN THE CO-OP. Spare credits (≳ 200) and an open board (`invest{module,credits}` for a Station
                module, or fund a `colony`/`terraform` board) → put credits in. Moves the shared bar toward the Accord
                and is never wasted.
@@ -189,7 +192,7 @@ final class Playbook
             9. POSITION. `move` toward the nearest useful thing: an `elevator` base (to reach orbit free), a deposit
                of the raw you are furthest below 30 on, an artifact (`attune`), loot (`collect`). `x,y` = destination,
                `dx,dy` = one ~3-cell step.
-            10. Only then `wait`.
+            10. Only then pass the tick with `deposit` (there is no `wait` verb).
 
             PHASE PLAYBOOK
             - EARLY (on the ground, thin inventory): harvest → `combine` for a `motor` (powered mining yields more)
@@ -229,7 +232,8 @@ final class Playbook
               or do something else. `chop` + `plant` on the same cell nets ~zero; it is not a strategy.
             - PHANTOM INGREDIENTS: `combine`/`build`/`construct` with any item at qty 0 in your Inventory line
               (iron, chip, composite, …). It is rejected outright. Only use what you actually hold.
-            - `wait` while you hold ≥ 20 of a raw and have a use for it.
+            - Idling (`deposit`) while you hold ≥ 20 of a raw and have a use for it.
+            - `build` repeating the SAME `part` after it was rejected "unknown part" — cycle the archetype list.
             - `construct shape=station` when not `in_space`; `depart` with no fueled ion-thruster ship or a closed window.
             - `move` with no target in mind, or toward a resource you already have plenty of.
 

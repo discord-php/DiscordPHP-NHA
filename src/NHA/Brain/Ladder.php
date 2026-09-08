@@ -173,7 +173,7 @@ final class Ladder
             // every tick. Ride/decay down instead.
             if (! self::hasAnyVehicle($raw)) {
                 return self::descentWithoutShip($raw)
-                    ?? ['verb' => 'wait', 'args' => [], 'why' => 'off the ground with no vehicle — wait out the decay'];
+                    ?? self::noop($raw, 'off the ground with no vehicle — wait out the decay');
             }
 
             return ['verb' => 'land', 'args' => [], 'why' => 'nothing to do off the ground — land and build where the materials are'];
@@ -389,7 +389,29 @@ final class Ladder
             return ['verb' => 'move', 'args' => ['x' => (int) $e0['x'], 'y' => (int) $e0['y']], 'why' => 'no ship up here — get to an elevator base to ride down'];
         }
 
-        return ['verb' => 'wait', 'args' => [], 'why' => 'no ship up here — hold for orbital decay back to the ground'];
+        return self::noop($raw, 'no ship up here — hold for orbital decay back to the ground');
+    }
+
+    /**
+     * A real idle turn. NHA has no `wait` verb (`"unknown verb"`); `deposit` is
+     * the designed self-scoped no-op — it touches a resource you already hold
+     * and leaves the balance unchanged. Falls back to a zero-distance `move`
+     * when the hold is completely empty.
+     *
+     * @param array<string,mixed> $raw
+     *
+     * @return array{verb: string, args: array<string,mixed>, why: string}
+     */
+    public static function noop(array $raw, string $why = 'nothing useful to do this turn'): array
+    {
+        foreach ((array) ($raw['inventory'] ?? []) as $res => $qty) {
+            if ($res !== 'credits' && is_numeric($qty) && $qty > 0) {
+                return ['verb' => 'deposit', 'args' => ['resource' => (string) $res, 'n' => 1], 'why' => $why];
+            }
+        }
+        $pos = (array) ($raw['position'] ?? [0, 0]);
+
+        return ['verb' => 'move', 'args' => ['x' => (int) ($pos[0] ?? 0), 'y' => (int) ($pos[1] ?? 0)], 'why' => $why];
     }
 
     /**
@@ -650,7 +672,7 @@ final class Ladder
             // down and build one.
             if ($inSpace && ! $hasShip) {
                 return self::descentWithoutShip($raw)
-                    ?? ['verb' => 'wait', 'args' => [], 'why' => 'expansionist — no ship in space, hold for decay then gear up'];
+                    ?? self::noop($raw, 'expansionist — no ship in space, hold for decay then gear up');
             }
 
             // In Earth orbit, flight-ready, a window open you can afford → depart
@@ -715,13 +737,18 @@ final class Ladder
                     }
                 }
                 // Kit in hand (ion_thruster + fuel + shield) but still no
-                // vehicle → assemble one. `build` turns the ion_thruster
-                // (plus structural materials) into loose parts; `finalize`
-                // then bundles every loose part into one ship. If the depot
-                // engine is not enough on its own, the model — which has the
-                // full parts vocabulary from the Playbook — takes it from here.
+                // vehicle → `build` the airframe parts, then `finalize` bundles
+                // every loose part into one ship. The `part` vocabulary is not
+                // documented anywhere and the engine answers a wrong guess with
+                // "unknown part X", so rotate through the plausible archetypes
+                // (from the expansion-era notes) rather than repeating one bad
+                // name; a hit lands in `loose_parts` and the rung above it
+                // finalizes. The live model explores the same space in parallel.
                 if ($has('ion_thruster') > 0) {
-                    return ['verb' => 'build', 'args' => ['part' => 'thruster', 'with' => ['ion_thruster' => 1]], 'why' => 'expansionist — build the thruster part from the ion_thruster, then finalize'];
+                    $parts = ['fuel_tank', 'landing_gear', 'chassis', 'frame', 'hull', 'wing', 'wheel', 'cockpit'];
+                    $part = $parts[(int) ($raw['tick'] ?? 0) % count($parts)];
+
+                    return ['verb' => 'build', 'args' => ['part' => $part], 'why' => "expansionist — build a {$part} toward the ship (rotating archetypes; wrong ones reject harmlessly), then finalize"];
                 }
                 // Low on credits and can't craft yet → let the generic ladder
                 // earn (harvest / sell). It will NOT tower-spam: the tower rung

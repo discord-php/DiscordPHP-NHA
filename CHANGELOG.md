@@ -12,6 +12,32 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.6] - 2026-09-08
+
+### Fixed
+- **`wait` is not an NHA verb** — the engine rejects it as *"unknown verb"*, so
+  every override and fallback that returned `wait` was a wasted, rejected tick.
+  New `Ladder::noop()` returns the designed no-op (`deposit` of one unit already
+  held, balance unchanged); `AutoPlayer::idle()` wraps it, and a submit-time
+  guard rewrites any lingering `wait` decision. `deposit` replaces `wait` in the
+  Playbook verb catalogue and ladder text.
+
+### Changed
+- The `build` `part` argument is an **undocumented enum** — 3.2.5's fixed guess
+  (`part: thruster`) drew *"unknown part thruster"* every tick, and the live
+  model guessed the same. The gear-up rung now **rotates** through the plausible
+  archetypes (`fuel_tank`, `landing_gear`, `chassis`, `frame`, `hull`, `wing`,
+  `wheel`, `cockpit`) by tick so the deterministic path actually searches the
+  vocabulary; a hit lands in `loose_parts` and the rung above it `finalize`s.
+  The Playbook's `build` hint and GEAR-FOR-DEPARTURE step carry the same list
+  and an explicit "don't repeat a rejected part" rule.
+
+### Notes
+- Live run confirmed 3.2.5 killed the `land`-with-no-vehicle spam and the agent
+  now crafts a `heat_shield` on the way up — real mission progress. The one
+  remaining blocker is discovering a valid `build` part name, which the running
+  agent (ladder + live LLM) is now probing.
+
 ## [3.2.5] - 2026-09-08
 
 ### Fixed

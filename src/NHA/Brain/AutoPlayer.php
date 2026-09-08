@@ -156,6 +156,23 @@ final class AutoPlayer
         return self::signatureFromList(implode(',', $ingredients));
     }
 
+    /**
+     * A real idle decision. NHA has no `wait` verb (it rejects as
+     * `"unknown verb"`); {@see Ladder::noop()} returns the designed no-op
+     * (`deposit` of one unit already held). Shaped as a decision array with a
+     * `reason` for {@see StateStore::recordDecision()}.
+     *
+     * @param array<string,mixed> $raw
+     *
+     * @return array{verb: string, args: array<string,mixed>, reason: string}
+     */
+    private static function idle(array $raw, string $reason): array
+    {
+        $n = Ladder::noop($raw, $reason);
+
+        return ['verb' => $n['verb'], 'args' => $n['args'], 'reason' => $reason];
+    }
+
     /** Normalises a comma-separated ingredient list to the sorted `a+b` signature. */
     private static function signatureFromList(string $csv): string
     {
@@ -853,8 +870,8 @@ final class AutoPlayer
                         $decision = $hold;
                         $verb = (string) ($decision['verb'] ?? '');
                     } else {
-                        $decision = ['verb' => 'wait', 'args' => [], 'reason' => 'in orbit with a ship — holding for a transfer window'];
-                        $verb = 'wait';
+                        $decision = self::idle($rawObs, 'in orbit with a ship — holding for a transfer window');
+                        $verb = (string) $decision['verb'];
                     }
                 }
 
@@ -864,7 +881,9 @@ final class AutoPlayer
                 // way down (ride the elevator, or wait out orbital decay).
                 if (in_array($verb, ['land', 'land_body', 'land_moon'], true) && ! Ladder::hasAnyVehicle($rawObs)) {
                     $down = Ladder::descentWithoutShip($rawObs);
-                    $decision = $down ?? ['verb' => 'wait', 'args' => [], 'reason' => 'no vehicle to land with — waiting out orbital decay'];
+                    $decision = $down !== null
+                        ? ['verb' => $down['verb'], 'args' => $down['args'], 'reason' => $down['why']]
+                        : self::idle($rawObs, 'no vehicle to land with — waiting out orbital decay');
                     $verb = (string) ($decision['verb'] ?? '');
                 }
 
@@ -876,8 +895,8 @@ final class AutoPlayer
                 if ($verb === 'build' && ! Ladder::hasAnyVehicle($rawObs)) {
                     $lastThree = array_slice(array_map(static fn($r): string => (string) ($r['verb'] ?? ''), $recent), -3);
                     if ($lastThree === ['build', 'build', 'build']) {
-                        $decision = ['verb' => 'wait', 'args' => [], 'reason' => 'three build attempts with no vehicle — pausing a tick before retrying the assembly'];
-                        $verb = 'wait';
+                        $decision = self::idle($rawObs, 'three build attempts with no vehicle — pausing a tick before retrying the assembly');
+                        $verb = (string) $decision['verb'];
                     }
                 }
 
@@ -908,6 +927,13 @@ final class AutoPlayer
                             $decision = $stay;
                         }
                     }
+                }
+
+                // NHA has no `wait` verb — the engine rejects it as "unknown
+                // verb". Anything (ladder, model, an override above) that still
+                // asked to idle is rewritten to the real no-op.
+                if (($decision['verb'] ?? '') === 'wait') {
+                    $decision = self::idle($rawObs, (string) ($decision['reason'] ?? 'idle turn'));
                 }
 
                 if (($decision['verb'] ?? '') === 'combine') {
