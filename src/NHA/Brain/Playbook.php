@@ -71,6 +71,9 @@ final class Playbook
     /**
      * The fixed system prompt: mission, the decision ladder, phase playbook and
      * anti-patterns, with the verb catalogue appended. Sent once per turn.
+     *
+     * The ladder here mirrors {@see AgentBrain::suggestion()}; both are
+     * diagrammed in `docs/PLAYBOOK.md` — update it whenever either changes.
      */
     public static function systemPrompt(): string
     {
