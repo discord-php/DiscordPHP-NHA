@@ -808,12 +808,16 @@ final class AutoPlayer
                     }
                 }
 
-                // No riding to orbit before the ship is ready. An expansionist
-                // agent that picks `ride`/`launch`/`depart` while still on the
-                // ground with no fuelled ion-thruster ship gets the gear-up
-                // suggestion instead — this is the "ride up, find nothing, land"
-                // bounce the mission prompt otherwise invites.
-                if (in_array($verb, ['ride', 'launch', 'depart'], true)
+                // Stay on the mission. An expansionist agent on the ground
+                // without a fuelled ion-thruster ship should be GEARING one, not
+                // riding to an empty orbit (`ride`/`launch`/`depart`) and not
+                // raising another vanity spire (`construct` box/cylinder/sphere/
+                // cone/pyramid). Swap either for the gear-up suggestion.
+                // Colony/terraform/extractor/monument `construct`s are the
+                // mission and pass through.
+                $vanityTower = $verb === 'construct'
+                    && in_array((string) ($decision['args']['shape'] ?? ''), ['box', 'cylinder', 'sphere', 'cone', 'pyramid'], true);
+                if (($vanityTower || in_array($verb, ['ride', 'launch', 'depart'], true))
                     && $loopObjective === null
                     && $stance === Stance::Expansionist->value
                     && ! (bool) ($observation->get('in_space') ?? false)
@@ -822,7 +826,7 @@ final class AutoPlayer
                     $held = (array) $observation->getInventory();
                     $fuelled = ($held['hydrogen'] ?? 0) > 0 || ($held['cryo_fuel'] ?? 0) > 0 || ($held['helium3'] ?? 0) > 0;
                     if (! (($held['ion_thruster'] ?? 0) > 0 && $fuelled)) {
-                        $gear = $this->fallbackDecision($observation, 'the ship is not ready — gear up before riding to orbit', $tried, $known, $researchPaying, $stance);
+                        $gear = $this->fallbackDecision($observation, 'stay on the mission — gear the ship, do not ' . ($vanityTower ? 'raise another spire' : 'ride to an empty orbit'), $tried, $known, $researchPaying, $stance);
                         if ($gear !== null && ($gear['verb'] ?? '') !== $verb) {
                             $decision = $gear;
                             $verb = (string) ($decision['verb'] ?? '');

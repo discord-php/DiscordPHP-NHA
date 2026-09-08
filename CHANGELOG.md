@@ -12,6 +12,19 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.2] - 2026-09-08
+
+### Fixed
+- Follow-up to 3.2.1 (live behaviour was still ~50% spires): `AutoPlayer` now
+  also overrides a **model `construct box/cylinder/sphere/cone/pyramid`** pick
+  (not just `ride`/`launch`/`depart`) when the agent is expansionist, grounded
+  and shipless — swapping the vanity spire for the gear-up move.
+  Colony/terraform/extractor/monument `construct`s pass through.
+- `Brain\Ladder` gear-up rung extended: it now also `combine`s **superalloy**
+  (metal + wood) toward a `heat_shield`, and its "buy a missing input" fallback
+  covers `helium3` and `metal` (a `buy` the depot does not stock is just
+  rejected and the ladder moves on).
+
 ## [3.2.1] - 2026-09-08
 
 ### Fixed

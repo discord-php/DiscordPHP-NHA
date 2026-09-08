@@ -567,15 +567,29 @@ final class Ladder
                 if (! $fuelled && $has('water') > 0 && $has('motor') > 0) {
                     return ['verb' => 'combine', 'args' => ['ingredients' => ['water' => 1, 'motor' => 1]], 'why' => 'expansionist — combine hydrogen fuel (water + motor)'];
                 }
-                // heat_shield = superalloy + composite (needed for Mars/Venus).
-                if ($has('heat_shield') === 0 && $has('superalloy') > 0 && $has('composite') > 0) {
-                    return ['verb' => 'combine', 'args' => ['ingredients' => ['superalloy' => 1, 'composite' => 1]], 'why' => 'expansionist — combine a heat_shield for the Mars/Venus route'];
+                // heat_shield = superalloy + composite (needed for Mars/Venus);
+                // superalloy = metal + wood, composite = aluminium + carbon.
+                if ($has('heat_shield') === 0) {
+                    if ($has('superalloy') > 0 && $has('composite') > 0) {
+                        return ['verb' => 'combine', 'args' => ['ingredients' => ['superalloy' => 1, 'composite' => 1]], 'why' => 'expansionist — combine a heat_shield for the Mars/Venus route'];
+                    }
+                    if ($has('superalloy') === 0 && $has('metal') > 0 && $has('wood') > 0) {
+                        return ['verb' => 'combine', 'args' => ['ingredients' => ['metal' => 1, 'wood' => 1]], 'why' => 'expansionist — combine superalloy toward a heat_shield'];
+                    }
                 }
                 // Missing an input for the above and can afford it → buy the
-                // cheapest one rather than idle into a tower.
+                // next one rather than idle into a tower. A `buy` the depot does
+                // not stock is simply rejected and the ladder moves on.
                 if ($credits >= 60) {
-                    foreach (['silicon' => $has('silicon'), 'motor' => $has('motor'), 'water' => $has('water')] as $res => $held) {
-                        if ($held === 0) {
+                    $want = ['silicon', 'motor', 'water'];
+                    if ($has('helium3') === 0 && $has('iridium') === 0) {
+                        $want[] = 'helium3';
+                    }
+                    if ($has('heat_shield') === 0 && $has('superalloy') === 0) {
+                        $want[] = 'metal'; // superalloy = metal + wood
+                    }
+                    foreach ($want as $res) {
+                        if ($has($res) === 0) {
                             return ['verb' => 'buy', 'args' => ['resource' => $res, 'n' => 3], 'why' => "expansionist — buy {$res} toward the ship"];
                         }
                     }

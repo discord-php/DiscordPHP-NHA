@@ -311,6 +311,30 @@ class AutoPlayerTest extends NHAUnitTestCase
     }
 
     /**
+     * An expansionist agent on the ground with no ship that the model steers
+     * into another vanity spire (or a `ride` to an empty orbit) is swapped for
+     * the gear-up move — buying a ship input here.
+     *
+     * @covers \NHA\Brain\AutoPlayer
+     */
+    public function testStepKeepsAGroundedExpansionistGearingInsteadOfTowering(): void
+    {
+        $nha = $this->nhaWith([
+            'tick' => 500, 'downed_until' => 0, 'position' => [10, 10],
+            'in_space' => false, 'altitude' => 0,
+            // armed + medicine → ranks expansionist; credits fund the gear-up buy;
+            // composite + metal would normally trigger a tower.
+            'inventory' => ['kinetic_gun' => 1, 'slug' => 6, 'stimpack' => 1, 'credits' => 4000, 'composite' => 6, 'metal' => 20],
+            'nearby_deposits' => [], 'elevators' => [['x' => 10, 'y' => 10]],
+        ]);
+        (new AutoPlayer($nha, $this->brainReturning('{"verb":"construct","args":{"shape":"box","size":8,"height":40}}'), new StateStore($this->statePath)))
+            ->step(142287, 'tok');
+
+        $this->assertNotSame('construct', $this->posts[0][1]['verb'], 'the vanity spire is swapped for gearing the ship');
+        $this->assertSame('buy', $this->posts[0][1]['verb']);
+    }
+
+    /**
      * @covers \NHA\Brain\AutoPlayer
      */
     public function testStepAllowsAnElevatorTripOnceTheDwellHasPassed(): void
