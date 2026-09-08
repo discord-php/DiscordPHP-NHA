@@ -314,6 +314,17 @@ final class AgentBrain
             );
         }
 
+        // Loop guard fired: the loop runner has detected repetition and forced a
+        // new objective for this turn. Tell the model plainly.
+        $forcedObjective = (string) ($lastDecision['forced_objective'] ?? '');
+        if ($forcedObjective !== '') {
+            $lines[] = sprintf(
+                'LOOP DETECTED (%s). You are stuck. This turn your objective is **%s** — do that and nothing resembling the repeated action.',
+                (string) ($lastDecision['loop'] ?? 'repetition'),
+                $forcedObjective,
+            );
+        }
+
         // Rolling history + a deterministic suggestion. A small local model
         // loops badly on the 7-rung ladder alone; showing it what it already
         // did and one concrete recommended move keeps it productive.

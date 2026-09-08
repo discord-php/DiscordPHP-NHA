@@ -320,6 +320,67 @@ class AutoPlayerTest extends NHAUnitTestCase
     /**
      * @covers \NHA\Brain\AutoPlayer
      */
+    public function testDetectLoopFlagsADominantAction(): void
+    {
+        $recent = array_fill(0, 8, ['verb' => 'chop', 'args' => ['n' => 1], 'tick' => 0]);
+
+        $this->assertStringContainsString('repeating chop', (string) AutoPlayer::detectLoop($recent));
+    }
+
+    /**
+     * @covers \NHA\Brain\AutoPlayer
+     */
+    public function testDetectLoopFlagsAShortCycle(): void
+    {
+        $recent = [];
+        for ($i = 0; $i < 3; $i++) {
+            $recent[] = ['verb' => 'ride', 'args' => [], 'tick' => 0];
+            $recent[] = ['verb' => 'move', 'args' => ['x' => 33, 'y' => 114], 'tick' => 0];
+        }
+
+        $this->assertStringContainsString('cycle', (string) AutoPlayer::detectLoop($recent));
+    }
+
+    /**
+     * @covers \NHA\Brain\AutoPlayer
+     */
+    public function testDetectLoopPassesVariedPlayAndShortHistory(): void
+    {
+        $this->assertNull(AutoPlayer::detectLoop([
+            ['verb' => 'chop', 'args' => ['n' => 15], 'tick' => 0],
+            ['verb' => 'sell', 'args' => ['resource' => 'wood', 'n' => 20], 'tick' => 0],
+            ['verb' => 'move', 'args' => ['x' => 10, 'y' => 10], 'tick' => 0],
+            ['verb' => 'mine', 'args' => ['n' => 5], 'tick' => 0],
+            ['verb' => 'combine', 'args' => ['ingredients' => ['a' => 1, 'b' => 1]], 'tick' => 0],
+            ['verb' => 'construct', 'args' => ['shape' => 'box'], 'tick' => 0],
+        ]));
+        $this->assertNull(AutoPlayer::detectLoop(array_fill(0, 4, ['verb' => 'chop', 'args' => [], 'tick' => 0])));
+    }
+
+    /**
+     * @covers \NHA\Brain\AutoPlayer
+     * @covers \NHA\StateStore
+     */
+    public function testStepOverridesABrainLoopWithARotatedObjective(): void
+    {
+        $state = new StateStore($this->statePath);
+        for ($i = 1; $i <= 8; $i++) {
+            $state->recordDecision(142287, ['verb' => 'chop', 'args' => ['n' => 1], 'reason' => '', 'queued_intent' => null, 'tick' => $i]);
+        }
+
+        $nha = $this->nhaWith(['tick' => 50, 'downed_until' => 0, 'position' => [40, 40], 'inventory' => ['wood' => 25]]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"chop","args":{"n":1}}'), $state);
+
+        $player->step(142287, 'tok');
+
+        $this->assertCount(1, $this->posts);
+        $this->assertNotSame('chop', $this->posts[0][1]['verb'], 'the loop was broken with a different action');
+        $this->assertNotNull($state->getForcedObjective(142287, 50), 'an objective was forced');
+    }
+
+    /**
+     * @covers \NHA\Brain\AutoPlayer
+     */
     public function testStepAllowsAProductionCombineEvenWhenWorldKnown(): void
     {
         // aluminium+carbon → composite is a production recipe: known, but you

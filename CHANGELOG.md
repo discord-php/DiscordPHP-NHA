@@ -4,6 +4,20 @@ All notable changes to DiscordPHP-NHA are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 SemVer with the **major tracking the NHA world API version**.
 
+## [3.1.12] - 2026-09-07
+
+### Added
+- Loop guard. `AutoPlayer::detectLoop()` scans the last ~12 decisions for one
+  action dominating the window or a short 2-4 move pattern repeated three times.
+  When it fires, `StateStore::bumpForcedObjective()` rotates the agent to a
+  different kind of goal (`explore → wealth → build → research`) and
+  `AutoPlayer` acts on it deterministically for that turn — sell the biggest
+  stack, construct/land, try a genuinely fresh pair, or walk a long step in a
+  rotating direction — whatever the brain returned. The forced objective is also
+  handed to the brain as a `LOOP DETECTED` directive and expires after 45 ticks.
+- The rolling decision log kept in `state.json` grows 15 → 24 entries so cyclic
+  patterns are visible across enough repetitions to catch.
+
 ## [3.1.11] - 2026-09-07
 
 ### Added

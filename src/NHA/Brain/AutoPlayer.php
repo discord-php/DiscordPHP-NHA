@@ -143,6 +143,55 @@ final class AutoPlayer
     }
 
     /**
+     * Looks at the recent decision history for an infinite loop: one action
+     * dominating the window, or a short 2-4 move pattern repeated three times.
+     * Returns a short description of the loop, or `null` when the play looks
+     * varied enough.
+     *
+     * @param list<array{verb: string, args: array, tick: ?int}> $recent Oldest first.
+     */
+    public static function detectLoop(array $recent): ?string
+    {
+        $fingerprints = [];
+        foreach ($recent as $r) {
+            $verb = (string) ($r['verb'] ?? '');
+            if ($verb === '') {
+                continue;
+            }
+            $args = (array) ($r['args'] ?? []);
+            ksort($args);
+            $fingerprints[] = $verb . ($args === [] ? '' : ':' . json_encode($args));
+        }
+
+        $n = count($fingerprints);
+        if ($n < 6) {
+            return null;
+        }
+
+        // One action dominates the window.
+        $counts = array_count_values($fingerprints);
+        arsort($counts);
+        $top = (string) array_key_first($counts);
+        if ($counts[$top] >= max(4, (int) ceil($n * 0.6))) {
+            return 'repeating ' . explode(':', $top)[0];
+        }
+
+        // The tail is a 2-4 move pattern repeated three times over.
+        for ($p = 2; $p <= 4; $p++) {
+            if ($n < $p * 3) {
+                continue;
+            }
+            $tail = array_slice($fingerprints, -$p * 3);
+            $unit = array_slice($tail, 0, $p);
+            if (array_slice($tail, $p, $p) === $unit && array_slice($tail, $p * 2, $p) === $unit) {
+                return $p . '-move cycle: ' . implode(' → ', array_map(static fn($s): string => explode(':', $s)[0], $unit));
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * The move for when the brain's pick is a dead end — a spent research
      * `combine`, or riding the elevator in circles. Runs the shared ladder
      * ({@see AgentBrain::suggestion()}) with the entire tried + world-known
@@ -193,6 +242,95 @@ final class AutoPlayer
             'verb' => (string) $suggestion['verb'],
             'args' => (array) ($suggestion['args'] ?? []),
             'reason' => "{$reasonLead} — {$suggestion['why']}",
+        ];
+    }
+
+    /**
+     * A deterministic action for a forced objective, used to break a detected
+     * loop regardless of what the brain picked. Always returns something — the
+     * point is to change the situation so the next observation is different.
+     *
+     * @param string              $objective One of {@see StateStore::OBJECTIVE_ROTATION}.
+     * @param array<string, bool> $known     World-known + dead combine sigs.
+     * @param list<string>        $tried     Sigs already submitted this run.
+     * @param list<string>        $dead      Guild-rejected sigs.
+     *
+     * @return array{verb: string, args: array<string, mixed>, reason: string}
+     */
+    private function loopBreakDecision(string $objective, AgentObservation $observation, array $known, array $tried, array $dead, int $tick): array
+    {
+        $raw = json_decode(json_encode($observation->jsonSerialize()), true);
+        $raw = is_array($raw) ? $raw : [];
+        $inv = (array) ($raw['inventory'] ?? []);
+        $pos = (array) ($raw['position'] ?? [0, 0]);
+        $x = (int) ($pos[0] ?? 0);
+        $y = (int) ($pos[1] ?? 0);
+        $offGround = ($raw['in_space'] ?? false) || (int) ($raw['altitude'] ?? 0) > 0;
+        $lead = "loop broken → {$objective}";
+
+        if ($objective === 'wealth') {
+            $best = null;
+            $bestQty = 0;
+            foreach ($inv as $res => $qty) {
+                if ($res === 'credits' || ! is_numeric($qty)) {
+                    continue;
+                }
+                if ((int) $qty >= 5 && (int) $qty > $bestQty) {
+                    $best = (string) $res;
+                    $bestQty = (int) $qty;
+                }
+            }
+            if ($best !== null) {
+                return ['verb' => 'sell', 'args' => ['resource' => $best, 'n' => min($bestQty, 20)], 'reason' => "{$lead}: sell {$best} for credits"];
+            }
+        }
+
+        if ($objective === 'build') {
+            if ($offGround) {
+                return ['verb' => 'land', 'args' => [], 'reason' => "{$lead}: land so you can build"];
+            }
+            if ((int) ($inv['composite'] ?? 0) >= 2 && (int) ($inv['metal'] ?? 0) >= 8) {
+                $shape = ['box', 'cylinder', 'pyramid', 'cone', 'sphere'][$tick % 5];
+
+                return [
+                    'verb' => 'construct',
+                    'args' => ['shape' => $shape, 'size' => min(8, (int) $inv['metal']), 'height' => 14 * min((int) $inv['composite'], 3), 'name' => 'spire-' . ($tick % 1000)],
+                    'reason' => "{$lead}: raise a {$shape}",
+                ];
+            }
+        }
+
+        if ($objective === 'research') {
+            $raws = [];
+            foreach ($inv as $res => $qty) {
+                if (! in_array($res, ['credits', 'engine', 'motor', 'chip', 'frame', 'fuel'], true) && is_numeric($qty) && $qty > 0) {
+                    $raws[] = (string) $res;
+                }
+            }
+            sort($raws);
+            $count = count($raws);
+            for ($i = 0; $i < $count; $i++) {
+                for ($j = $i + 1; $j < $count; $j++) {
+                    $pair = [$raws[$i], $raws[$j]];
+                    sort($pair);
+                    $sig = implode('+', $pair);
+                    if (! isset($known[$sig]) && ! in_array($sig, $tried, true) && ! in_array($sig, $dead, true)) {
+                        return ['verb' => 'combine', 'args' => ['ingredients' => [$pair[0] => 1, $pair[1] => 1]], 'reason' => "{$lead}: try {$sig}"];
+                    }
+                }
+            }
+        }
+
+        // explore — and the fallthrough for every objective with nothing to do:
+        // a long step in a direction that rotates over time, so the agent walks
+        // off the cell it was stuck on and the next observation is fresh.
+        $dirs = [[13, 0], [0, 13], [-13, 0], [0, -13], [10, 10], [-10, -10], [10, -10], [-10, 10]];
+        $d = $dirs[intdiv(max(0, $tick), 6) % count($dirs)];
+
+        return [
+            'verb' => 'move',
+            'args' => ['x' => max(0, min(219, $x + $d[0])), 'y' => max(0, min(219, $y + $d[1]))],
+            'reason' => "{$lead}: walk to fresh ground",
         ];
     }
 
@@ -292,7 +430,14 @@ final class AutoPlayer
             $tried = $this->state->getTriedCombineSignatures($agent_id);
             $researchPaying = $this->state->noteInventorPoints($agent_id, (int) ($observation->get('inventor_points') ?? 0));
 
-            $recent = $this->state->getRecentDecisions($agent_id, 10);
+            $recent = $this->state->getRecentDecisions($agent_id, 12);
+
+            // Loop guard: if the last several turns are one action on repeat or a
+            // short repeating cycle, force a *different kind* of objective this
+            // turn (rotating explore → wealth → build → research) and act on it
+            // deterministically, whatever the brain says.
+            $loop = self::detectLoop($recent);
+            $loopObjective = $loop !== null ? $this->state->bumpForcedObjective($agent_id, $tick) : null;
 
             $context = ($last ?? []);
             if (($pre['outcome'] ?? null) !== null) {
@@ -302,10 +447,20 @@ final class AutoPlayer
             $context['known_combines'] = array_keys($known);
             $context['tried_combines'] = $tried;
             $context['dead_combines'] = $dead;
+            if ($loop !== null) {
+                $context['loop'] = $loop;
+                $context['forced_objective'] = $loopObjective;
+            }
 
-            return $this->brain->decide($observation, $context ?: null)->then(function (?array $decision) use ($agent_id, $token, $tick, $observation, $known, $tried, $dead, $researchPaying, $recent) {
-                if ($decision === null) {
+            return $this->brain->decide($observation, $context ?: null)->then(function (?array $decision) use ($agent_id, $token, $tick, $observation, $known, $tried, $dead, $researchPaying, $recent, $loop, $loopObjective) {
+                if ($decision === null && $loopObjective === null) {
                     return "💤 Agent #{$agent_id}: brain chose to wait (tick {$tick}).";
+                }
+
+                // Stuck in a loop — override with a deterministic move for the
+                // rotated objective so the situation actually changes.
+                if ($loopObjective !== null) {
+                    $decision = $this->loopBreakDecision($loopObjective, $observation, $known, $tried, $dead, $tick);
                 }
 
                 $verb = (string) ($decision['verb'] ?? '');
@@ -348,7 +503,7 @@ final class AutoPlayer
                 }
 
                 return $this->nha->intentWithToken($agent_id, $token, $decision['verb'], $decision['args'])
-                    ->then(function ($queued) use ($agent_id, $decision, $tick) {
+                    ->then(function ($queued) use ($agent_id, $decision, $tick, $loop, $loopObjective) {
                         $queued = (array) $queued;
                         $queuedId = $queued['queued_intent'] ?? null;
 
@@ -363,8 +518,11 @@ final class AutoPlayer
                         $ref = $queuedId !== null ? " (queued #{$queuedId})" : '';
                         $args = $decision['args'] === [] ? '' : ' ' . json_encode($decision['args'], JSON_UNESCAPED_SLASHES);
                         $reason = $decision['reason'] !== '' ? "\n> {$decision['reason']}" : '';
+                        $head = $loopObjective !== null
+                            ? "♻️ Agent #{$agent_id} loop ({$loop}) → forced **{$loopObjective}**:"
+                            : "🤖 Agent #{$agent_id} →";
 
-                        return "🤖 Agent #{$agent_id} → **{$decision['verb']}**{$args}{$ref}{$reason}";
+                        return "{$head} **{$decision['verb']}**{$args}{$ref}{$reason}";
                     });
             });
         }));

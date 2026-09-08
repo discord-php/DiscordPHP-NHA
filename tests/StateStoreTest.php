@@ -432,4 +432,24 @@ class StateStoreTest extends NHAUnitTestCase
         $this->assertSame(['glass+wood', 'lens+salt'], (new StateStore($this->path))->getDeadCombines(7));
         $this->assertSame([], $store->getDeadCombines(999), 'scoped per agent');
     }
+
+    /**
+     * @covers \NHA\StateStore
+     */
+    public function testForcedObjectiveRotatesPersistsAndExpires(): void
+    {
+        $store = new StateStore($this->path);
+
+        $this->assertSame('explore', $store->bumpForcedObjective(7, 100));
+        $this->assertSame('wealth', $store->bumpForcedObjective(7, 105));
+        $this->assertSame('build', $store->bumpForcedObjective(7, 110));
+
+        // Fresh reader, still inside the TTL.
+        $this->assertSame('build', (new StateStore($this->path))->getForcedObjective(7, 120));
+        // Aged out after 45 ticks.
+        $this->assertNull($store->getForcedObjective(7, 200));
+        // Wraps back round.
+        $this->assertSame('research', $store->bumpForcedObjective(7, 210));
+        $this->assertSame('explore', $store->bumpForcedObjective(7, 215));
+    }
 }

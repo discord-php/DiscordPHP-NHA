@@ -341,11 +341,11 @@ class StateStore
 
         $this->data['agent_decisions'][(string) $agent_id] = $entry;
 
-        // Also keep a short rolling history so the brain can see it is looping
-        // (or has already tried a `combine` pair) beyond just the last turn.
+        // Also keep a rolling history so the brain (and the loop detector in
+        // AutoPlayer) can see repetition beyond just the last turn.
         $log = (array) ($this->data['agent_decision_log'][(string) $agent_id] ?? []);
         $log[] = ['verb' => $entry['verb'], 'args' => $entry['args'], 'tick' => $entry['tick']];
-        $this->data['agent_decision_log'][(string) $agent_id] = array_slice($log, -15);
+        $this->data['agent_decision_log'][(string) $agent_id] = array_slice($log, -24);
 
         $this->save();
     }
@@ -474,6 +474,54 @@ class StateStore
             (array) ($this->data['agent_dead_combines'][(string) $agent_id] ?? []),
             'is_string',
         ));
+    }
+
+    /** A forced objective sticks for this many world ticks after a loop break. */
+    private const FORCED_OBJECTIVE_TTL_TICKS = 45;
+
+    /** Objectives cycled through, in order, each time the agent is caught looping. */
+    public const OBJECTIVE_ROTATION = ['explore', 'wealth', 'build', 'research'];
+
+    /**
+     * Advances the agent's forced-objective cursor one step through
+     * {@see self::OBJECTIVE_ROTATION} and returns the new objective. Called by
+     * {@see \NHA\Brain\AutoPlayer} when it detects the agent is stuck in a loop,
+     * so each successive loop break tries a *different* kind of goal.
+     *
+     * @since 3.1.12
+     */
+    public function bumpForcedObjective(int $agent_id, int $tick): string
+    {
+        $key = (string) $agent_id;
+        $prev = $this->data['agent_forced_objective'][$key] ?? null;
+        $idx = (is_array($prev) ? (int) ($prev['idx'] ?? -1) : -1);
+        $idx = ($idx + 1) % count(self::OBJECTIVE_ROTATION);
+        $objective = self::OBJECTIVE_ROTATION[$idx];
+
+        $this->data['agent_forced_objective'][$key] = ['idx' => $idx, 'objective' => $objective, 'tick' => $tick];
+        $this->save();
+
+        return $objective;
+    }
+
+    /**
+     * The objective forced by the most recent loop break, or `null` once it has
+     * aged out ({@see self::FORCED_OBJECTIVE_TTL_TICKS} ticks) — after which the
+     * agent is back on the normal ladder.
+     *
+     * @since 3.1.12
+     */
+    public function getForcedObjective(int $agent_id, int $tick): ?string
+    {
+        $entry = $this->data['agent_forced_objective'][(string) $agent_id] ?? null;
+        if (! is_array($entry)) {
+            return null;
+        }
+        if ($tick > 0 && ($tick - (int) ($entry['tick'] ?? 0)) > self::FORCED_OBJECTIVE_TTL_TICKS) {
+            return null;
+        }
+
+        return ((string) ($entry['objective'] ?? '')) ?: null;
     }
 
     /** Research counts as "paying" for this long after the last inventor-point gain. */
