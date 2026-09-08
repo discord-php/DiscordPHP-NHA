@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+            <title>DiscordPHP-NHA Documentation</title>
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <base href="../">
+    <link rel="icon" type="image/png" sizes="32x32" href="images/favicon-32x32.png"/>
+    <link rel="icon" type="image/png" sizes="16x16" href="images/favicon-16x16.png"/>
+    <link rel="icon" href="images/favicon.ico"/>
+    <link rel="apple-touch-icon" href="images/apple-touch-icon.png"/>
+    <link rel="stylesheet" href="css/normalize.css">
+    <link rel="stylesheet" href="css/base.css">
+            <link rel="preconnect" href="https://fonts.gstatic.com">
+        <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@100;200;300;400;600;700&display=swap" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;600;700&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="css/template.css">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.12.0/css/all.min.css" integrity="sha256-ybRkN9dBjhcS2qrW1z+hfCxq+1aBdwyQM5wlQoQVt/0=" crossorigin="anonymous" />
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.23.0/themes/prism-okaidia.css">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.23.0/plugins/line-numbers/prism-line-numbers.css">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.23.0/plugins/line-highlight/prism-line-highlight.css">
+                <script src="https://cdn.jsdelivr.net/npm/fuse.js@3.4.6"></script>
+        <script src="https://cdn.jsdelivr.net/npm/css-vars-ponyfill@2"></script>
+        <script src="js/template.js"></script>
+        <script src="js/search.js"></script>
+        <script defer src="js/searchIndex.js"></script>
+    </head>
+<body id="top">
+    <header class="phpdocumentor-header phpdocumentor-section">
+    <h1 class="phpdocumentor-title"><a href="" class="phpdocumentor-title__link">DiscordPHP-NHA Documentation</a></h1>
+    <input class="phpdocumentor-header__menu-button" type="checkbox" id="menu-button" name="menu-button" />
+    <label class="phpdocumentor-header__menu-icon" for="menu-button">
+        <i class="fas fa-bars"></i>
+    </label>
+    <section data-search-form class="phpdocumentor-search">
+    <label>
+        <span class="visually-hidden">Search for</span>
+        <svg class="phpdocumentor-search__icon" width="21" height="20" viewBox="0 0 21 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="7.5" cy="7.5" r="6.5" stroke="currentColor" stroke-width="2"/>
+            <line x1="12.4892" y1="12.2727" x2="19.1559" y2="18.9393" stroke="currentColor" stroke-width="3"/>
+        </svg>
+        <input type="search" class="phpdocumentor-field phpdocumentor-search__field" placeholder="Loading .." disabled />
+    </label>
+</section>
+
+    <nav class="phpdocumentor-topnav">
+    <ul class="phpdocumentor-topnav__menu">
+        </ul>
+</nav>
+</header>
+
+    <main class="phpdocumentor">
+        <div class="phpdocumentor-section">
+            <input class="phpdocumentor-sidebar__menu-button" type="checkbox" id="sidebar-button" name="sidebar-button" />
+<label class="phpdocumentor-sidebar__menu-icon" for="sidebar-button">
+    Menu
+</label>
+<aside class="phpdocumentor-column -three phpdocumentor-sidebar">
+                    <section class="phpdocumentor-sidebar__category -namespaces">
+            <h2 class="phpdocumentor-sidebar__category-header">Namespaces</h2>
+                                    <h4 class="phpdocumentor-sidebar__root-namespace">
+    <a href="namespaces/nha.html" class="">NHA</a>
+</h4>
+    <ul class="phpdocumentor-list">
+                    <li>
+                <a href="namespaces/nha-bot.html" class="">Bot</a>
+                
+            </li>
+                    <li>
+                <a href="namespaces/nha-brain.html" class="">Brain</a>
+                
+            </li>
+                    <li>
+                <a href="namespaces/nha-http.html" class="">Http</a>
+                
+            </li>
+                    <li>
+                <a href="namespaces/nha-parts.html" class="">Parts</a>
+                
+            </li>
+                    <li>
+                <a href="namespaces/nha-repository.html" class="">Repository</a>
+                
+            </li>
+                    <li>
+                <a href="namespaces/nha-state.html" class="">State</a>
+                
+            </li>
+            </ul>
+
+                        </section>
+                <section class="phpdocumentor-sidebar__category -packages">
+            <h2 class="phpdocumentor-sidebar__category-header">Packages</h2>
+                                    <h4 class="phpdocumentor-sidebar__root-namespace">
+    <a href="packages/Application.html" class="">Application</a>
+</h4>
+
+                        </section>
+            
+    <section class="phpdocumentor-sidebar__category -reports">
+        <h2 class="phpdocumentor-sidebar__category-header">Reports</h2>
+                <h3 class="phpdocumentor-sidebar__root-package"><a href="reports/deprecated.html">Deprecated</a></h3>
+        <h3 class="phpdocumentor-sidebar__root-package"><a href="reports/errors.html">Errors</a></h3>
+        <h3 class="phpdocumentor-sidebar__root-package"><a href="reports/markers.html">Markers</a></h3>
+    </section>
+
+    <section class="phpdocumentor-sidebar__category -indices">
+        <h2 class="phpdocumentor-sidebar__category-header">Indices</h2>
+        <h3 class="phpdocumentor-sidebar__root-package"><a href="indices/files.html">Files</a></h3>
+    </section>
+</aside>
+
+            <div class="phpdocumentor-column -nine phpdocumentor-content">
+                                <section>
+                                        <ul class="phpdocumentor-breadcrumbs">
+            <li class="phpdocumentor-breadcrumb"><a href="namespaces/nha.html">NHA</a></li>
+            <li class="phpdocumentor-breadcrumb"><a href="namespaces/nha-brain.html">Brain</a></li>
+    </ul>
+
+    <article class="phpdocumentor-element -class">
+        <h2 class="phpdocumentor-content__title">
+    Ladder
+
+    
+            <div class="phpdocumentor-element__package">
+            in package
+            <ul class="phpdocumentor-breadcrumbs">
+                                    <li class="phpdocumentor-breadcrumb"><a href="packages/Application.html">Application</a></li>
+                            </ul>
+        </div>
+    
+    
+    </h2>
+
+<div class="phpdocumentor-label-line">
+
+    <div class="phpdocumentor-label phpdocumentor-label--success"><span>Final</span><span>Yes</span></div>
+
+
+</div>
+
+        <aside class="phpdocumentor-element-found-in">
+    <abbr class="phpdocumentor-element-found-in__file" title="src/NHA/Brain/Ladder.php"><a href="files/src-nha-brain-ladder.html"><abbr title="src/NHA/Brain/Ladder.php">Ladder.php</abbr></a></abbr>
+    :
+    <span class="phpdocumentor-element-found-in__line">34</span>
+
+    </aside>
+
+            <p class="phpdocumentor-summary">The deterministic decision ladder — &quot;what would a sensible agent do here?&quot;
+computed straight from an observation, no LLM. Two entry points:</p>
+
+
+    <section class="phpdocumentor-description"><ul>
+<li><abbr title="\NHA\Brain\suggestion()">suggestion()</abbr> — the full ladder (defend → finish parts → arm → stance
+nudge → one speculative combine → build → stockpile → sell a glut →
+reposition). <a href="classes/NHA-Brain-PromptBuilder.html"><abbr title="\NHA\Brain\PromptBuilder">PromptBuilder</abbr></a> shows its pick to the model as the
+&quot;SUGGESTED next action&quot; anchor, and <a href="classes/NHA-Brain-AutoPlayer.html"><abbr title="\NHA\Brain\AutoPlayer">AutoPlayer</abbr></a> falls back to it
+whenever the model's pick is refused by a guardrail.</li>
+<li><abbr title="\NHA\Brain\defensiveAction()">defensiveAction()</abbr> — just rung 0 (combat), which <a href="classes/NHA-Brain-AutoPlayer.html"><abbr title="\NHA\Brain\AutoPlayer">AutoPlayer</abbr></a>
+applies as a hard override before it ever consults the model.</li>
+</ul>
+<p>Split out of <a href="classes/NHA-Brain-AgentBrain.html"><abbr title="\NHA\Brain\AgentBrain">AgentBrain</abbr></a> (which is now only the LLM round-trip) so the
+fallback logic has one home and its callers stop reaching into that class's
+statics. The rungs are diagrammed in <code class="prettyprint">docs/PLAYBOOK.md</code>; keep it in sync.</p>
+</section>
+
+
+    <h5 class="phpdocumentor-tag-list__heading" id="tags">
+        Tags
+        <a href="classes/NHA-Brain-Ladder.html#tags" class="headerlink"><i class="fas fa-link"></i></a>
+
+    </h5>
+    <dl class="phpdocumentor-tag-list">
+                    <dt class="phpdocumentor-tag-list__entry">
+                <span class="phpdocumentor-tag__name">since</span>
+            </dt>
+                            <dd class="phpdocumentor-tag-list__definition">
+                                            <span class="phpdocumentor-tag-link">3.1.34</span>
+                                                                                                        
+                                    </dd>
+                        </dl>
+
+    
+    
+<h3 id="toc">
+    Table of Contents
+    <a href="classes/NHA-Brain-Ladder.html#toc" class="headerlink"><i class="fas fa-link"></i></a>
+
+</h3>
+
+
+
+
+
+
+
+<h4 id="toc-constants">
+    Constants
+    <a href="classes/NHA-Brain-Ladder.html#toc-constants" class="headerlink"><i class="fas fa-link"></i></a>
+
+</h4>
+<dl class="phpdocumentor-table-of-contents">
+            <dt class="phpdocumentor-table-of-contents__entry -constant -public">
+    <a class="" href="classes/NHA-Brain-Ladder.html#constant_CREDIT_FLOOR">CREDIT_FLOOR</a>
+    <span>
+        &nbsp;: mixed&nbsp;= 300                            </span>
+</dt>
+<dd>Economy targets for the ladder.</dd>
+
+            <dt class="phpdocumentor-table-of-contents__entry -constant -public">
+    <a class="" href="classes/NHA-Brain-Ladder.html#constant_HOARD_CAP">HOARD_CAP</a>
+    <span>
+        &nbsp;: mixed&nbsp;= 80                            </span>
+</dt>
+
+            <dt class="phpdocumentor-table-of-contents__entry -constant -public">
+    <a class="" href="classes/NHA-Brain-Ladder.html#constant_RESEARCH_SURPLUS">RESEARCH_SURPLUS</a>
+    <span>
+        &nbsp;: mixed&nbsp;= 60                            </span>
+</dt>
+<dd>Research only fires when at least two raws sit this deep — a genuine surplus, not the stockpile.</dd>
+
+            <dt class="phpdocumentor-table-of-contents__entry -constant -public">
+    <a class="" href="classes/NHA-Brain-Ladder.html#constant_RESOURCE_TARGET">RESOURCE_TARGET</a>
+    <span>
+        &nbsp;: mixed&nbsp;= 30                            </span>
+</dt>
+
+    </dl>
+
+
+
+<h4 id="toc-methods">
+    Methods
+    <a href="classes/NHA-Brain-Ladder.html#toc-methods" class="headerlink"><i class="fas fa-link"></i></a>
+
+</h4>
+<dl class="phpdocumentor-table-of-contents">
+            <dt class="phpdocumentor-table-of-contents__entry -method -public">
+    <a class="" href="classes/NHA-Brain-Ladder.html#method_defensiveAction">defensiveAction()</a>
+    <span>
+                                &nbsp;: array{verb: string, args: array<string,mixed>, reason: string}|null    </span>
+</dt>
+<dd>The defensive move when the agent is in (or just came out of) a fight:
+heal if badly hurt and able, shoot back if armed and the attacker is in
+range, otherwise break contact. Returns `null` when there is no threat.</dd>
+
+            <dt class="phpdocumentor-table-of-contents__entry -method -public">
+    <a class="" href="classes/NHA-Brain-Ladder.html#method_suggestion">suggestion()</a>
+    <span>
+                                &nbsp;: array{verb: string, args: array<string,mixed>, why: string}|null    </span>
+</dt>
+<dd>A deterministic &quot;what would the ladder do&quot; pick, surfaced to anchor a weak
+model. Mirrors {@see Playbook}&#039;s priorities: finish parts → gamble one
+novel combine → build for reliable points → sell a glut → harvest only
+when short → reposition. Returns `null` when nothing is obviously right
+(the model is then on its own).</dd>
+
+            <dt class="phpdocumentor-table-of-contents__entry -method -private">
+    <a class="" href="classes/NHA-Brain-Ladder.html#method_armMove">armMove()</a>
+    <span>
+                                &nbsp;: array{verb: string, args: array<string,mixed>, why: string}|null    </span>
+</dt>
+<dd>Rung 1c: buy a minimum survival kit when out of combat and unequipped — a
+medicine first, then a weapon, then ammo for it. Returns `null` once the
+kit is covered or the credits are too thin.</dd>
+
+            <dt class="phpdocumentor-table-of-contents__entry -method -private">
+    <a class="" href="classes/NHA-Brain-Ladder.html#method_bestMedicine">bestMedicine()</a>
+    <span>
+                                &nbsp;: string|null    </span>
+</dt>
+<dd>Best self-heal medicine on hand, strongest first, or `null`.</dd>
+
+            <dt class="phpdocumentor-table-of-contents__entry -method -private">
+    <a class="" href="classes/NHA-Brain-Ladder.html#method_combatMove">combatMove()</a>
+    <span>
+                                &nbsp;: array{verb: string, args: array<string,mixed>, why: string}|null    </span>
+</dt>
+<dd>Rung 0: the defensive move when the agent is in (or just came out of) a
+fight — heal if badly hurt and able, shoot back if armed and the attacker
+is in range, otherwise break contact. Returns `null` when there is no
+threat.</dd>
+
+            <dt class="phpdocumentor-table-of-contents__entry -method -private">
+    <a class="" href="classes/NHA-Brain-Ladder.html#method_stanceMove">stanceMove()</a>
+    <span>
+                                &nbsp;: array{verb: string, args: array<string,mixed>, why: string}|null    </span>
+</dt>
+<dd>Rung 1d: a deterministic nudge toward the active stance, ahead of the
+generic ladder. Returns `null` for `homestead` (the generic ladder already
+plays it) and whenever the stance has nothing pressing to add this turn.</dd>
+
+    </dl>
+
+
+
+        
+    <section class="phpdocumentor-constants">
+        <h3 class="phpdocumentor-elements__header" id="constants">
+            Constants
+            <a href="classes/NHA-Brain-Ladder.html#constants" class="headerlink"><i class="fas fa-link"></i></a>
+
+        </h3>
+                    <article class="phpdocumentor-element -constant -public ">
+    <h4 class="phpdocumentor-element__name" id="constant_CREDIT_FLOOR">
+        CREDIT_FLOOR
+        <a href="classes/NHA-Brain-Ladder.html#constant_CREDIT_FLOOR" class="headerlink"><i class="fas fa-link"></i></a>
+
+    </h4>
+
+    <aside class="phpdocumentor-element-found-in">
+    <abbr class="phpdocumentor-element-found-in__file" title="src/NHA/Brain/Ladder.php"><a href="files/src-nha-brain-ladder.html"><abbr title="src/NHA/Brain/Ladder.php">Ladder.php</abbr></a></abbr>
+    :
+    <span class="phpdocumentor-element-found-in__line">46</span>
+
+    </aside>
+
+        <p class="phpdocumentor-summary">Economy targets for the ladder.</p>
+
+    
+    <code class="phpdocumentor-signature phpdocumentor-code ">
+    <span class="phpdocumentor-signature__visibility">public</span>
+        <span class="phpdocumentor-signature__type">mixed</span>
+    <span class="phpdocumentor-signature__name">CREDIT_FLOOR</span>
+    = <span class="phpdocumentor-signature__default-value">300</span>
+</code>
+
+
+        <section class="phpdocumentor-description"><ul>
+<li><code class="prettyprint">CREDIT_FLOOR</code> — keep at least this many credits; only <code class="prettyprint">sell</code> to climb
+back to it, or to fund a project (buy-to-build / invest).</li>
+<li><code class="prettyprint">RESOURCE_TARGET</code> — stockpile each raw up to here (harvest / walk toward
+deposits until reached); never <code class="prettyprint">sell</code> below it outside a credit emergency.</li>
+<li><code class="prettyprint">HOARD_CAP</code> — the one non-credit <code class="prettyprint">sell</code> trigger: shed the excess above
+this so a &quot;never sell&quot; rule cannot deadlock into mining forever.</li>
+</ul>
+</section>
+
+    
+    
+
+        
+    </article>
+                    <article class="phpdocumentor-element -constant -public ">
+    <h4 class="phpdocumentor-element__name" id="constant_HOARD_CAP">
+        HOARD_CAP
+        <a href="classes/NHA-Brain-Ladder.html#constant_HOARD_CAP" class="headerlink"><i class="fas fa-link"></i></a>
+
+    </h4>
+
+    <aside class="phpdocumentor-element-found-in">
+    <abbr class="phpdocumentor-element-found-in__file" title="src/NHA/Brain/Ladder.php"><a href="files/src-nha-brain-ladder.html"><abbr title="src/NHA/Brain/Ladder.php">Ladder.php</abbr></a></abbr>
+    :
+    <span class="phpdocumentor-element-found-in__line">48</span>
+
+    </aside>
+
+    
+    
+    <code class="phpdocumentor-signature phpdocumentor-code ">
+    <span class="phpdocumentor-signature__visibility">public</span>
+        <span class="phpdocumentor-signature__type">mixed</span>
+    <span class="phpdocumentor-signature__name">HOARD_CAP</span>
+    = <span class="phpdocumentor-signature__default-value">80</span>
+</code>
+
+
+    
+    
+    
+
+        
+    </article>
+                    <article class="phpdocumentor-element -constant -public ">
+    <h4 class="phpdocumentor-element__name" id="constant_RESEARCH_SURPLUS">
+        RESEARCH_SURPLUS
+        <a href="classes/NHA-Brain-Ladder.html#constant_RESEARCH_SURPLUS" class="headerlink"><i class="fas fa-link"></i></a>
+
+    </h4>
+
+    <aside class="phpdocumentor-element-found-in">
+    <abbr class="phpdocumentor-element-found-in__file" title="src/NHA/Brain/Ladder.php"><a href="files/src-nha-brain-ladder.html"><abbr title="src/NHA/Brain/Ladder.php">Ladder.php</abbr></a></abbr>
+    :
+    <span class="phpdocumentor-element-found-in__line">51</span>
+
+    </aside>
+
+        <p class="phpdocumentor-summary">Research only fires when at least two raws sit this deep — a genuine surplus, not the stockpile.</p>
+
+    
+    <code class="phpdocumentor-signature phpdocumentor-code ">
+    <span class="phpdocumentor-signature__visibility">public</span>
+        <span class="phpdocumentor-signature__type">mixed</span>
+    <span class="phpdocumentor-signature__name">RESEARCH_SURPLUS</span>
+    = <span class="phpdocumentor-signature__default-value">60</span>
+</code>
+
+
+    
+    
+    
+
+        
+    </article>
+                    <article class="phpdocumentor-element -constant -public ">
+    <h4 class="phpdocumentor-element__name" id="constant_RESOURCE_TARGET">
+        RESOURCE_TARGET
+        <a href="classes/NHA-Brain-Ladder.html#constant_RESOURCE_TARGET" class="headerlink"><i class="fas fa-link"></i></a>
+
+    </h4>
+
+    <aside class="phpdocumentor-element-found-in">
+    <abbr class="phpdocumentor-element-found-in__file" title="src/NHA/Brain/Ladder.php"><a href="files/src-nha-brain-ladder.html"><abbr title="src/NHA/Brain/Ladder.php">Ladder.php</abbr></a></abbr>
+    :
+    <span class="phpdocumentor-element-found-in__line">47</span>
+
+    </aside>
+
+    
+    
+    <code class="phpdocumentor-signature phpdocumentor-code ">
+    <span class="phpdocumentor-signature__visibility">public</span>
+        <span class="phpdocumentor-signature__type">mixed</span>
+    <span class="phpdocumentor-signature__name">RESOURCE_TARGET</span>
+    = <span class="phpdocumentor-signature__default-value">30</span>
+</code>
+
+
+    
+    
+    
+
+        
+    </article>
+            </section>
+
+        
+
+            <section class="phpdocumentor-methods">
+        <h3 class="phpdocumentor-elements__header" id="methods">
+            Methods
+            <a href="classes/NHA-Brain-Ladder.html#methods" class="headerlink"><i class="fas fa-link"></i></a>
+
+        </h3>
+                    <article
+        class="phpdocumentor-element
+            -method
+            -public
+                                    -static                    "
+>
+    <h4 class="phpdocumentor-element__name" id="method_defensiveAction">
+        defensiveAction()
+        <a href="classes/NHA-Brain-Ladder.html#method_defensiveAction" class="headerlink"><i class="fas fa-link"></i></a>
+
+    </h4>
+    <aside class="phpdocumentor-element-found-in">
+    <abbr class="phpdocumentor-element-found-in__file" title="src/NHA/Brain/Ladder.php"><a href="files/src-nha-brain-ladder.html"><abbr title="src/NHA/Brain/Ladder.php">Ladder.php</abbr></a></abbr>
+    :
+    <span class="phpdocumentor-element-found-in__line">282</span>
+
+    </aside>
+
+        <p class="phpdocumentor-summary">The defensive move when the agent is in (or just came out of) a fight:
+heal if badly hurt and able, shoot back if armed and the attacker is in
+range, otherwise break contact. Returns `null` when there is no threat.</p>
+
+    <code class="phpdocumentor-code phpdocumentor-signature ">
+    <span class="phpdocumentor-signature__visibility">public</span>
+            <span class="phpdocumentor-signature__static">static</span>        <span class="phpdocumentor-signature__name">defensiveAction</span><span>(</span><span class="phpdocumentor-signature__argument"><span class="phpdocumentor-signature__argument__type">array&lt;string, mixed&gt;&nbsp;</span><span class="phpdocumentor-signature__argument__name">$raw</span></span><span>)</span><span> : </span><span class="phpdocumentor-signature__response_type">array{verb: string, args: array<string,mixed>, reason: string}|null</span></code>
+
+    <div class="phpdocumentor-label-line">
+        </div>
+    
+        <section class="phpdocumentor-description"><p>Public so <a href="classes/NHA-Brain-AutoPlayer.html"><abbr title="\NHA\Brain\AutoPlayer">AutoPlayer</abbr></a> can apply it as a hard override — combat
+defence never waits on the LLM.</p>
+</section>
+
+        <h5 class="phpdocumentor-argument-list__heading">Parameters</h5>
+    <dl class="phpdocumentor-argument-list">
+                    <dt class="phpdocumentor-argument-list__entry">
+                <span class="phpdocumentor-argument-list__argument__name">$raw</span>
+                : <span class="phpdocumentor-argument-list__argument__type">array&lt;string, mixed&gt;</span>
+                            </dt>
+            <dd class="phpdocumentor-argument-list__definition">
+                    <section class="phpdocumentor-description"><p>The normalised observation.</p>
+</section>
+
+            </dd>
+            </dl>
+
+    
+
+        
+    
+            <section>
+        <h5 class="phpdocumentor-return-value__heading">Return values</h5>
+        <span class="phpdocumentor-signature__response_type">array{verb: string, args: array<string,mixed>, reason: string}|null</span>
+            </section>
+
+</article>
+                    <article
+        class="phpdocumentor-element
+            -method
+            -public
+                                    -static                    "
+>
+    <h4 class="phpdocumentor-element__name" id="method_suggestion">
+        suggestion()
+        <a href="classes/NHA-Brain-Ladder.html#method_suggestion" class="headerlink"><i class="fas fa-link"></i></a>
+
+    </h4>
+    <aside class="phpdocumentor-element-found-in">
+    <abbr class="phpdocumentor-element-found-in__file" title="src/NHA/Brain/Ladder.php"><a href="files/src-nha-brain-ladder.html"><abbr title="src/NHA/Brain/Ladder.php">Ladder.php</abbr></a></abbr>
+    :
+    <span class="phpdocumentor-element-found-in__line">73</span>
+
+    </aside>
+
+        <p class="phpdocumentor-summary">A deterministic &quot;what would the ladder do&quot; pick, surfaced to anchor a weak
+model. Mirrors {@see Playbook}&#039;s priorities: finish parts → gamble one
+novel combine → build for reliable points → sell a glut → harvest only
+when short → reposition. Returns `null` when nothing is obviously right
+(the model is then on its own).</p>
+
+    <code class="phpdocumentor-code phpdocumentor-signature ">
+    <span class="phpdocumentor-signature__visibility">public</span>
+            <span class="phpdocumentor-signature__static">static</span>        <span class="phpdocumentor-signature__name">suggestion</span><span>(</span><span class="phpdocumentor-signature__argument"><span class="phpdocumentor-signature__argument__type">array&lt;string, mixed&gt;&nbsp;</span><span class="phpdocumentor-signature__argument__name">$raw</span></span><span class="phpdocumentor-signature__argument"><span>, </span><span class="phpdocumentor-signature__argument__type">array&lt;string, bool&gt;&nbsp;</span><span class="phpdocumentor-signature__argument__name">$tried</span></span><span class="phpdocumentor-signature__argument"><span>[</span><span>, </span><span class="phpdocumentor-signature__argument__type">array&lt;string, bool&gt;&nbsp;</span><span class="phpdocumentor-signature__argument__name">$worldKnown</span><span> = </span><span class="phpdocumentor-signature__argument__default-value">[]</span><span> ]</span></span><span class="phpdocumentor-signature__argument"><span>[</span><span>, </span><span class="phpdocumentor-signature__argument__type">bool&nbsp;</span><span class="phpdocumentor-signature__argument__name">$allowSpeculation</span><span> = </span><span class="phpdocumentor-signature__argument__default-value">true</span><span> ]</span></span><span class="phpdocumentor-signature__argument"><span>[</span><span>, </span><span class="phpdocumentor-signature__argument__type">string&nbsp;</span><span class="phpdocumentor-signature__argument__name">$stance</span><span> = </span><span class="phpdocumentor-signature__argument__default-value">'homestead'</span><span> ]</span></span><span>)</span><span> : </span><span class="phpdocumentor-signature__response_type">array{verb: string, args: array<string,mixed>, why: string}|null</span></code>
+
+    <div class="phpdocumentor-label-line">
+        </div>
+    
+        <section class="phpdocumentor-description"><p>Also reused by <a href="classes/NHA-Brain-AutoPlayer.html"><abbr title="\NHA\Brain\AutoPlayer">AutoPlayer</abbr></a> as the infrastructure fallback when a
+research <code class="prettyprint">combine</code> is refused — pass the whole tried+known combine space
+as both <code class="prettyprint">$tried</code> and <code class="prettyprint">$worldKnown</code> and the ladder skips its
+speculative-combine rung and drops straight to build / wealth / harvest.</p>
+</section>
+
+        <h5 class="phpdocumentor-argument-list__heading">Parameters</h5>
+    <dl class="phpdocumentor-argument-list">
+                    <dt class="phpdocumentor-argument-list__entry">
+                <span class="phpdocumentor-argument-list__argument__name">$raw</span>
+                : <span class="phpdocumentor-argument-list__argument__type">array&lt;string, mixed&gt;</span>
+                            </dt>
+            <dd class="phpdocumentor-argument-list__definition">
+                    <section class="phpdocumentor-description"><p>The normalised observation.</p>
+</section>
+
+            </dd>
+                    <dt class="phpdocumentor-argument-list__entry">
+                <span class="phpdocumentor-argument-list__argument__name">$tried</span>
+                : <span class="phpdocumentor-argument-list__argument__type">array&lt;string, bool&gt;</span>
+                            </dt>
+            <dd class="phpdocumentor-argument-list__definition">
+                    <section class="phpdocumentor-description"><p><code class="prettyprint">a+b =&gt; true</code> for combine sets submitted THIS session.</p>
+</section>
+
+            </dd>
+                    <dt class="phpdocumentor-argument-list__entry">
+                <span class="phpdocumentor-argument-list__argument__name">$worldKnown</span>
+                : <span class="phpdocumentor-argument-list__argument__type">array&lt;string, bool&gt;</span>
+                 = <span class="phpdocumentor-argument-list__argument__default-value">[]</span>            </dt>
+            <dd class="phpdocumentor-argument-list__definition">
+                    <section class="phpdocumentor-description"><p><code class="prettyprint">a+b =&gt; true</code> for sets the whole world has already invented.</p>
+</section>
+
+            </dd>
+                    <dt class="phpdocumentor-argument-list__entry">
+                <span class="phpdocumentor-argument-list__argument__name">$allowSpeculation</span>
+                : <span class="phpdocumentor-argument-list__argument__type">bool</span>
+                 = <span class="phpdocumentor-argument-list__argument__default-value">true</span>            </dt>
+            <dd class="phpdocumentor-argument-list__definition">
+                    <section class="phpdocumentor-description"><p>When false, the speculative-combine rung is skipped entirely —
+used by the infrastructure fallback, where research is finished.</p>
+</section>
+
+            </dd>
+                    <dt class="phpdocumentor-argument-list__entry">
+                <span class="phpdocumentor-argument-list__argument__name">$stance</span>
+                : <span class="phpdocumentor-argument-list__argument__type">string</span>
+                 = <span class="phpdocumentor-argument-list__argument__default-value">'homestead'</span>            </dt>
+            <dd class="phpdocumentor-argument-list__definition">
+                
+            </dd>
+            </dl>
+
+    
+
+        
+    
+            <section>
+        <h5 class="phpdocumentor-return-value__heading">Return values</h5>
+        <span class="phpdocumentor-signature__response_type">array{verb: string, args: array<string,mixed>, why: string}|null</span>
+            </section>
+
+</article>
+                    <article
+        class="phpdocumentor-element
+            -method
+            -private
+                                    -static                    "
+>
+    <h4 class="phpdocumentor-element__name" id="method_armMove">
+        armMove()
+        <a href="classes/NHA-Brain-Ladder.html#method_armMove" class="headerlink"><i class="fas fa-link"></i></a>
+
+    </h4>
+    <aside class="phpdocumentor-element-found-in">
+    <abbr class="phpdocumentor-element-found-in__file" title="src/NHA/Brain/Ladder.php"><a href="files/src-nha-brain-ladder.html"><abbr title="src/NHA/Brain/Ladder.php">Ladder.php</abbr></a></abbr>
+    :
+    <span class="phpdocumentor-element-found-in__line">407</span>
+
+    </aside>
+
+        <p class="phpdocumentor-summary">Rung 1c: buy a minimum survival kit when out of combat and unequipped — a
+medicine first, then a weapon, then ammo for it. Returns `null` once the
+kit is covered or the credits are too thin.</p>
+
+    <code class="phpdocumentor-code phpdocumentor-signature ">
+    <span class="phpdocumentor-signature__visibility">private</span>
+            <span class="phpdocumentor-signature__static">static</span>        <span class="phpdocumentor-signature__name">armMove</span><span>(</span><span class="phpdocumentor-signature__argument"><span class="phpdocumentor-signature__argument__type">array&lt;string, mixed&gt;&nbsp;</span><span class="phpdocumentor-signature__argument__name">$inv</span></span><span class="phpdocumentor-signature__argument"><span>, </span><span class="phpdocumentor-signature__argument__type">int&nbsp;</span><span class="phpdocumentor-signature__argument__name">$credits</span></span><span>)</span><span> : </span><span class="phpdocumentor-signature__response_type">array{verb: string, args: array<string,mixed>, why: string}|null</span></code>
+
+    <div class="phpdocumentor-label-line">
+        </div>
+    
+    
+        <h5 class="phpdocumentor-argument-list__heading">Parameters</h5>
+    <dl class="phpdocumentor-argument-list">
+                    <dt class="phpdocumentor-argument-list__entry">
+                <span class="phpdocumentor-argument-list__argument__name">$inv</span>
+                : <span class="phpdocumentor-argument-list__argument__type">array&lt;string, mixed&gt;</span>
+                            </dt>
+            <dd class="phpdocumentor-argument-list__definition">
+                
+            </dd>
+                    <dt class="phpdocumentor-argument-list__entry">
+                <span class="phpdocumentor-argument-list__argument__name">$credits</span>
+                : <span class="phpdocumentor-argument-list__argument__type">int</span>
+                            </dt>
+            <dd class="phpdocumentor-argument-list__definition">
+                
+            </dd>
+            </dl>
+
+    
+
+        
+    
+            <section>
+        <h5 class="phpdocumentor-return-value__heading">Return values</h5>
+        <span class="phpdocumentor-signature__response_type">array{verb: string, args: array<string,mixed>, why: string}|null</span>
+            </section>
+
+</article>
+                    <article
+        class="phpdocumentor-element
+            -method
+            -private
+                                    -static                    "
+>
+    <h4 class="phpdocumentor-element__name" id="method_bestMedicine">
+        bestMedicine()
+        <a href="classes/NHA-Brain-Ladder.html#method_bestMedicine" class="headerlink"><i class="fas fa-link"></i></a>
+
+    </h4>
+    <aside class="phpdocumentor-element-found-in">
+    <abbr class="phpdocumentor-element-found-in__file" title="src/NHA/Brain/Ladder.php"><a href="files/src-nha-brain-ladder.html"><abbr title="src/NHA/Brain/Ladder.php">Ladder.php</abbr></a></abbr>
+    :
+    <span class="phpdocumentor-element-found-in__line">300</span>
+
+    </aside>
+
+        <p class="phpdocumentor-summary">Best self-heal medicine on hand, strongest first, or `null`.</p>
+
+    <code class="phpdocumentor-code phpdocumentor-signature ">
+    <span class="phpdocumentor-signature__visibility">private</span>
+            <span class="phpdocumentor-signature__static">static</span>        <span class="phpdocumentor-signature__name">bestMedicine</span><span>(</span><span class="phpdocumentor-signature__argument"><span class="phpdocumentor-signature__argument__type">array&lt;string|int, mixed&gt;&nbsp;</span><span class="phpdocumentor-signature__argument__name">$inv</span></span><span>)</span><span> : </span><span class="phpdocumentor-signature__response_type">string|null</span></code>
+
+    <div class="phpdocumentor-label-line">
+        </div>
+    
+    
+        <h5 class="phpdocumentor-argument-list__heading">Parameters</h5>
+    <dl class="phpdocumentor-argument-list">
+                    <dt class="phpdocumentor-argument-list__entry">
+                <span class="phpdocumentor-argument-list__argument__name">$inv</span>
+                : <span class="phpdocumentor-argument-list__argument__type">array&lt;string|int, mixed&gt;</span>
+                            </dt>
+            <dd class="phpdocumentor-argument-list__definition">
+                
+            </dd>
+            </dl>
+
+    
+
+        
+    
+            <section>
+        <h5 class="phpdocumentor-return-value__heading">Return values</h5>
+        <span class="phpdocumentor-signature__response_type">string|null</span>
+            </section>
+
+</article>
+                    <article
+        class="phpdocumentor-element
+            -method
+            -private
+                                    -static                    "
+>
+    <h4 class="phpdocumentor-element__name" id="method_combatMove">
+        combatMove()
+        <a href="classes/NHA-Brain-Ladder.html#method_combatMove" class="headerlink"><i class="fas fa-link"></i></a>
+
+    </h4>
+    <aside class="phpdocumentor-element-found-in">
+    <abbr class="phpdocumentor-element-found-in__file" title="src/NHA/Brain/Ladder.php"><a href="files/src-nha-brain-ladder.html"><abbr title="src/NHA/Brain/Ladder.php">Ladder.php</abbr></a></abbr>
+    :
+    <span class="phpdocumentor-element-found-in__line">322</span>
+
+    </aside>
+
+        <p class="phpdocumentor-summary">Rung 0: the defensive move when the agent is in (or just came out of) a
+fight — heal if badly hurt and able, shoot back if armed and the attacker
+is in range, otherwise break contact. Returns `null` when there is no
+threat.</p>
+
+    <code class="phpdocumentor-code phpdocumentor-signature ">
+    <span class="phpdocumentor-signature__visibility">private</span>
+            <span class="phpdocumentor-signature__static">static</span>        <span class="phpdocumentor-signature__name">combatMove</span><span>(</span><span class="phpdocumentor-signature__argument"><span class="phpdocumentor-signature__argument__type">array&lt;string, mixed&gt;&nbsp;</span><span class="phpdocumentor-signature__argument__name">$raw</span></span><span class="phpdocumentor-signature__argument"><span>, </span><span class="phpdocumentor-signature__argument__type">array&lt;string, mixed&gt;&nbsp;</span><span class="phpdocumentor-signature__argument__name">$inv</span></span><span class="phpdocumentor-signature__argument"><span>, </span><span class="phpdocumentor-signature__argument__type">float&nbsp;</span><span class="phpdocumentor-signature__argument__name">$hp</span></span><span class="phpdocumentor-signature__argument"><span>, </span><span class="phpdocumentor-signature__argument__type">float&nbsp;</span><span class="phpdocumentor-signature__argument__name">$hpMax</span></span><span class="phpdocumentor-signature__argument"><span>, </span><span class="phpdocumentor-signature__argument__type">int&nbsp;</span><span class="phpdocumentor-signature__argument__name">$x</span></span><span class="phpdocumentor-signature__argument"><span>, </span><span class="phpdocumentor-signature__argument__type">int&nbsp;</span><span class="phpdocumentor-signature__argument__name">$y</span></span><span class="phpdocumentor-signature__argument"><span>, </span><span class="phpdocumentor-signature__argument__type">int&nbsp;</span><span class="phpdocumentor-signature__argument__name">$tick</span></span><span>)</span><span> : </span><span class="phpdocumentor-signature__response_type">array{verb: string, args: array<string,mixed>, why: string}|null</span></code>
+
+    <div class="phpdocumentor-label-line">
+        </div>
+    
+    
+        <h5 class="phpdocumentor-argument-list__heading">Parameters</h5>
+    <dl class="phpdocumentor-argument-list">
+                    <dt class="phpdocumentor-argument-list__entry">
+                <span class="phpdocumentor-argument-list__argument__name">$raw</span>
+                : <span class="phpdocumentor-argument-list__argument__type">array&lt;string, mixed&gt;</span>
+                            </dt>
+            <dd class="phpdocumentor-argument-list__definition">
+                
+            </dd>
+                    <dt class="phpdocumentor-argument-list__entry">
+                <span class="phpdocumentor-argument-list__argument__name">$inv</span>
+                : <span class="phpdocumentor-argument-list__argument__type">array&lt;string, mixed&gt;</span>
+                            </dt>
+            <dd class="phpdocumentor-argument-list__definition">
+                
+            </dd>
+                    <dt class="phpdocumentor-argument-list__entry">
+                <span class="phpdocumentor-argument-list__argument__name">$hp</span>
+                : <span class="phpdocumentor-argument-list__argument__type">float</span>
+                            </dt>
+            <dd class="phpdocumentor-argument-list__definition">
+                
+            </dd>
+                    <dt class="phpdocumentor-argument-list__entry">
+                <span class="phpdocumentor-argument-list__argument__name">$hpMax</span>
+                : <span class="phpdocumentor-argument-list__argument__type">float</span>
+                            </dt>
+            <dd class="phpdocumentor-argument-list__definition">
+                
+            </dd>
+                    <dt class="phpdocumentor-argument-list__entry">
+                <span class="phpdocumentor-argument-list__argument__name">$x</span>
+                : <span class="phpdocumentor-argument-list__argument__type">int</span>
+                            </dt>
+            <dd class="phpdocumentor-argument-list__definition">
+                
+            </dd>
+                    <dt class="phpdocumentor-argument-list__entry">
+                <span class="phpdocumentor-argument-list__argument__name">$y</span>
+                : <span class="phpdocumentor-argument-list__argument__type">int</span>
+                            </dt>
+            <dd class="phpdocumentor-argument-list__definition">
+                
+            </dd>
+                    <dt class="phpdocumentor-argument-list__entry">
+                <span class="phpdocumentor-argument-list__argument__name">$tick</span>
+                : <span class="phpdocumentor-argument-list__argument__type">int</span>
+                            </dt>
+            <dd class="phpdocumentor-argument-list__definition">
+                
+            </dd>
+            </dl>
+
+    
+
+        
+    
+            <section>
+        <h5 class="phpdocumentor-return-value__heading">Return values</h5>
+        <span class="phpdocumentor-signature__response_type">array{verb: string, args: array<string,mixed>, why: string}|null</span>
+            </section>
+
+</article>
+                    <article
+        class="phpdocumentor-element
+            -method
+            -private
+                                    -static                    "
+>
+    <h4 class="phpdocumentor-element__name" id="method_stanceMove">
+        stanceMove()
+        <a href="classes/NHA-Brain-Ladder.html#method_stanceMove" class="headerlink"><i class="fas fa-link"></i></a>
+
+    </h4>
+    <aside class="phpdocumentor-element-found-in">
+    <abbr class="phpdocumentor-element-found-in__file" title="src/NHA/Brain/Ladder.php"><a href="files/src-nha-brain-ladder.html"><abbr title="src/NHA/Brain/Ladder.php">Ladder.php</abbr></a></abbr>
+    :
+    <span class="phpdocumentor-element-found-in__line">441</span>
+
+    </aside>
+
+        <p class="phpdocumentor-summary">Rung 1d: a deterministic nudge toward the active stance, ahead of the
+generic ladder. Returns `null` for `homestead` (the generic ladder already
+plays it) and whenever the stance has nothing pressing to add this turn.</p>
+
+    <code class="phpdocumentor-code phpdocumentor-signature ">
+    <span class="phpdocumentor-signature__visibility">private</span>
+            <span class="phpdocumentor-signature__static">static</span>        <span class="phpdocumentor-signature__name">stanceMove</span><span>(</span><span class="phpdocumentor-signature__argument"><span class="phpdocumentor-signature__argument__type">string&nbsp;</span><span class="phpdocumentor-signature__argument__name">$stance</span></span><span class="phpdocumentor-signature__argument"><span>, </span><span class="phpdocumentor-signature__argument__type">array&lt;string, mixed&gt;&nbsp;</span><span class="phpdocumentor-signature__argument__name">$raw</span></span><span class="phpdocumentor-signature__argument"><span>, </span><span class="phpdocumentor-signature__argument__type">array&lt;string, mixed&gt;&nbsp;</span><span class="phpdocumentor-signature__argument__name">$inv</span></span><span class="phpdocumentor-signature__argument"><span>, </span><span class="phpdocumentor-signature__argument__type">array&lt;string, int&gt;&nbsp;</span><span class="phpdocumentor-signature__argument__name">$raws</span></span><span class="phpdocumentor-signature__argument"><span>, </span><span class="phpdocumentor-signature__argument__type">int&nbsp;</span><span class="phpdocumentor-signature__argument__name">$credits</span></span><span class="phpdocumentor-signature__argument"><span>, </span><span class="phpdocumentor-signature__argument__type">int&nbsp;</span><span class="phpdocumentor-signature__argument__name">$x</span></span><span class="phpdocumentor-signature__argument"><span>, </span><span class="phpdocumentor-signature__argument__type">int&nbsp;</span><span class="phpdocumentor-signature__argument__name">$y</span></span><span>)</span><span> : </span><span class="phpdocumentor-signature__response_type">array{verb: string, args: array<string,mixed>, why: string}|null</span></code>
+
+    <div class="phpdocumentor-label-line">
+        </div>
+    
+    
+        <h5 class="phpdocumentor-argument-list__heading">Parameters</h5>
+    <dl class="phpdocumentor-argument-list">
+                    <dt class="phpdocumentor-argument-list__entry">
+                <span class="phpdocumentor-argument-list__argument__name">$stance</span>
+                : <span class="phpdocumentor-argument-list__argument__type">string</span>
+                            </dt>
+            <dd class="phpdocumentor-argument-list__definition">
+                
+            </dd>
+                    <dt class="phpdocumentor-argument-list__entry">
+                <span class="phpdocumentor-argument-list__argument__name">$raw</span>
+                : <span class="phpdocumentor-argument-list__argument__type">array&lt;string, mixed&gt;</span>
+                            </dt>
+            <dd class="phpdocumentor-argument-list__definition">
+                
+            </dd>
+                    <dt class="phpdocumentor-argument-list__entry">
+                <span class="phpdocumentor-argument-list__argument__name">$inv</span>
+                : <span class="phpdocumentor-argument-list__argument__type">array&lt;string, mixed&gt;</span>
+                            </dt>
+            <dd class="phpdocumentor-argument-list__definition">
+                
+            </dd>
+                    <dt class="phpdocumentor-argument-list__entry">
+                <span class="phpdocumentor-argument-list__argument__name">$raws</span>
+                : <span class="phpdocumentor-argument-list__argument__type">array&lt;string, int&gt;</span>
+                            </dt>
+            <dd class="phpdocumentor-argument-list__definition">
+                
+            </dd>
+                    <dt class="phpdocumentor-argument-list__entry">
+                <span class="phpdocumentor-argument-list__argument__name">$credits</span>
+                : <span class="phpdocumentor-argument-list__argument__type">int</span>
+                            </dt>
+            <dd class="phpdocumentor-argument-list__definition">
+                
+            </dd>
+                    <dt class="phpdocumentor-argument-list__entry">
+                <span class="phpdocumentor-argument-list__argument__name">$x</span>
+                : <span class="phpdocumentor-argument-list__argument__type">int</span>
+                            </dt>
+            <dd class="phpdocumentor-argument-list__definition">
+                
+            </dd>
+                    <dt class="phpdocumentor-argument-list__entry">
+                <span class="phpdocumentor-argument-list__argument__name">$y</span>
+                : <span class="phpdocumentor-argument-list__argument__type">int</span>
+                            </dt>
+            <dd class="phpdocumentor-argument-list__definition">
+                
+            </dd>
+            </dl>
+
+    
+
+        
+    
+            <section>
+        <h5 class="phpdocumentor-return-value__heading">Return values</h5>
+        <span class="phpdocumentor-signature__response_type">array{verb: string, args: array<string,mixed>, why: string}|null</span>
+            </section>
+
+</article>
+            </section>
+
+        
+    </article>
+                                </section>
+                <section class="phpdocumentor-on-this-page__sidebar">
+                                
+    <section class="phpdocumentor-on-this-page__content">
+        <strong class="phpdocumentor-on-this-page__title">On this page</strong>
+
+        <ul class="phpdocumentor-list -clean">
+            <li class="phpdocumentor-on-this-page-section__title">Table Of Contents</li>
+            <li>
+                <ul class="phpdocumentor-list -clean">
+                                        <li><a href="classes/NHA-Brain-Ladder.html#toc-constants">Constants</a></li>
+                                                                                <li><a href="classes/NHA-Brain-Ladder.html#toc-methods">Methods</a></li>
+                                    </ul>
+            </li>
+                            <li class="phpdocumentor-on-this-page-section__title">Constants</li>
+                <li>
+                    <ul class="phpdocumentor-list -clean">
+                                                    <li class=""><a href="classes/NHA-Brain-Ladder.html#constant_CREDIT_FLOOR">CREDIT_FLOOR</a></li>
+                                                    <li class=""><a href="classes/NHA-Brain-Ladder.html#constant_HOARD_CAP">HOARD_CAP</a></li>
+                                                    <li class=""><a href="classes/NHA-Brain-Ladder.html#constant_RESEARCH_SURPLUS">RESEARCH_SURPLUS</a></li>
+                                                    <li class=""><a href="classes/NHA-Brain-Ladder.html#constant_RESOURCE_TARGET">RESOURCE_TARGET</a></li>
+                                            </ul>
+                </li>
+            
+            
+                        <li class="phpdocumentor-on-this-page-section__title">Methods</li>
+            <li>
+                <ul class="phpdocumentor-list -clean">
+                                            <li class=""><a href="classes/NHA-Brain-Ladder.html#method_defensiveAction">defensiveAction()</a></li>
+                                            <li class=""><a href="classes/NHA-Brain-Ladder.html#method_suggestion">suggestion()</a></li>
+                                            <li class=""><a href="classes/NHA-Brain-Ladder.html#method_armMove">armMove()</a></li>
+                                            <li class=""><a href="classes/NHA-Brain-Ladder.html#method_bestMedicine">bestMedicine()</a></li>
+                                            <li class=""><a href="classes/NHA-Brain-Ladder.html#method_combatMove">combatMove()</a></li>
+                                            <li class=""><a href="classes/NHA-Brain-Ladder.html#method_stanceMove">stanceMove()</a></li>
+                                    </ul>
+            </li>
+                    </ul>
+    </section>
+
+                </section>
+                            </div>
+            <section data-search-results class="phpdocumentor-search-results phpdocumentor-search-results--hidden">
+    <section class="phpdocumentor-search-results__dialog">
+        <header class="phpdocumentor-search-results__header">
+            <h2 class="phpdocumentor-search-results__title">Search results</h2>
+            <button class="phpdocumentor-search-results__close"><i class="fas fa-times"></i></button>
+        </header>
+        <section class="phpdocumentor-search-results__body">
+            <ul class="phpdocumentor-search-results__entries"></ul>
+        </section>
+    </section>
+</section>
+        </div>
+        <a href="classes/NHA-Brain-Ladder.html#top" class="phpdocumentor-back-to-top"><i class="fas fa-chevron-circle-up"></i></a>
+
+    </main>
+
+    <script>
+        cssVars({});
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.23.0/prism.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.23.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.23.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.23.0/plugins/line-highlight/prism-line-highlight.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+            <title>DiscordPHP-NHA Documentation</title>
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <base href="../">
+    <link rel="icon" type="image/png" sizes="32x32" href="images/favicon-32x32.png"/>
+    <link rel="icon" type="image/png" sizes="16x16" href="images/favicon-16x16.png"/>
+    <link rel="icon" href="images/favicon.ico"/>
+    <link rel="apple-touch-icon" href="images/apple-touch-icon.png"/>
+    <link rel="stylesheet" href="css/normalize.css">
+    <link rel="stylesheet" href="css/base.css">
+            <link rel="preconnect" href="https://fonts.gstatic.com">
+        <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@100;200;300;400;600;700&display=swap" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;600;700&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="css/template.css">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.12.0/css/all.min.css" integrity="sha256-ybRkN9dBjhcS2qrW1z+hfCxq+1aBdwyQM5wlQoQVt/0=" crossorigin="anonymous" />
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.23.0/themes/prism-okaidia.css">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.23.0/plugins/line-numbers/prism-line-numbers.css">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.23.0/plugins/line-highlight/prism-line-highlight.css">
+                <script src="https://cdn.jsdelivr.net/npm/fuse.js@3.4.6"></script>
+        <script src="https://cdn.jsdelivr.net/npm/css-vars-ponyfill@2"></script>
+        <script src="js/template.js"></script>
+        <script src="js/search.js"></script>
+        <script defer src="js/searchIndex.js"></script>
+    </head>
+<body id="top">
+    <header class="phpdocumentor-header phpdocumentor-section">
+    <h1 class="phpdocumentor-title"><a href="" class="phpdocumentor-title__link">DiscordPHP-NHA Documentation</a></h1>
+    <input class="phpdocumentor-header__menu-button" type="checkbox" id="menu-button" name="menu-button" />
+    <label class="phpdocumentor-header__menu-icon" for="menu-button">
+        <i class="fas fa-bars"></i>
+    </label>
+    <section data-search-form class="phpdocumentor-search">
+    <label>
+        <span class="visually-hidden">Search for</span>
+        <svg class="phpdocumentor-search__icon" width="21" height="20" viewBox="0 0 21 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="7.5" cy="7.5" r="6.5" stroke="currentColor" stroke-width="2"/>
+            <line x1="12.4892" y1="12.2727" x2="19.1559" y2="18.9393" stroke="currentColor" stroke-width="3"/>
+        </svg>
+        <input type="search" class="phpdocumentor-field phpdocumentor-search__field" placeholder="Loading .." disabled />
+    </label>
+</section>
+
+    <nav class="phpdocumentor-topnav">
+    <ul class="phpdocumentor-topnav__menu">
+        </ul>
+</nav>
+</header>
+
+    <main class="phpdocumentor">
+        <div class="phpdocumentor-section">
+            <input class="phpdocumentor-sidebar__menu-button" type="checkbox" id="sidebar-button" name="sidebar-button" />
+<label class="phpdocumentor-sidebar__menu-icon" for="sidebar-button">
+    Menu
+</label>
+<aside class="phpdocumentor-column -three phpdocumentor-sidebar">
+                    <section class="phpdocumentor-sidebar__category -namespaces">
+            <h2 class="phpdocumentor-sidebar__category-header">Namespaces</h2>
+                                    <h4 class="phpdocumentor-sidebar__root-namespace">
+    <a href="namespaces/nha.html" class="">NHA</a>
+</h4>
+    <ul class="phpdocumentor-list">
+                    <li>
+                <a href="namespaces/nha-bot.html" class="">Bot</a>
+                
+            </li>
+                    <li>
+                <a href="namespaces/nha-brain.html" class="">Brain</a>
+                
+            </li>
+                    <li>
+                <a href="namespaces/nha-http.html" class="">Http</a>
+                
+            </li>
+                    <li>
+                <a href="namespaces/nha-parts.html" class="">Parts</a>
+                
+            </li>
+                    <li>
+                <a href="namespaces/nha-repository.html" class="">Repository</a>
+                
+            </li>
+                    <li>
+                <a href="namespaces/nha-state.html" class="">State</a>
+                
+            </li>
+            </ul>
+
+                        </section>
+                <section class="phpdocumentor-sidebar__category -packages">
+            <h2 class="phpdocumentor-sidebar__category-header">Packages</h2>
+                                    <h4 class="phpdocumentor-sidebar__root-namespace">
+    <a href="packages/Application.html" class="">Application</a>
+</h4>
+
+                        </section>
+            
+    <section class="phpdocumentor-sidebar__category -reports">
+        <h2 class="phpdocumentor-sidebar__category-header">Reports</h2>
+                <h3 class="phpdocumentor-sidebar__root-package"><a href="reports/deprecated.html">Deprecated</a></h3>
+        <h3 class="phpdocumentor-sidebar__root-package"><a href="reports/errors.html">Errors</a></h3>
+        <h3 class="phpdocumentor-sidebar__root-package"><a href="reports/markers.html">Markers</a></h3>
+    </section>
+
+    <section class="phpdocumentor-sidebar__category -indices">
+        <h2 class="phpdocumentor-sidebar__category-header">Indices</h2>
+        <h3 class="phpdocumentor-sidebar__root-package"><a href="indices/files.html">Files</a></h3>
+    </section>
+</aside>
+
+            <div class="phpdocumentor-column -nine phpdocumentor-content">
+                                <section>
+                                        <ul class="phpdocumentor-breadcrumbs">
+            <li class="phpdocumentor-breadcrumb"><a href="namespaces/nha.html">NHA</a></li>
+            <li class="phpdocumentor-breadcrumb"><a href="namespaces/nha-state.html">State</a></li>
+    </ul>
+
+    <article class="phpdocumentor-element -trait">
+        <h2 class="phpdocumentor-content__title">
+    LoopStrategyStateTrait
+    </h2>
+
+        <aside class="phpdocumentor-element-found-in">
+    <abbr class="phpdocumentor-element-found-in__file" title="src/NHA/State/LoopStrategyStateTrait.php"><a href="files/src-nha-state-loopstrategystatetrait.html"><abbr title="src/NHA/State/LoopStrategyStateTrait.php">LoopStrategyStateTrait.php</abbr></a></abbr>
+    :
+    <span class="phpdocumentor-element-found-in__line">27</span>
+
+    </aside>
+
+            <p class="phpdocumentor-summary">{@see \NHA\StateStore} slice: the autoplay loop&#039;s strategic memory —
+the forced-objective rotation and its cooldown (armed when
+{@see \NHA\Brain\AutoPlayer::detectLoop()} catches the agent looping), the
+persisted {@see \NHA\Brain\Stance}, and the inventor-points trend that tells
+the fallback whether research is still paying.</p>
+
+
+    <section class="phpdocumentor-description"><p>Relies on the host's <code class="prettyprint">array $data</code> and <code class="prettyprint">save()</code>.</p>
+</section>
+
+
+    <h5 class="phpdocumentor-tag-list__heading" id="tags">
+        Tags
+        <a href="classes/NHA-State-LoopStrategyStateTrait.html#tags" class="headerlink"><i class="fas fa-link"></i></a>
+
+    </h5>
+    <dl class="phpdocumentor-tag-list">
+                    <dt class="phpdocumentor-tag-list__entry">
+                <span class="phpdocumentor-tag__name">since</span>
+            </dt>
+                            <dd class="phpdocumentor-tag-list__definition">
+                                            <span class="phpdocumentor-tag-link">3.1.32</span>
+                                                                                                        
+                                    </dd>
+                        </dl>
+
+    
+    
+<h3 id="toc">
+    Table of Contents
+    <a href="classes/NHA-State-LoopStrategyStateTrait.html#toc" class="headerlink"><i class="fas fa-link"></i></a>
+
+</h3>
+
+
+
+
+
+
+
+<h4 id="toc-constants">
+    Constants
+    <a href="classes/NHA-State-LoopStrategyStateTrait.html#toc-constants" class="headerlink"><i class="fas fa-link"></i></a>
+
+</h4>
+<dl class="phpdocumentor-table-of-contents">
+            <dt class="phpdocumentor-table-of-contents__entry -constant -public">
+    <a class="" href="classes/NHA-State-LoopStrategyStateTrait.html#constant_OBJECTIVE_ROTATION">OBJECTIVE_ROTATION</a>
+    <span>
+        &nbsp;: mixed&nbsp;= [&#039;explore&#039;, &#039;wealth&#039;, &#039;build&#039;, &#039;research&#039;]                            </span>
+</dt>
+<dd>Objectives cycled through, in order, each time the agent is caught looping.</dd>
+
+            <dt class="phpdocumentor-table-of-contents__entry -constant -private">
+    <a class="" href="classes/NHA-State-LoopStrategyStateTrait.html#constant_FORCED_OBJECTIVE_TTL_TICKS">FORCED_OBJECTIVE_TTL_TICKS</a>
+    <span>
+        &nbsp;: mixed&nbsp;= 45                            </span>
+</dt>
+<dd>A forced objective sticks for this many world ticks after a loop break.</dd>
+
+            <dt class="phpdocumentor-table-of-contents__entry -constant -private">
+    <a class="" href="classes/NHA-State-LoopStrategyStateTrait.html#constant_LOOP_BREAK_COOLDOWN_TICKS">LOOP_BREAK_COOLDOWN_TICKS</a>
+    <span>
+        &nbsp;: mixed&nbsp;= 24                            </span>
+</dt>
+<dd>After a loop break, do not break again for this many ticks — let it play out.</dd>
+
+            <dt class="phpdocumentor-table-of-contents__entry -constant -private">
+    <a class="" href="classes/NHA-State-LoopStrategyStateTrait.html#constant_RESEARCH_PAYING_WINDOW">RESEARCH_PAYING_WINDOW</a>
+    <span>
+        &nbsp;: mixed&nbsp;= 900                            </span>
+</dt>
+<dd>Research counts as &quot;paying&quot; for this long after the last inventor-point gain.</dd>
+
+    </dl>
+
+
+
+<h4 id="toc-methods">
+    Methods
+    <a href="classes/NHA-State-LoopStrategyStateTrait.html#toc-methods" class="headerlink"><i class="fas fa-link"></i></a>
+
+</h4>
+<dl class="phpdocumentor-table-of-contents">
+            <dt class="phpdocumentor-table-of-contents__entry -method -public">
+    <a class="" href="classes/NHA-State-LoopStrategyStateTrait.html#method_bumpForcedObjective">bumpForcedObjective()</a>
+    <span>
+                                &nbsp;: string    </span>
+</dt>
+<dd>Advances the agent&#039;s forced-objective cursor one step through
+{@see self::OBJECTIVE_ROTATION} and returns the new objective. Called by
+{@see \NHA\Brain\AutoPlayer} when it detects the agent is stuck in a loop,
+so each successive loop break tries a *different* kind of goal.</dd>
+
+            <dt class="phpdocumentor-table-of-contents__entry -method -public">
+    <a class="" href="classes/NHA-State-LoopStrategyStateTrait.html#method_getForcedObjective">getForcedObjective()</a>
+    <span>
+                                &nbsp;: string|null    </span>
+</dt>
+<dd>The objective forced by the most recent loop break, or `null` once it has
+aged out ({@see self::FORCED_OBJECTIVE_TTL_TICKS} ticks) — after which the
+agent is back on the normal ladder.</dd>
+
+            <dt class="phpdocumentor-table-of-contents__entry -method -public">
+    <a class="" href="classes/NHA-State-LoopStrategyStateTrait.html#method_getStance">getStance()</a>
+    <span>
+                                &nbsp;: array{stance: string, tick: int}    </span>
+</dt>
+<dd>The agent&#039;s persisted strategic stance and the tick it last changed
+(`{stance, tick}`). Defaults to `homestead` at tick 0.</dd>
+
+            <dt class="phpdocumentor-table-of-contents__entry -method -public">
+    <a class="" href="classes/NHA-State-LoopStrategyStateTrait.html#method_loopBreakCooldownActive">loopBreakCooldownActive()</a>
+    <span>
+                                &nbsp;: bool    </span>
+</dt>
+<dd>Whether a loop break happened too recently to break again — the forced
+objective (and the brain turns after it) need a few ticks to actually
+change the situation before the loop detector is allowed to fire once more.</dd>
+
+            <dt class="phpdocumentor-table-of-contents__entry -method -public">
+    <a class="" href="classes/NHA-State-LoopStrategyStateTrait.html#method_noteInventorPoints">noteInventorPoints()</a>
+    <span>
+                                &nbsp;: bool    </span>
+</dt>
+<dd>Records the agent&#039;s current lifetime `inventor_points` and reports whether
+research is paying *right now* — the score rose this turn, or rose within
+the last {@see self::RESEARCH_PAYING_WINDOW} seconds.</dd>
+
+            <dt class="phpdocumentor-table-of-contents__entry -method -public">
+    <a class="" href="classes/NHA-State-LoopStrategyStateTrait.html#method_peekNextForcedObjective">peekNextForcedObjective()</a>
+    <span>
+                                &nbsp;: string    </span>
+</dt>
+<dd>The objective {@see bumpForcedObjective()} WOULD return next, without
+advancing the cursor or arming the cooldown — so the loop guard can name
+the objective in the brain prompt and only commit it once the turn
+actually applies it.</dd>
+
+            <dt class="phpdocumentor-table-of-contents__entry -method -public">
+    <a class="" href="classes/NHA-State-LoopStrategyStateTrait.html#method_setStance">setStance()</a>
+    <span>
+                                &nbsp;: void    </span>
+</dt>
+<dd>Records the agent&#039;s stance. `$tick` is only stamped when the stance
+actually changes, so it marks the last *switch* for the dwell timer.</dd>
+
+    </dl>
+
+
+
+
+        
+    <section class="phpdocumentor-constants">
+        <h3 class="phpdocumentor-elements__header" id="constants">
+            Constants
+            <a href="classes/NHA-State-LoopStrategyStateTrait.html#constants" class="headerlink"><i class="fas fa-link"></i></a>
+
+        </h3>
+                    <article class="phpdocumentor-element -constant -public ">
+    <h4 class="phpdocumentor-element__name" id="constant_OBJECTIVE_ROTATION">
+        OBJECTIVE_ROTATION
+        <a href="classes/NHA-State-LoopStrategyStateTrait.html#constant_OBJECTIVE_ROTATION" class="headerlink"><i class="fas fa-link"></i></a>
+
+    </h4>
+
+    <aside class="phpdocumentor-element-found-in">
+    <abbr class="phpdocumentor-element-found-in__file" title="src/NHA/State/LoopStrategyStateTrait.php"><a href="files/src-nha-state-loopstrategystatetrait.html"><abbr title="src/NHA/State/LoopStrategyStateTrait.php">LoopStrategyStateTrait.php</abbr></a></abbr>
+    :
+    <span class="phpdocumentor-element-found-in__line">36</span>
+
+    </aside>
+
+        <p class="phpdocumentor-summary">Objectives cycled through, in order, each time the agent is caught looping.</p>
+
+    
+    <code class="phpdocumentor-signature phpdocumentor-code ">
+    <span class="phpdocumentor-signature__visibility">public</span>
+        <span class="phpdocumentor-signature__type">mixed</span>
+    <span class="phpdocumentor-signature__name">OBJECTIVE_ROTATION</span>
+    = <span class="phpdocumentor-signature__default-value">[&#039;explore&#039;, &#039;wealth&#039;, &#039;build&#039;, &#039;research&#039;]</span>
+</code>
+
+
+    
+    
+    
+
+        
+    </article>
+                    <article class="phpdocumentor-element -constant -private ">
+    <h4 class="phpdocumentor-element__name" id="constant_FORCED_OBJECTIVE_TTL_TICKS">
+        FORCED_OBJECTIVE_TTL_TICKS
+        <a href="classes/NHA-State-LoopStrategyStateTrait.html#constant_FORCED_OBJECTIVE_TTL_TICKS" class="headerlink"><i class="fas fa-link"></i></a>
+
+    </h4>
+
+    <aside class="phpdocumentor-element-found-in">
+    <abbr class="phpdocumentor-element-found-in__file" title="src/NHA/State/LoopStrategyStateTrait.php"><a href="files/src-nha-state-loopstrategystatetrait.html"><abbr title="src/NHA/State/LoopStrategyStateTrait.php">LoopStrategyStateTrait.php</abbr></a></abbr>
+    :
+    <span class="phpdocumentor-element-found-in__line">30</span>
+
+    </aside>
+
+        <p class="phpdocumentor-summary">A forced objective sticks for this many world ticks after a loop break.</p>
+
+    
+    <code class="phpdocumentor-signature phpdocumentor-code ">
+    <span class="phpdocumentor-signature__visibility">private</span>
+        <span class="phpdocumentor-signature__type">mixed</span>
+    <span class="phpdocumentor-signature__name">FORCED_OBJECTIVE_TTL_TICKS</span>
+    = <span class="phpdocumentor-signature__default-value">45</span>
+</code>
+
+
+    
+    
+    
+
+        
+    </article>
+                    <article class="phpdocumentor-element -constant -private ">
+    <h4 class="phpdocumentor-element__name" id="constant_LOOP_BREAK_COOLDOWN_TICKS">
+        LOOP_BREAK_COOLDOWN_TICKS
+        <a href="classes/NHA-State-LoopStrategyStateTrait.html#constant_LOOP_BREAK_COOLDOWN_TICKS" class="headerlink"><i class="fas fa-link"></i></a>
+
+    </h4>
+
+    <aside class="phpdocumentor-element-found-in">
+    <abbr class="phpdocumentor-element-found-in__file" title="src/NHA/State/LoopStrategyStateTrait.php"><a href="files/src-nha-state-loopstrategystatetrait.html"><abbr title="src/NHA/State/LoopStrategyStateTrait.php">LoopStrategyStateTrait.php</abbr></a></abbr>
+    :
+    <span class="phpdocumentor-element-found-in__line">33</span>
+
+    </aside>
+
+        <p class="phpdocumentor-summary">After a loop break, do not break again for this many ticks — let it play out.</p>
+
+    
+    <code class="phpdocumentor-signature phpdocumentor-code ">
+    <span class="phpdocumentor-signature__visibility">private</span>
+        <span class="phpdocumentor-signature__type">mixed</span>
+    <span class="phpdocumentor-signature__name">LOOP_BREAK_COOLDOWN_TICKS</span>
+    = <span class="phpdocumentor-signature__default-value">24</span>
+</code>
+
+
+    
+    
+    
+
+        
+    </article>
+                    <article class="phpdocumentor-element -constant -private ">
+    <h4 class="phpdocumentor-element__name" id="constant_RESEARCH_PAYING_WINDOW">
+        RESEARCH_PAYING_WINDOW
+        <a href="classes/NHA-State-LoopStrategyStateTrait.html#constant_RESEARCH_PAYING_WINDOW" class="headerlink"><i class="fas fa-link"></i></a>
+
+    </h4>
+
+    <aside class="phpdocumentor-element-found-in">
+    <abbr class="phpdocumentor-element-found-in__file" title="src/NHA/State/LoopStrategyStateTrait.php"><a href="files/src-nha-state-loopstrategystatetrait.html"><abbr title="src/NHA/State/LoopStrategyStateTrait.php">LoopStrategyStateTrait.php</abbr></a></abbr>
+    :
+    <span class="phpdocumentor-element-found-in__line">39</span>
+
+    </aside>
+
+        <p class="phpdocumentor-summary">Research counts as &quot;paying&quot; for this long after the last inventor-point gain.</p>
+
+    
+    <code class="phpdocumentor-signature phpdocumentor-code ">
+    <span class="phpdocumentor-signature__visibility">private</span>
+        <span class="phpdocumentor-signature__type">mixed</span>
+    <span class="phpdocumentor-signature__name">RESEARCH_PAYING_WINDOW</span>
+    = <span class="phpdocumentor-signature__default-value">900</span>
+</code>
+
+
+    
+    
+    
+
+        
+    </article>
+            </section>
+
+        
+
+            <section class="phpdocumentor-methods">
+        <h3 class="phpdocumentor-elements__header" id="methods">
+            Methods
+            <a href="classes/NHA-State-LoopStrategyStateTrait.html#methods" class="headerlink"><i class="fas fa-link"></i></a>
+
+        </h3>
+                    <article
+        class="phpdocumentor-element
+            -method
+            -public
+                                                        "
+>
+    <h4 class="phpdocumentor-element__name" id="method_bumpForcedObjective">
+        bumpForcedObjective()
+        <a href="classes/NHA-State-LoopStrategyStateTrait.html#method_bumpForcedObjective" class="headerlink"><i class="fas fa-link"></i></a>
+
+    </h4>
+    <aside class="phpdocumentor-element-found-in">
+    <abbr class="phpdocumentor-element-found-in__file" title="src/NHA/State/LoopStrategyStateTrait.php"><a href="files/src-nha-state-loopstrategystatetrait.html"><abbr title="src/NHA/State/LoopStrategyStateTrait.php">LoopStrategyStateTrait.php</abbr></a></abbr>
+    :
+    <span class="phpdocumentor-element-found-in__line">49</span>
+
+    </aside>
+
+        <p class="phpdocumentor-summary">Advances the agent&#039;s forced-objective cursor one step through
+{@see self::OBJECTIVE_ROTATION} and returns the new objective. Called by
+{@see \NHA\Brain\AutoPlayer} when it detects the agent is stuck in a loop,
+so each successive loop break tries a *different* kind of goal.</p>
+
+    <code class="phpdocumentor-code phpdocumentor-signature ">
+    <span class="phpdocumentor-signature__visibility">public</span>
+                    <span class="phpdocumentor-signature__name">bumpForcedObjective</span><span>(</span><span class="phpdocumentor-signature__argument"><span class="phpdocumentor-signature__argument__type">int&nbsp;</span><span class="phpdocumentor-signature__argument__name">$agent_id</span></span><span class="phpdocumentor-signature__argument"><span>, </span><span class="phpdocumentor-signature__argument__type">int&nbsp;</span><span class="phpdocumentor-signature__argument__name">$tick</span></span><span>)</span><span> : </span><span class="phpdocumentor-signature__response_type">string</span></code>
+
+    <div class="phpdocumentor-label-line">
+        </div>
+    
+    
+        <h5 class="phpdocumentor-argument-list__heading">Parameters</h5>
+    <dl class="phpdocumentor-argument-list">
+                    <dt class="phpdocumentor-argument-list__entry">
+                <span class="phpdocumentor-argument-list__argument__name">$agent_id</span>
+                : <span class="phpdocumentor-argument-list__argument__type">int</span>
+                            </dt>
+            <dd class="phpdocumentor-argument-list__definition">
+                
+            </dd>
+                    <dt class="phpdocumentor-argument-list__entry">
+                <span class="phpdocumentor-argument-list__argument__name">$tick</span>
+                : <span class="phpdocumentor-argument-list__argument__type">int</span>
+                            </dt>
+            <dd class="phpdocumentor-argument-list__definition">
+                
+            </dd>
+            </dl>
+
+    
+    <h5 class="phpdocumentor-tag-list__heading" id="method_bumpForcedObjective_tags">
+        Tags
+        <a href="classes/NHA-State-LoopStrategyStateTrait.html#method_bumpForcedObjective_tags" class="headerlink"><i class="fas fa-link"></i></a>
+
+    </h5>
+    <dl class="phpdocumentor-tag-list">
+                    <dt class="phpdocumentor-tag-list__entry">
+                <span class="phpdocumentor-tag__name">since</span>
+            </dt>
+                            <dd class="phpdocumentor-tag-list__definition">
+                                            <span class="phpdocumentor-tag-link">3.1.12</span>
+                                                                                                        
+                                    </dd>
+                        </dl>
+
+        
+    
+            <section>
+        <h5 class="phpdocumentor-return-value__heading">Return values</h5>
+        <span class="phpdocumentor-signature__response_type">string</span>
+            </section>
+
+</article>
+                    <article
+        class="phpdocumentor-element
+            -method
+            -public
+                                                        "
+>
+    <h4 class="phpdocumentor-element__name" id="method_getForcedObjective">
+        getForcedObjective()
+        <a href="classes/NHA-State-LoopStrategyStateTrait.html#method_getForcedObjective" class="headerlink"><i class="fas fa-link"></i></a>
+
+    </h4>
+    <aside class="phpdocumentor-element-found-in">
+    <abbr class="phpdocumentor-element-found-in__file" title="src/NHA/State/LoopStrategyStateTrait.php"><a href="files/src-nha-state-loopstrategystatetrait.html"><abbr title="src/NHA/State/LoopStrategyStateTrait.php">LoopStrategyStateTrait.php</abbr></a></abbr>
+    :
+    <span class="phpdocumentor-element-found-in__line">86</span>
+
+    </aside>
+
+        <p class="phpdocumentor-summary">The objective forced by the most recent loop break, or `null` once it has
+aged out ({@see self::FORCED_OBJECTIVE_TTL_TICKS} ticks) — after which the
+agent is back on the normal ladder.</p>
+
+    <code class="phpdocumentor-code phpdocumentor-signature ">
+    <span class="phpdocumentor-signature__visibility">public</span>
+                    <span class="phpdocumentor-signature__name">getForcedObjective</span><span>(</span><span class="phpdocumentor-signature__argument"><span class="phpdocumentor-signature__argument__type">int&nbsp;</span><span class="phpdocumentor-signature__argument__name">$agent_id</span></span><span class="phpdocumentor-signature__argument"><span>, </span><span class="phpdocumentor-signature__argument__type">int&nbsp;</span><span class="phpdocumentor-signature__argument__name">$tick</span></span><span>)</span><span> : </span><span class="phpdocumentor-signature__response_type">string|null</span></code>
+
+    <div class="phpdocumentor-label-line">
+        </div>
+    
+    
+        <h5 class="phpdocumentor-argument-list__heading">Parameters</h5>
+    <dl class="phpdocumentor-argument-list">
+                    <dt class="phpdocumentor-argument-list__entry">
+                <span class="phpdocumentor-argument-list__argument__name">$agent_id</span>
+                : <span class="phpdocumentor-argument-list__argument__type">int</span>
+                            </dt>
+            <dd class="phpdocumentor-argument-list__definition">
+                
+            </dd>
+                    <dt class="phpdocumentor-argument-list__entry">
+                <span class="phpdocumentor-argument-list__argument__name">$tick</span>
+                : <span class="phpdocumentor-argument-list__argument__type">int</span>
+                            </dt>
+            <dd class="phpdocumentor-argument-list__definition">
+                
+            </dd>
+            </dl>
+
+    
+    <h5 class="phpdocumentor-tag-list__heading" id="method_getForcedObjective_tags">
+        Tags
+        <a href="classes/NHA-State-LoopStrategyStateTrait.html#method_getForcedObjective_tags" class="headerlink"><i class="fas fa-link"></i></a>
+
+    </h5>
+    <dl class="phpdocumentor-tag-list">
+                    <dt class="phpdocumentor-tag-list__entry">
+                <span class="phpdocumentor-tag__name">since</span>
+            </dt>
+                            <dd class="phpdocumentor-tag-list__definition">
+                                            <span class="phpdocumentor-tag-link">3.1.12</span>
+                                                                                                        
+                                    </dd>
+                        </dl>
+
+        
+    
+            <section>
+        <h5 class="phpdocumentor-return-value__heading">Return values</h5>
+        <span class="phpdocumentor-signature__response_type">string|null</span>
+            </section>
+
+</article>
+                    <article
+        class="phpdocumentor-element
+            -method
+            -public
+                                                        "
+>
+    <h4 class="phpdocumentor-element__name" id="method_getStance">
+        getStance()
+        <a href="classes/NHA-State-LoopStrategyStateTrait.html#method_getStance" class="headerlink"><i class="fas fa-link"></i></a>
+
+    </h4>
+    <aside class="phpdocumentor-element-found-in">
+    <abbr class="phpdocumentor-element-found-in__file" title="src/NHA/State/LoopStrategyStateTrait.php"><a href="files/src-nha-state-loopstrategystatetrait.html"><abbr title="src/NHA/State/LoopStrategyStateTrait.php">LoopStrategyStateTrait.php</abbr></a></abbr>
+    :
+    <span class="phpdocumentor-element-found-in__line">126</span>
+
+    </aside>
+
+        <p class="phpdocumentor-summary">The agent&#039;s persisted strategic stance and the tick it last changed
+(`{stance, tick}`). Defaults to `homestead` at tick 0.</p>
+
+    <code class="phpdocumentor-code phpdocumentor-signature ">
+    <span class="phpdocumentor-signature__visibility">public</span>
+                    <span class="phpdocumentor-signature__name">getStance</span><span>(</span><span class="phpdocumentor-signature__argument"><span class="phpdocumentor-signature__argument__type">int&nbsp;</span><span class="phpdocumentor-signature__argument__name">$agent_id</span></span><span>)</span><span> : </span><span class="phpdocumentor-signature__response_type">array{stance: string, tick: int}</span></code>
+
+    <div class="phpdocumentor-label-line">
+        </div>
+    
+    
+        <h5 class="phpdocumentor-argument-list__heading">Parameters</h5>
+    <dl class="phpdocumentor-argument-list">
+                    <dt class="phpdocumentor-argument-list__entry">
+                <span class="phpdocumentor-argument-list__argument__name">$agent_id</span>
+                : <span class="phpdocumentor-argument-list__argument__type">int</span>
+                            </dt>
+            <dd class="phpdocumentor-argument-list__definition">
+                
+            </dd>
+            </dl>
+
+    
+    <h5 class="phpdocumentor-tag-list__heading" id="method_getStance_tags">
+        Tags
+        <a href="classes/NHA-State-LoopStrategyStateTrait.html#method_getStance_tags" class="headerlink"><i class="fas fa-link"></i></a>
+
+    </h5>
+    <dl class="phpdocumentor-tag-list">
+                    <dt class="phpdocumentor-tag-list__entry">
+                <span class="phpdocumentor-tag__name">since</span>
+            </dt>
+                            <dd class="phpdocumentor-tag-list__definition">
+                                            <span class="phpdocumentor-tag-link">3.1.23</span>
+                                                                                                        
+                                    </dd>
+                        </dl>
+
+        
+    
+            <section>
+        <h5 class="phpdocumentor-return-value__heading">Return values</h5>
+        <span class="phpdocumentor-signature__response_type">array{stance: string, tick: int}</span>
+            </section>
+
+</article>
+                    <article
+        class="phpdocumentor-element
+            -method
+            -public
+                                                        "
+>
+    <h4 class="phpdocumentor-element__name" id="method_loopBreakCooldownActive">
+        loopBreakCooldownActive()
+        <a href="classes/NHA-State-LoopStrategyStateTrait.html#method_loopBreakCooldownActive" class="headerlink"><i class="fas fa-link"></i></a>
+
+    </h4>
+    <aside class="phpdocumentor-element-found-in">
+    <abbr class="phpdocumentor-element-found-in__file" title="src/NHA/State/LoopStrategyStateTrait.php"><a href="files/src-nha-state-loopstrategystatetrait.html"><abbr title="src/NHA/State/LoopStrategyStateTrait.php">LoopStrategyStateTrait.php</abbr></a></abbr>
+    :
+    <span class="phpdocumentor-element-found-in__line">108</span>
+
+    </aside>
+
+        <p class="phpdocumentor-summary">Whether a loop break happened too recently to break again — the forced
+objective (and the brain turns after it) need a few ticks to actually
+change the situation before the loop detector is allowed to fire once more.</p>
+
+    <code class="phpdocumentor-code phpdocumentor-signature ">
+    <span class="phpdocumentor-signature__visibility">public</span>
+                    <span class="phpdocumentor-signature__name">loopBreakCooldownActive</span><span>(</span><span class="phpdocumentor-signature__argument"><span class="phpdocumentor-signature__argument__type">int&nbsp;</span><span class="phpdocumentor-signature__argument__name">$agent_id</span></span><span class="phpdocumentor-signature__argument"><span>, </span><span class="phpdocumentor-signature__argument__type">int&nbsp;</span><span class="phpdocumentor-signature__argument__name">$tick</span></span><span>)</span><span> : </span><span class="phpdocumentor-signature__response_type">bool</span></code>
+
+    <div class="phpdocumentor-label-line">
+        </div>
+    
+        <section class="phpdocumentor-description"><p>Without this the loop-break moves themselves keep the &quot;no productive
+action&quot; window full and it thrashes every turn.</p>
+</section>
+
+        <h5 class="phpdocumentor-argument-list__heading">Parameters</h5>
+    <dl class="phpdocumentor-argument-list">
+                    <dt class="phpdocumentor-argument-list__entry">
+                <span class="phpdocumentor-argument-list__argument__name">$agent_id</span>
+                : <span class="phpdocumentor-argument-list__argument__type">int</span>
+                            </dt>
+            <dd class="phpdocumentor-argument-list__definition">
+                
+            </dd>
+                    <dt class="phpdocumentor-argument-list__entry">
+                <span class="phpdocumentor-argument-list__argument__name">$tick</span>
+                : <span class="phpdocumentor-argument-list__argument__type">int</span>
+                            </dt>
+            <dd class="phpdocumentor-argument-list__definition">
+                
+            </dd>
+            </dl>
+
+    
+    <h5 class="phpdocumentor-tag-list__heading" id="method_loopBreakCooldownActive_tags">
+        Tags
+        <a href="classes/NHA-State-LoopStrategyStateTrait.html#method_loopBreakCooldownActive_tags" class="headerlink"><i class="fas fa-link"></i></a>
+
+    </h5>
+    <dl class="phpdocumentor-tag-list">
+                    <dt class="phpdocumentor-tag-list__entry">
+                <span class="phpdocumentor-tag__name">since</span>
+            </dt>
+                            <dd class="phpdocumentor-tag-list__definition">
+                                            <span class="phpdocumentor-tag-link">3.1.14</span>
+                                                                                                        
+                                    </dd>
+                        </dl>
+
+        
+    
+            <section>
+        <h5 class="phpdocumentor-return-value__heading">Return values</h5>
+        <span class="phpdocumentor-signature__response_type">bool</span>
+            </section>
+
+</article>
+                    <article
+        class="phpdocumentor-element
+            -method
+            -public
+                                                        "
+>
+    <h4 class="phpdocumentor-element__name" id="method_noteInventorPoints">
+        noteInventorPoints()
+        <a href="classes/NHA-State-LoopStrategyStateTrait.html#method_noteInventorPoints" class="headerlink"><i class="fas fa-link"></i></a>
+
+    </h4>
+    <aside class="phpdocumentor-element-found-in">
+    <abbr class="phpdocumentor-element-found-in__file" title="src/NHA/State/LoopStrategyStateTrait.php"><a href="files/src-nha-state-loopstrategystatetrait.html"><abbr title="src/NHA/State/LoopStrategyStateTrait.php">LoopStrategyStateTrait.php</abbr></a></abbr>
+    :
+    <span class="phpdocumentor-element-found-in__line">168</span>
+
+    </aside>
+
+        <p class="phpdocumentor-summary">Records the agent&#039;s current lifetime `inventor_points` and reports whether
+research is paying *right now* — the score rose this turn, or rose within
+the last {@see self::RESEARCH_PAYING_WINDOW} seconds.</p>
+
+    <code class="phpdocumentor-code phpdocumentor-signature ">
+    <span class="phpdocumentor-signature__visibility">public</span>
+                    <span class="phpdocumentor-signature__name">noteInventorPoints</span><span>(</span><span class="phpdocumentor-signature__argument"><span class="phpdocumentor-signature__argument__type">int&nbsp;</span><span class="phpdocumentor-signature__argument__name">$agent_id</span></span><span class="phpdocumentor-signature__argument"><span>, </span><span class="phpdocumentor-signature__argument__type">int&nbsp;</span><span class="phpdocumentor-signature__argument__name">$points</span></span><span>)</span><span> : </span><span class="phpdocumentor-signature__response_type">bool</span></code>
+
+    <div class="phpdocumentor-label-line">
+        </div>
+    
+        <section class="phpdocumentor-description"><p>Inventor points never drop (a rejected invention only refunds ingredients),
+so an absolute <code class="prettyprint">&gt; 0</code> test stays true forever once an agent has invented
+anything. The autoplay fallback needs the recent trend instead: keep
+speculating while discoveries are still landing, fall to infrastructure
+once they dry up. The first sighting only sets the baseline and returns
+<code class="prettyprint">false</code> (no trend yet).</p>
+</section>
+
+        <h5 class="phpdocumentor-argument-list__heading">Parameters</h5>
+    <dl class="phpdocumentor-argument-list">
+                    <dt class="phpdocumentor-argument-list__entry">
+                <span class="phpdocumentor-argument-list__argument__name">$agent_id</span>
+                : <span class="phpdocumentor-argument-list__argument__type">int</span>
+                            </dt>
+            <dd class="phpdocumentor-argument-list__definition">
+                
+            </dd>
+                    <dt class="phpdocumentor-argument-list__entry">
+                <span class="phpdocumentor-argument-list__argument__name">$points</span>
+                : <span class="phpdocumentor-argument-list__argument__type">int</span>
+                            </dt>
+            <dd class="phpdocumentor-argument-list__definition">
+                
+            </dd>
+            </dl>
+
+    
+    <h5 class="phpdocumentor-tag-list__heading" id="method_noteInventorPoints_tags">
+        Tags
+        <a href="classes/NHA-State-LoopStrategyStateTrait.html#method_noteInventorPoints_tags" class="headerlink"><i class="fas fa-link"></i></a>
+
+    </h5>
+    <dl class="phpdocumentor-tag-list">
+                    <dt class="phpdocumentor-tag-list__entry">
+                <span class="phpdocumentor-tag__name">since</span>
+            </dt>
+                            <dd class="phpdocumentor-tag-list__definition">
+                                            <span class="phpdocumentor-tag-link">3.1.9</span>
+                                                                                                        
+                                    </dd>
+                        </dl>
+
+        
+    
+            <section>
+        <h5 class="phpdocumentor-return-value__heading">Return values</h5>
+        <span class="phpdocumentor-signature__response_type">bool</span>
+            </section>
+
+</article>
+                    <article
+        class="phpdocumentor-element
+            -method
+            -public
+                                                        "
+>
+    <h4 class="phpdocumentor-element__name" id="method_peekNextForcedObjective">
+        peekNextForcedObjective()
+        <a href="classes/NHA-State-LoopStrategyStateTrait.html#method_peekNextForcedObjective" class="headerlink"><i class="fas fa-link"></i></a>
+
+    </h4>
+    <aside class="phpdocumentor-element-found-in">
+    <abbr class="phpdocumentor-element-found-in__file" title="src/NHA/State/LoopStrategyStateTrait.php"><a href="files/src-nha-state-loopstrategystatetrait.html"><abbr title="src/NHA/State/LoopStrategyStateTrait.php">LoopStrategyStateTrait.php</abbr></a></abbr>
+    :
+    <span class="phpdocumentor-element-found-in__line">71</span>
+
+    </aside>
+
+        <p class="phpdocumentor-summary">The objective {@see bumpForcedObjective()} WOULD return next, without
+advancing the cursor or arming the cooldown — so the loop guard can name
+the objective in the brain prompt and only commit it once the turn
+actually applies it.</p>
+
+    <code class="phpdocumentor-code phpdocumentor-signature ">
+    <span class="phpdocumentor-signature__visibility">public</span>
+                    <span class="phpdocumentor-signature__name">peekNextForcedObjective</span><span>(</span><span class="phpdocumentor-signature__argument"><span class="phpdocumentor-signature__argument__type">int&nbsp;</span><span class="phpdocumentor-signature__argument__name">$agent_id</span></span><span>)</span><span> : </span><span class="phpdocumentor-signature__response_type">string</span></code>
+
+    <div class="phpdocumentor-label-line">
+        </div>
+    
+    
+        <h5 class="phpdocumentor-argument-list__heading">Parameters</h5>
+    <dl class="phpdocumentor-argument-list">
+                    <dt class="phpdocumentor-argument-list__entry">
+                <span class="phpdocumentor-argument-list__argument__name">$agent_id</span>
+                : <span class="phpdocumentor-argument-list__argument__type">int</span>
+                            </dt>
+            <dd class="phpdocumentor-argument-list__definition">
+                
+            </dd>
+            </dl>
+
+    
+    <h5 class="phpdocumentor-tag-list__heading" id="method_peekNextForcedObjective_tags">
+        Tags
+        <a href="classes/NHA-State-LoopStrategyStateTrait.html#method_peekNextForcedObjective_tags" class="headerlink"><i class="fas fa-link"></i></a>
+
+    </h5>
+    <dl class="phpdocumentor-tag-list">
+                    <dt class="phpdocumentor-tag-list__entry">
+                <span class="phpdocumentor-tag__name">since</span>
+            </dt>
+                            <dd class="phpdocumentor-tag-list__definition">
+                                            <span class="phpdocumentor-tag-link">3.1.21</span>
+                                                                                                        
+                                    </dd>
+                        </dl>
+
+        
+    
+            <section>
+        <h5 class="phpdocumentor-return-value__heading">Return values</h5>
+        <span class="phpdocumentor-signature__response_type">string</span>
+            </section>
+
+</article>
+                    <article
+        class="phpdocumentor-element
+            -method
+            -public
+                                                        "
+>
+    <h4 class="phpdocumentor-element__name" id="method_setStance">
+        setStance()
+        <a href="classes/NHA-State-LoopStrategyStateTrait.html#method_setStance" class="headerlink"><i class="fas fa-link"></i></a>
+
+    </h4>
+    <aside class="phpdocumentor-element-found-in">
+    <abbr class="phpdocumentor-element-found-in__file" title="src/NHA/State/LoopStrategyStateTrait.php"><a href="files/src-nha-state-loopstrategystatetrait.html"><abbr title="src/NHA/State/LoopStrategyStateTrait.php">LoopStrategyStateTrait.php</abbr></a></abbr>
+    :
+    <span class="phpdocumentor-element-found-in__line">142</span>
+
+    </aside>
+
+        <p class="phpdocumentor-summary">Records the agent&#039;s stance. `$tick` is only stamped when the stance
+actually changes, so it marks the last *switch* for the dwell timer.</p>
+
+    <code class="phpdocumentor-code phpdocumentor-signature ">
+    <span class="phpdocumentor-signature__visibility">public</span>
+                    <span class="phpdocumentor-signature__name">setStance</span><span>(</span><span class="phpdocumentor-signature__argument"><span class="phpdocumentor-signature__argument__type">int&nbsp;</span><span class="phpdocumentor-signature__argument__name">$agent_id</span></span><span class="phpdocumentor-signature__argument"><span>, </span><span class="phpdocumentor-signature__argument__type">string&nbsp;</span><span class="phpdocumentor-signature__argument__name">$stance</span></span><span class="phpdocumentor-signature__argument"><span>, </span><span class="phpdocumentor-signature__argument__type">int&nbsp;</span><span class="phpdocumentor-signature__argument__name">$tick</span></span><span>)</span><span> : </span><span class="phpdocumentor-signature__response_type">void</span></code>
+
+    <div class="phpdocumentor-label-line">
+        </div>
+    
+    
+        <h5 class="phpdocumentor-argument-list__heading">Parameters</h5>
+    <dl class="phpdocumentor-argument-list">
+                    <dt class="phpdocumentor-argument-list__entry">
+                <span class="phpdocumentor-argument-list__argument__name">$agent_id</span>
+                : <span class="phpdocumentor-argument-list__argument__type">int</span>
+                            </dt>
+            <dd class="phpdocumentor-argument-list__definition">
+                
+            </dd>
+                    <dt class="phpdocumentor-argument-list__entry">
+                <span class="phpdocumentor-argument-list__argument__name">$stance</span>
+                : <span class="phpdocumentor-argument-list__argument__type">string</span>
+                            </dt>
+            <dd class="phpdocumentor-argument-list__definition">
+                
+            </dd>
+                    <dt class="phpdocumentor-argument-list__entry">
+                <span class="phpdocumentor-argument-list__argument__name">$tick</span>
+                : <span class="phpdocumentor-argument-list__argument__type">int</span>
+                            </dt>
+            <dd class="phpdocumentor-argument-list__definition">
+                
+            </dd>
+            </dl>
+
+    
+    <h5 class="phpdocumentor-tag-list__heading" id="method_setStance_tags">
+        Tags
+        <a href="classes/NHA-State-LoopStrategyStateTrait.html#method_setStance_tags" class="headerlink"><i class="fas fa-link"></i></a>
+
+    </h5>
+    <dl class="phpdocumentor-tag-list">
+                    <dt class="phpdocumentor-tag-list__entry">
+                <span class="phpdocumentor-tag__name">since</span>
+            </dt>
+                            <dd class="phpdocumentor-tag-list__definition">
+                                            <span class="phpdocumentor-tag-link">3.1.23</span>
+                                                                                                        
+                                    </dd>
+                        </dl>
+
+        
+    
+    
+</article>
+            </section>
+
+        
+    </article>
+                                </section>
+                <section class="phpdocumentor-on-this-page__sidebar">
+                                
+    <section class="phpdocumentor-on-this-page__content">
+        <strong class="phpdocumentor-on-this-page__title">On this page</strong>
+
+        <ul class="phpdocumentor-list -clean">
+            <li class="phpdocumentor-on-this-page-section__title">Table Of Contents</li>
+            <li>
+                <ul class="phpdocumentor-list -clean">
+                                        <li><a href="classes/NHA-State-LoopStrategyStateTrait.html#toc-constants">Constants</a></li>
+                                                                                <li><a href="classes/NHA-State-LoopStrategyStateTrait.html#toc-methods">Methods</a></li>
+                                    </ul>
+            </li>
+                        <li class="phpdocumentor-on-this-page-section__title">Constants</li>
+            <li>
+                <ul class="phpdocumentor-list -clean">
+                                            <li class=""><a href="classes/NHA-State-LoopStrategyStateTrait.html#constant_OBJECTIVE_ROTATION">OBJECTIVE_ROTATION</a></li>
+                                            <li class=""><a href="classes/NHA-State-LoopStrategyStateTrait.html#constant_FORCED_OBJECTIVE_TTL_TICKS">FORCED_OBJECTIVE_TTL_TICKS</a></li>
+                                            <li class=""><a href="classes/NHA-State-LoopStrategyStateTrait.html#constant_LOOP_BREAK_COOLDOWN_TICKS">LOOP_BREAK_COOLDOWN_TICKS</a></li>
+                                            <li class=""><a href="classes/NHA-State-LoopStrategyStateTrait.html#constant_RESEARCH_PAYING_WINDOW">RESEARCH_PAYING_WINDOW</a></li>
+                                    </ul>
+            </li>
+                                                <li class="phpdocumentor-on-this-page-section__title">Methods</li>
+            <li>
+                <ul class="phpdocumentor-list -clean">
+                                            <li class=""><a href="classes/NHA-State-LoopStrategyStateTrait.html#method_bumpForcedObjective">bumpForcedObjective()</a></li>
+                                            <li class=""><a href="classes/NHA-State-LoopStrategyStateTrait.html#method_getForcedObjective">getForcedObjective()</a></li>
+                                            <li class=""><a href="classes/NHA-State-LoopStrategyStateTrait.html#method_getStance">getStance()</a></li>
+                                            <li class=""><a href="classes/NHA-State-LoopStrategyStateTrait.html#method_loopBreakCooldownActive">loopBreakCooldownActive()</a></li>
+                                            <li class=""><a href="classes/NHA-State-LoopStrategyStateTrait.html#method_noteInventorPoints">noteInventorPoints()</a></li>
+                                            <li class=""><a href="classes/NHA-State-LoopStrategyStateTrait.html#method_peekNextForcedObjective">peekNextForcedObjective()</a></li>
+                                            <li class=""><a href="classes/NHA-State-LoopStrategyStateTrait.html#method_setStance">setStance()</a></li>
+                                    </ul>
+            </li>
+                    </ul>
+    </section>
+
+                </section>
+                            </div>
+            <section data-search-results class="phpdocumentor-search-results phpdocumentor-search-results--hidden">
+    <section class="phpdocumentor-search-results__dialog">
+        <header class="phpdocumentor-search-results__header">
+            <h2 class="phpdocumentor-search-results__title">Search results</h2>
+            <button class="phpdocumentor-search-results__close"><i class="fas fa-times"></i></button>
+        </header>
+        <section class="phpdocumentor-search-results__body">
+            <ul class="phpdocumentor-search-results__entries"></ul>
+        </section>
+    </section>
+</section>
+        </div>
+        <a href="classes/NHA-State-LoopStrategyStateTrait.html#top" class="phpdocumentor-back-to-top"><i class="fas fa-chevron-circle-up"></i></a>
+
+    </main>
+
+    <script>
+        cssVars({});
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.23.0/prism.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.23.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.23.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.23.0/plugins/line-highlight/prism-line-highlight.min.js"></script>
+</body>
+</html>
