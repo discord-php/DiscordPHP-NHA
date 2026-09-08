@@ -12,6 +12,16 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.1.29] - 2026-09-08
+
+### Changed
+- `Brain\Playbook` — rung 4b rewritten as **GET A VEHICLE**: the agent has
+  never `finalize`d one, so once it is stocked and grounded with no vehicle in
+  hand it should read the part costs from the recipe block, `build` the
+  cheapest affordable part, repeat a part per turn until it can `finalize`,
+  then `deploy` — ahead of inventing and a second tower. A rejected `build`
+  means "can't afford that part", not "retry".
+
 ## [3.1.28] - 2026-09-08
 
 ### Changed

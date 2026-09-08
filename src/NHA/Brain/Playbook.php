@@ -155,9 +155,14 @@ final class Playbook
                If you do NOT hold `composite` but you DO hold credits (≈ 60+), BUY your way to a tower instead of
                idling: `buy` `metal` (≈ 5 each), then `buy` `aluminum` + `carbon` (cheap) and `combine` them into
                `composite`, then `construct`. Credits only score when spent — a pile of them is wasted potential.
-            4b. PASSIVE INCOME — `build` vehicle parts → `finalize` a vehicle → `deploy` it to roam and mine on its
-               own. Once you can fly, `construct shape=extractor` on a body auto-drips resources into your hold.
-               A completed Station module or an open colony board takes `invest {module,credits}` for co-op points.
+            4b. GET A VEHICLE — you have never `finalize`d one, and that is a hole. A deployed vehicle mines on
+               its own (passive points) and a ship is the ONLY way to `depart` for another body. Once you are
+               stocked and grounded with no vehicle in hand: read the part costs in the recipe block, `build`
+               the cheapest part you can afford THIS turn, and keep building a part per turn until you hold
+               enough to `finalize`. Do this BEFORE inventing and BEFORE a second tower. If a `build` is
+               rejected you cannot afford that part — pick a cheaper one or harvest/sell first, do not repeat it.
+               Then `deploy` the finished vehicle. On a body, `construct shape=extractor` auto-drips resources
+               into your hold. A completed Station module or open colony board takes `invest {module,credits}`.
             5. WEALTH. `sell` ONLY when you need the credits — below ~300, or to fund a `buy`/`invest` this turn —
                or when a single raw has piled past ~80 (dump the excess above 30). Otherwise KEEP your raws; a
                stockpile is what lets you build. `fulfill` a contract whose `want` you already cover.
