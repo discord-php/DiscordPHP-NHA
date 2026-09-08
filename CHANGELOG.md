@@ -4,6 +4,14 @@ All notable changes to DiscordPHP-NHA are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 SemVer with the **major tracking the NHA world API version**.
 
+## [Unreleased]
+
+### Added
+- `docs/PLAYBOOK.md` — maintained UML (Mermaid) for the autoplay brain: the
+  per-turn flow of `AutoPlayer::step()`, the `AgentBrain::suggestion()` ladder,
+  the loop guard, and a component diagram. Update it alongside any change to
+  that logic.
+
 ## [3.1.16] - 2026-09-07
 
 ### Fixed

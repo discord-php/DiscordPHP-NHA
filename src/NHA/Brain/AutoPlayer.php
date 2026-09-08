@@ -403,6 +403,10 @@ final class AutoPlayer
     /**
      * Executes one autoplay turn.
      *
+     * The turn flow (lease → outcome poll → observe → loop guard → decide →
+     * combine/ride guardrails → submit) is diagrammed in `docs/PLAYBOOK.md`;
+     * keep that in sync with changes here.
+     *
      * @param int         $agent_id
      * @param string      $token         The agent's action token (empty → the ambient token).
      * @param string|null $lease         A per-process id for the driving loop. When set, the turn

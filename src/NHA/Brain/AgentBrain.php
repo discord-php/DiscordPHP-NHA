@@ -447,6 +447,8 @@ final class AgentBrain
      * space as both `$tried` and `$worldKnown` and the ladder skips its
      * speculative-combine rung and drops straight to build / wealth / harvest.
      *
+     * The rungs are diagrammed in `docs/PLAYBOOK.md`; keep it in sync.
+     *
      * @param array<string,mixed> $raw              The normalised observation.
      * @param array<string,bool>  $tried            `a+b => true` for combine sets submitted THIS session.
      * @param array<string,bool>  $worldKnown       `a+b => true` for sets the whole world has already invented.
