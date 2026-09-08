@@ -12,6 +12,20 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.1.32] - 2026-09-08
+
+### Changed
+- `StateStore` split: the ~30 accessors moved into six cohesive traits under
+  `NHA\State\` — `IdentityStateTrait` (default agent / Discord users / autoplay
+  flag / command signatures), `PositionStateTrait`, `AutoplayLeaseTrait`,
+  `DecisionLogTrait`, `CombineMemoryTrait` and `LoopStrategyStateTrait`
+  (forced-objective rotation + cooldown + stance + inventor-points trend).
+  `StateStore` itself is now just the JSON file: load, the shared `$data`, and
+  the atomic `save()` the traits call — 723 → 87 lines. No API change (every
+  method, constant and static stays on `StateStore` via the traits); some
+  magic caps became named constants (`DECISION_LOG_CAP`, `TRIED_COMBINES_CAP`,
+  `DEAD_COMBINES_CAP`).
+
 ## [3.1.31] - 2026-09-08
 
 ### Changed

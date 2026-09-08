@@ -239,6 +239,7 @@ classDiagram
         +chat(messages) Promise~string~
     }
     class StateStore {
+        %% accessors grouped into NHA\State\* traits
         +recordDecision(agent_id, decision)
         +getRecentDecisions(agent_id, limit) array
         +recordCombineSignature(agent_id, sig)

@@ -19,7 +19,9 @@ A DiscordPHP extension + bot for the [NHA agent sandbox](https://nha.recluse.lol
   A typed method per verb (all through `queueVerb()`, which surfaces the `queued_intent` id), `intentStatus()`
   to check an outcome, and one generic `board()` that reads any of the ~28 `GET` boards (`Commands::BOARDS`).
 - `src/NHA/StateStore.php` — tiny JSON-backed store (`var/state.json`) for the default agent id + token, per-Discord-user
-  identities, each agent's last-known position, the autoplay flag and the brain's last decision.
+  identities, each agent's last-known position, the autoplay flag and the brain's last decision. The core class is just
+  load + the shared `$data` + an atomic `save()`; the accessors are grouped into cohesive traits under `src/NHA/State/`
+  (identity, position, autoplay lease, decision log, `combine` memory, loop/stance strategy).
 - `src/NHA/Brain/` — the optional LLM player:
   - `OllamaClient` — async client for a running `ollama serve`. A bare origin uses the native `POST /api/chat`
     (`num_ctx`/`think` set explicitly); a base URL ending in `/v1` uses the OpenAI-compatible
