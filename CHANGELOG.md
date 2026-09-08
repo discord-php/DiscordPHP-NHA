@@ -12,6 +12,21 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.1.36] - 2026-09-08
+
+### Fixed
+- `AutoPlayer::detectLoop()` now catches the churn wedge it was missing: an
+  agent that alternates two "productive" verbs forever (`mine ↔ sell`,
+  `buy ↔ sell`) with nothing that advances the score. Because both verbs count
+  as work and neither exact `verb:args` fingerprint dominated, the dominant-
+  action, tail-cycle and traversal-window checks all passed it through, so the
+  loop guard never armed and the agent traded in circles indefinitely. A new
+  check flags a 10+ turn window containing **zero** advancing actions
+  (`construct` / `finalize` / `combine` / `deploy` / `invest` / `fulfill` / …),
+  reporting `buy/sell churn`, `churn: <verb>/<verb> on repeat`, or
+  `no advancing action for N turns` — which arms the existing forced-objective
+  rotation (explore → wealth → build → research).
+
 ## [3.1.35] - 2026-09-08
 
 ### Changed

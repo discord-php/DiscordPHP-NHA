@@ -498,6 +498,103 @@ class AutoPlayerTest extends NHAUnitTestCase
     }
 
     /**
+     * The real-world wedge: mine one raw, sell another, forever. Both verbs are
+     * "work", so the old checks (dominant fingerprint, tail cycle, traversal
+     * window) all passed it.
+     *
+     * @covers \NHA\Brain\AutoPlayer
+     */
+    public function testDetectLoopFlagsAMineSellOscillationWithNoBuild(): void
+    {
+        // Varied args (different raws each turn) so the pristine 2-cycle check
+        // misses it — only the verb-level churn check catches this.
+        $raws = ['iron', 'crystal', 'copper', 'nickel', 'silicon', 'cobalt'];
+        $recent = [];
+        foreach ($raws as $i => $res) {
+            $recent[] = ['verb' => 'mine', 'args' => ['n' => 15, 'resource' => $res], 'tick' => $i * 2, 'alt' => 0];
+            $recent[] = ['verb' => 'sell', 'args' => ['resource' => $raws[($i + 3) % 6], 'n' => 20], 'tick' => $i * 2 + 1, 'alt' => 0];
+        }
+
+        $this->assertStringContainsString('churn: mine/sell', (string) AutoPlayer::detectLoop($recent));
+    }
+
+    /**
+     * @covers \NHA\Brain\AutoPlayer
+     */
+    public function testDetectLoopFlagsBuySellChurn(): void
+    {
+        $recent = [
+            ['verb' => 'buy', 'args' => ['resource' => 'carbon', 'n' => 20], 'tick' => 0, 'alt' => 0],
+            ['verb' => 'sell', 'args' => ['resource' => 'carbon', 'n' => 20], 'tick' => 1, 'alt' => 0],
+            ['verb' => 'buy', 'args' => ['resource' => 'aluminum', 'n' => 40], 'tick' => 2, 'alt' => 0],
+            ['verb' => 'sell', 'args' => ['resource' => 'aluminum', 'n' => 20], 'tick' => 3, 'alt' => 0],
+            ['verb' => 'sell', 'args' => ['resource' => 'aluminum', 'n' => 20], 'tick' => 4, 'alt' => 0],
+            ['verb' => 'mine', 'args' => ['n' => 15, 'resource' => 'iron'], 'tick' => 5, 'alt' => 0],
+            ['verb' => 'sell', 'args' => ['resource' => 'brine', 'n' => 20], 'tick' => 6, 'alt' => 0],
+            ['verb' => 'buy', 'args' => ['resource' => 'carbon', 'n' => 20], 'tick' => 7, 'alt' => 0],
+            ['verb' => 'sell', 'args' => ['resource' => 'carbon', 'n' => 20], 'tick' => 8, 'alt' => 0],
+            ['verb' => 'buy', 'args' => ['resource' => 'aluminum', 'n' => 20], 'tick' => 9, 'alt' => 0],
+            ['verb' => 'sell', 'args' => ['resource' => 'aluminum', 'n' => 20], 'tick' => 10, 'alt' => 0],
+            ['verb' => 'mine', 'args' => ['n' => 15, 'resource' => 'iron'], 'tick' => 11, 'alt' => 0],
+        ];
+
+        $this->assertStringContainsString('buy/sell churn', (string) AutoPlayer::detectLoop($recent));
+    }
+
+    /**
+     * A dozen turns of harvesting, trading and riding with not one build /
+     * assemble / combine / deploy — the exact shape of the reported wedge.
+     *
+     * @covers \NHA\Brain\AutoPlayer
+     */
+    public function testDetectLoopFlagsNoAdvancingActionOverALongWindow(): void
+    {
+        $recent = [
+            ['verb' => 'sell', 'args' => ['resource' => 'brine', 'n' => 20], 'tick' => 0, 'alt' => 0],
+            ['verb' => 'mine', 'args' => ['n' => 15, 'resource' => 'iron'], 'tick' => 1, 'alt' => 0],
+            ['verb' => 'sell', 'args' => ['resource' => 'brine', 'n' => 20], 'tick' => 2, 'alt' => 0],
+            ['verb' => 'mine', 'args' => ['n' => 15, 'resource' => 'iron'], 'tick' => 3, 'alt' => 0],
+            ['verb' => 'sell', 'args' => ['resource' => 'brine', 'n' => 20], 'tick' => 4, 'alt' => 0],
+            ['verb' => 'mine', 'args' => ['n' => 15, 'resource' => 'iron'], 'tick' => 5, 'alt' => 0],
+            ['verb' => 'sell', 'args' => ['resource' => 'brine', 'n' => 20], 'tick' => 6, 'alt' => 0],
+            ['verb' => 'ride', 'args' => [], 'tick' => 7, 'alt' => 0],
+            ['verb' => 'dock', 'args' => [], 'tick' => 8, 'alt' => 594],
+            ['verb' => 'mine', 'args' => ['n' => 15, 'resource' => 'crystal'], 'tick' => 9, 'alt' => 584],
+            ['verb' => 'sell', 'args' => ['resource' => 'crystal', 'n' => 28], 'tick' => 10, 'alt' => 572],
+            ['verb' => 'mine', 'args' => ['n' => 15, 'resource' => 'iron'], 'tick' => 11, 'alt' => 562],
+        ];
+
+        $this->assertNotNull(AutoPlayer::detectLoop($recent));
+        $this->assertMatchesRegularExpression('/churn|no advancing action/', (string) AutoPlayer::detectLoop($recent));
+    }
+
+    /**
+     * Guard against the new check over-firing: a stockpiling agent that does
+     * reach a build / combine inside the window is not looping.
+     *
+     * @covers \NHA\Brain\AutoPlayer
+     */
+    public function testDetectLoopAllowsHarvestingThatStillReachesABuild(): void
+    {
+        $recent = [
+            ['verb' => 'mine', 'args' => ['n' => 15, 'resource' => 'iron'], 'tick' => 0, 'alt' => 0],
+            ['verb' => 'mine', 'args' => ['n' => 15, 'resource' => 'iron'], 'tick' => 1, 'alt' => 0],
+            ['verb' => 'buy', 'args' => ['resource' => 'carbon', 'n' => 3], 'tick' => 2, 'alt' => 0],
+            ['verb' => 'buy', 'args' => ['resource' => 'aluminum', 'n' => 3], 'tick' => 3, 'alt' => 0],
+            ['verb' => 'combine', 'args' => ['ingredients' => ['aluminum' => 1, 'carbon' => 1]], 'tick' => 4, 'alt' => 0],
+            ['verb' => 'mine', 'args' => ['n' => 15, 'resource' => 'iron'], 'tick' => 5, 'alt' => 0],
+            ['verb' => 'gather', 'args' => ['n' => 10], 'tick' => 6, 'alt' => 0],
+            ['verb' => 'construct', 'args' => ['shape' => 'box', 'size' => 8], 'tick' => 7, 'alt' => 0],
+            ['verb' => 'mine', 'args' => ['n' => 15, 'resource' => 'iron'], 'tick' => 8, 'alt' => 0],
+            ['verb' => 'move', 'args' => ['x' => 40, 'y' => 90], 'tick' => 9, 'alt' => 0],
+            ['verb' => 'chop', 'args' => ['n' => 12], 'tick' => 10, 'alt' => 0],
+            ['verb' => 'sell', 'args' => ['resource' => 'wood', 'n' => 15], 'tick' => 11, 'alt' => 0],
+        ];
+
+        $this->assertNull(AutoPlayer::detectLoop($recent));
+    }
+
+    /**
      * @covers \NHA\Brain\AutoPlayer
      * @covers \NHA\StateStore
      */

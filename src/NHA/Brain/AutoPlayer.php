@@ -169,6 +169,18 @@ final class AutoPlayer
     private const TRAVERSAL_VERBS = ['move', 'ride', 'land', 'launch', 'wait'];
 
     /**
+     * Verbs that actually move the score / codex forward — a build, an assembly,
+     * a research combine, passive-income deploy, a co-op invest, a contract. A
+     * window with none of these is churn no matter how "busy" it looks: `mine`
+     * and `sell` are work, but `mine → sell → mine → sell` forever is not
+     * progress. {@see detectLoop()} flags a long stretch with zero of these.
+     */
+    private const ADVANCING_VERBS = [
+        'construct', 'finalize', 'combine', 'deploy', 'invest', 'fulfill',
+        'plant', 'ally', 'accept_ally', 'attack', 'heal', 'distress',
+    ];
+
+    /**
      * Verbs that move the agent between the ground and orbit / another body — an
      * "elevator trip". Each one has a real cost (fuel, a wasted turn, leaving
      * behind local work), so the agent should not take two in quick succession.
@@ -276,6 +288,25 @@ final class AutoPlayer
         $traversal = count(array_filter($window, static fn(string $v): bool => in_array($v, self::TRAVERSAL_VERBS, true)));
         if (count($window) >= 8 && $traversal >= 6) {
             return 'no productive action for ' . $traversal . '/' . count($window) . ' turns';
+        }
+
+        // Churn: a long run of only gathering / trading / repositioning with
+        // nothing that advances the score. Two "productive" verbs alternating
+        // forever (`mine ↔ sell`, `buy ↔ sell`) slip past every check above —
+        // each keeps the window "productive" and neither exact fingerprint
+        // dominates — but the agent is going nowhere.
+        $churn = array_slice($verbs, -12);
+        if (count($churn) >= 10 && ! array_intersect($churn, self::ADVANCING_VERBS)) {
+            $trade = count(array_filter($churn, static fn(string $v): bool => $v === 'buy' || $v === 'sell'));
+            $distinct = array_values(array_unique($churn));
+            if ($trade >= 4 && in_array('buy', $churn, true) && in_array('sell', $churn, true)) {
+                return 'buy/sell churn — trading in circles, nothing built (' . count($churn) . ' turns)';
+            }
+            if (count($distinct) <= 4 || $trade >= 6) {
+                return count($distinct) <= 2
+                    ? 'churn: ' . implode('/', $distinct) . ' on repeat, no progress'
+                    : 'no advancing action for ' . count($churn) . ' turns';
+            }
         }
 
         return null;
