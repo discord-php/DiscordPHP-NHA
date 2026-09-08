@@ -16,7 +16,7 @@ namespace NHA\Brain;
 /**
  * The strategic stance an agent is playing right now. It is a soft steer, not a
  * script: it re-flavours the system prompt {@see Playbook::systemPrompt()} and
- * lightly reorders the deterministic ladder {@see AgentBrain::suggestion()}, but
+ * lightly reorders the deterministic ladder {@see Ladder::suggestion()}, but
  * the survive / defend / arm rungs and the anti-patterns always apply.
  *
  *  - `homestead`   — dig in: stockpile, build towers, hold ground. The default.
@@ -107,7 +107,7 @@ enum Stance: string
         // 3. A fat credit pile and nothing to build with it.
         $credits = $has('credits');
         $canBuildSoon = $has('composite') >= 2 && $has('metal') >= 8;
-        if ($credits >= AgentBrain::CREDIT_FLOOR * 6 && ! $canBuildSoon) {
+        if ($credits >= Ladder::CREDIT_FLOOR * 6 && ! $canBuildSoon) {
             return self::Capitalist;
         }
 

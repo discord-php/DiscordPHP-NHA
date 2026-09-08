@@ -12,6 +12,19 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.1.34] - 2026-09-08
+
+### Changed
+- `Brain\AgentBrain` split again: the deterministic fallback — `suggestion()`
+  (the full ladder), `defensiveAction()` (rung 0 combat), the private
+  `combatMove` / `armMove` / `stanceMove` / `bestMedicine` helpers, and the
+  `CREDIT_FLOOR` / `RESOURCE_TARGET` / `HOARD_CAP` / `RESEARCH_SURPLUS`
+  constants — moved to a new `Brain\Ladder`. `AgentBrain` is now only the LLM
+  round-trip (`decide()` / `parseDecision()` / `summarize()`), 600 → 122 lines.
+  `AutoPlayer`, `PromptBuilder` and `Stance` now call `Ladder::…` directly
+  instead of reaching into `AgentBrain` statics; ladder tests moved to
+  `LadderTest`. No behaviour change. `docs/PLAYBOOK.md` updated.
+
 ## [3.1.33] - 2026-09-08
 
 ### Changed

@@ -377,7 +377,7 @@ class AutoPlayerTest extends NHAUnitTestCase
 
     /**
      * @covers \NHA\Brain\AutoPlayer
-     * @covers \NHA\Brain\AgentBrain::defensiveAction
+     * @covers \NHA\Brain\Ladder::defensiveAction
      */
     public function testStepDefendsBeforeConsultingTheBrain(): void
     {

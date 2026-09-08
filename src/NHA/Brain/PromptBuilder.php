@@ -23,11 +23,10 @@ use NHA\Parts\AgentObservation;
  *
  * The *system* turn (strategy) is {@see Playbook::systemPrompt()}; the two are
  * assembled in {@see AgentBrain::decide()}. Split out of {@see AgentBrain} so the
- * ~300 lines of string assembly here stay clear of the decision/parse logic and
- * the deterministic ladder.
+ * ~300 lines of string assembly here stay clear of the decision/parse logic.
  *
  * Pure formatting — no game transport, no side effects. The one collaborator is
- * {@see AgentBrain::suggestion()}, whose pick is surfaced as the "SUGGESTED next
+ * {@see Ladder::suggestion()}, whose pick is surfaced as the "SUGGESTED next
  * action" line to anchor a weak model.
  *
  * @since 3.1.30
@@ -334,7 +333,7 @@ final class PromptBuilder
                 . '(aluminium + carbon) — you cannot build one yet, so do not keep trying.';
         }
 
-        if ($suggestion = AgentBrain::suggestion($raw, $tried, array_fill_keys($knownCombines, true))) {
+        if ($suggestion = Ladder::suggestion($raw, $tried, array_fill_keys($knownCombines, true))) {
             $lines[] = sprintf(
                 'SUGGESTED next action: %s%s — %s. Do this unless you clearly see something better.',
                 $suggestion['verb'],

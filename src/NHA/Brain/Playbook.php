@@ -73,7 +73,7 @@ final class Playbook
      * decision ladder, phase playbook and anti-patterns, with the verb
      * catalogue appended. Sent once per turn.
      *
-     * The ladder here mirrors {@see AgentBrain::suggestion()}; both are
+     * The ladder here mirrors {@see Ladder::suggestion()}; both are
      * diagrammed in `docs/PLAYBOOK.md` — update it whenever either changes.
      *
      * @param string $stance One of {@see Stance}'s values; defaults to homestead.

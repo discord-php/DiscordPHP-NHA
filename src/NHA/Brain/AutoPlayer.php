@@ -284,7 +284,7 @@ final class AutoPlayer
     /**
      * The move for when the brain's pick is a dead end — a spent research
      * `combine`, or riding the elevator in circles. Runs the shared ladder
-     * ({@see AgentBrain::suggestion()}) with the entire tried + world-known
+     * ({@see Ladder::suggestion()}) with the entire tried + world-known
      * combine space marked exhausted.
      *
      * If `inventor_points` rose recently the ladder may offer a *fresh* (untried,
@@ -313,7 +313,7 @@ final class AutoPlayer
             $exhausted[$sig] = true;
         }
 
-        $suggestion = AgentBrain::suggestion($raw, $exhausted, $exhausted, $researchPaying, $stance);
+        $suggestion = Ladder::suggestion($raw, $exhausted, $exhausted, $researchPaying, $stance);
         if ($suggestion === null) {
             return null;
         }
@@ -564,7 +564,7 @@ final class AutoPlayer
 
             // Combat overrides everything — defend before consulting the brain
             // or the loop guard. Heal, shoot back, or break contact.
-            if (($defence = AgentBrain::defensiveAction($rawObs)) !== null) {
+            if (($defence = Ladder::defensiveAction($rawObs)) !== null) {
                 $altNow = (int) ($observation->get('altitude') ?? 0);
 
                 return $this->nha->intentWithToken($agent_id, $token, $defence['verb'], $defence['args'])

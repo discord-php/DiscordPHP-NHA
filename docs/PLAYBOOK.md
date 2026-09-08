@@ -9,7 +9,7 @@ falls back on, and the loop guard that overrides it.
 > | Diagram | Source |
 > |---|---|
 > | One turn | [`AutoPlayer::step()`](../src/NHA/Brain/AutoPlayer.php) |
-> | The ladder | [`AgentBrain::suggestion()`](../src/NHA/Brain/AgentBrain.php) |
+> | The ladder | [`Ladder::suggestion()`](../src/NHA/Brain/Ladder.php) |
 > | Loop guard | [`AutoPlayer::detectLoop()`](../src/NHA/Brain/AutoPlayer.php) + [`StateStore`](../src/NHA/StateStore.php) objective/cooldown helpers |
 > | Prose strategy | [`Playbook::systemPrompt()`](../src/NHA/Brain/Playbook.php) — the LLM system prompt; the ladder mirrors its rungs |
 > | Situation digest | [`PromptBuilder::build()`](../src/NHA/Brain/PromptBuilder.php) — the LLM user turn |
@@ -35,7 +35,7 @@ flowchart TD
     obs --> downed{downed?}
     downed -- yes --> skipD[["&#129657; skip"]]
     downed -- no --> stance["Stance::pick &#8594; homestead / aggressive /<br/>capitalist / expansionist<br/>&#40;hysteresis; persisted&#41;"]
-    stance --> combat{AgentBrain::defensiveAction<br/>&#40;recent attack / robber / hostile closing while hurt&#41;?}
+    stance --> combat{Ladder::defensiveAction<br/>&#40;recent attack / robber / hostile closing while hurt&#41;?}
     combat -- yes --> defend[["&#128737;&#65039; heal / attack back / break contact<br/>&#8594; submit &amp; record, skip the brain entirely"]]
     combat -- no --> ctx["build context:<br/>&#8226; known &#8746; dead combine sigs<br/>&#8226; tried sigs &#40;whole run&#41;<br/>&#8226; noteInventorPoints &#8594; researchPaying<br/>&#8226; recent 12 decisions"]
     ctx --> detect["detectLoop recent<br/>&#40;a 'stuck land/launch' bypasses the cooldown&#41;"]
@@ -75,7 +75,7 @@ when the ladder has nothing, and the turn is skipped.
 
 ---
 
-## The deterministic ladder — `AgentBrain::suggestion()`
+## The deterministic ladder — `Ladder::suggestion()`
 
 Checked top to bottom; the first rung that matches wins. Also surfaced to the LLM
 as the `SUGGESTED next action` line.
@@ -115,7 +115,7 @@ flowchart TD
     r5 -- no --> nul[["null — caller decides &#40;skip / wait&#41;"]]
 ```
 
-Economy targets ([`AgentBrain`](../src/NHA/Brain/AgentBrain.php) constants):
+Economy targets ([`Ladder`](../src/NHA/Brain/Ladder.php) constants):
 `CREDIT_FLOOR` 300 · `RESOURCE_TARGET` 30 · `HOARD_CAP` 80 · `RESEARCH_SURPLUS`
 60. `sell` fires only below the floor or above the cap; harvesting and
 repositioning fill each raw toward the target; research (rung 2) fires only when
@@ -224,9 +224,13 @@ classDiagram
     }
     class AgentBrain {
         +decide(observation, context?) Promise
-        +static suggestion(raw, tried, known, allowSpeculation) ?array
         +static parseDecision(content) ?array
         +summarize(observation, context?) string
+    }
+    class Ladder {
+        +static suggestion(raw, tried, known, allowSpeculation, stance) ?array
+        +static defensiveAction(raw) ?array
+        +const CREDIT_FLOOR / RESOURCE_TARGET / HOARD_CAP / RESEARCH_SURPLUS
     }
     class PromptBuilder {
         +static build(observation, context?) string
@@ -255,11 +259,12 @@ classDiagram
     }
 
     AutoPlayer --> AgentBrain : asks each turn
+    AutoPlayer --> Ladder : defensiveAction override + suggestion fallback
     AutoPlayer --> StateStore : reads / writes durable state
     AutoPlayer --> NHA : observe / intentWithToken
     AgentBrain --> Playbook : system prompt + verb catalogue
     AgentBrain --> PromptBuilder : user turn (situation digest)
     AgentBrain --> OllamaClient : one chat per decision
-    PromptBuilder ..> AgentBrain : surfaces suggestion() as the SUGGESTED line
-    AgentBrain ..> AutoPlayer : suggestion() reused as the fallback ladder
+    PromptBuilder ..> Ladder : surfaces suggestion() as the SUGGESTED line
+    Playbook ..> Ladder : prose rungs mirror the ladder
 ```
