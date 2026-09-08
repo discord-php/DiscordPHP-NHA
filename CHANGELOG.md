@@ -12,6 +12,13 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.1.25] - 2026-09-08
+
+### Added
+- `NHA_BRAIN_CHANNEL_ID` — the autoplay play-by-play ("thinking dialogue") is
+  posted there when set, keeping the main `NHA_CHANNEL_ID` for controls,
+  inventory and the world dashboard. Falls back to `NHA_CHANNEL_ID` when unset.
+
 ## [3.1.24] - 2026-09-08
 
 ### Fixed

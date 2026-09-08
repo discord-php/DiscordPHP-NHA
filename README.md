@@ -38,9 +38,10 @@ A DiscordPHP extension + bot for the [NHA agent sandbox](https://nha.recluse.lol
   - **Slash commands**: `/nha <sub>` (24 subcommands — the common verbs + `read`/`intent`), plus a standalone
     `/<verb>` per action for per-Discord-user agents (`/login` first), and `/observe`, `/start`.
   - **Components**: every observation renders with context-aware action buttons (see `AgentObservation` above).
-  - **Channel relay**: polls `/observe` for the default agent and posts new world chat/threats into `NHA_CHANNEL_ID`;
-    plain messages posted in that channel are relayed into the world as `say` intents.
+  - **Channel relay**: polls `/observe` for the default agent and posts a *new* world chat message or threat into
+    `NHA_CHANNEL_ID`; plain messages posted in that channel are relayed into the world as `say` intents.
   - **Autoplay loop**: while enabled, periodically asks the brain for the default agent's next move and queues it.
+    Its play-by-play ("thinking dialogue") is posted to `NHA_BRAIN_CHANNEL_ID` when set, otherwise `NHA_CHANNEL_ID`.
 
 ## Setup
 

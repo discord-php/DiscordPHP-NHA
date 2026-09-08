@@ -95,6 +95,10 @@ $env_path ? loadEnv($env_path) : throw new \Exception('The .env file does not ex
 
 $error_channel_id = getenv('ERROR_CHANNEL_ID') ?: null;
 $channel_id = getenv('NHA_CHANNEL_ID') ?: null;
+// Optional separate channel for the autoplay play-by-play ("thinking dialogue"),
+// keeping the main channel for controls / inventory / the world dashboard.
+// Falls back to the main channel when unset.
+$brain_channel_id = getenv('NHA_BRAIN_CHANNEL_ID') ?: $channel_id;
 $poll_interval = (float) (getenv('NHA_POLL_INTERVAL') ?: 5);
 
 $streamHandler = new StreamHandler('php://stdout', Level::Debug);
@@ -800,7 +804,7 @@ if ($autoPlayer) {
         $nha->logger->warning("[autoplay] {$msg}");
     };
 
-    Loop::get()->addPeriodicTimer($autoplay_interval, function () use ($nha, $state, $autoPlayer, $channel_id, $autoplay_interval, $autoplay_warn, &$autoplay_busy): void {
+    Loop::get()->addPeriodicTimer($autoplay_interval, function () use ($nha, $state, $autoPlayer, $brain_channel_id, $autoplay_interval, $autoplay_warn, &$autoplay_busy): void {
         if ($autoplay_busy || ! $state->isAutoplayEnabled()) {
             return;
         }
@@ -820,10 +824,10 @@ if ($autoPlayer) {
         // the busy flag so the next tick tries again.
         try {
             $autoPlayer->step($agent_id, (string) ($state->getDefaultAgentToken() ?? ''), 'bot.php:' . getmypid(), (int) $autoplay_interval)->then(
-                function (string $line) use ($nha, $channel_id, $done): void {
+                function (string $line) use ($nha, $brain_channel_id, $done): void {
                     $nha->logger->info("[autoplay] {$line}");
-                    if ($channel_id) {
-                        $nha->getChannel($channel_id)?->sendMessage(
+                    if ($brain_channel_id) {
+                        $nha->getChannel($brain_channel_id)?->sendMessage(
                             NHA::createBuilder()->addComponent(Container::new()->addComponents([TextDisplay::new($line)])),
                         );
                     }
