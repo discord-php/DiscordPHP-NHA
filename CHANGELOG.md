@@ -12,6 +12,23 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.1.27] - 2026-09-08
+
+### Changed
+- `bot.php` went from 848 lines to ~175 by extracting cohesive pieces into
+  `NHA\Bot\*` classes (no behaviour change):
+  - `Bot\Env` — `.env` location + loading + typed getters.
+  - `Bot\Replies` — `Commands::` promise → chat / slash response, `❌` on error,
+    `flattenOptions()`.
+  - `Bot\ChatCommands` — the whole `!nha` prefix-command tree.
+  - `Bot\SlashCommands` — the lazy slash registration (option builders, the
+    `/nha` group + dispatch, per-user single-verb commands, signature-diffed
+    `createCommand`).
+  - `Bot\ChannelRelay` — the poll → dashboard + `MESSAGE_CREATE` → `say` bridge.
+  - `Bot\AutoplayLoop` — the periodic `AutoPlayer::step()` loop with its
+    busy-skip and warn-throttle.
+  `bot.php` now just wires configuration → `NHA` → these components → `run()`.
+
 ## [3.1.26] - 2026-09-08
 
 ### Fixed
