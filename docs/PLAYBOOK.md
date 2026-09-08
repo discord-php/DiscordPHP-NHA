@@ -33,14 +33,15 @@ flowchart TD
     rules[knownCombines&#40;&#41;<br/>re-pull GET /rules &#8804; every 90s] --> obs[NHA::observe]
     obs --> downed{downed?}
     downed -- yes --> skipD[["&#129657; skip"]]
-    downed -- no --> combat{AgentBrain::defensiveAction<br/>&#40;recent attack / robber / hostile closing while hurt&#41;?}
+    downed -- no --> stance["Stance::pick &#8594; homestead / aggressive /<br/>capitalist / expansionist<br/>&#40;hysteresis; persisted&#41;"]
+    stance --> combat{AgentBrain::defensiveAction<br/>&#40;recent attack / robber / hostile closing while hurt&#41;?}
     combat -- yes --> defend[["&#128737;&#65039; heal / attack back / break contact<br/>&#8594; submit &amp; record, skip the brain entirely"]]
     combat -- no --> ctx["build context:<br/>&#8226; known &#8746; dead combine sigs<br/>&#8226; tried sigs &#40;whole run&#41;<br/>&#8226; noteInventorPoints &#8594; researchPaying<br/>&#8226; recent 12 decisions"]
     ctx --> detect["detectLoop recent<br/>&#40;a 'stuck land/launch' bypasses the cooldown&#41;"]
     detect --> isloop{loop found &amp;<br/>not in cooldown?}
     isloop -- yes --> peek["state.peekNextForcedObjective<br/>&#40;name it for the prompt; do NOT commit yet&#41;"]
     peek --> decide
-    isloop -- no --> decide[["brain.decide observation, context"]]
+    isloop -- no --> decide[["brain.decide observation, context, stance"]]
     decide --> waited{decision == null<br/>AND no forced objective?}
     waited -- yes --> recW["record a 'wait'<br/>&#40;visible to detectLoop&#41;"] --> done
     waited -- no --> forced{forced objective<br/>this turn?}
@@ -60,7 +61,7 @@ flowchart TD
     g2 -- no --> rec
     fb2 --> rec
     rec[if final verb == combine:<br/>state.recordCombineSignature] --> submit[NHA::intentWithToken<br/>state.recordDecision &#40;with altitude&#41;]
-    submit --> done([&#129302; / &#9851;&#65039; / &#128260; status line])
+    submit --> done([&#129302; &#91;stance&#93; / &#128737;&#65039; / &#9851;&#65039; / &#128260; status line])
 ```
 
 `fallbackDecision(reasonLead, tried, known, researchPaying)` runs the ladder
@@ -85,8 +86,10 @@ flowchart TD
     r1b -- yes --> deploy[["deploy — passive mining income"]]
     r1b -- no --> r1c{"&#40;1c&#41; out of combat AND<br/>no medicine / weapon / ammo?"}
     r1c -- yes --> arm[["buy stimpack &#8594; buy kinetic_gun &#8594; buy slug &#215;5"]]
-    r1c -- no --> r2{"&#40;2&#41; allowSpeculation AND &#8805; 2 raws<br/>AND &#40;&#8804; 1 tried OR inventor_points &gt; 0&#41;<br/>AND a fresh untried/unknown pair exists"}
-    r2 -- yes --> combine[["combine &#123;a,b&#125; — inventor-point gamble"]]
+    r1c -- no --> r1d{"&#40;1d&#41; a stance-specific nudge?<br/>aggressive: top ammo / close on prey<br/>capitalist: fulfil a contract / bank a surplus<br/>expansionist: extractor / dock / walk to elevator"}
+    r1d -- yes --> stanced[["the stance move"]]
+    r1d -- no --> r2{"&#40;2&#41; allowSpeculation AND &#8805; 2 raws<br/>at 60+ each &#40;a real surplus, not the stockpile&#41;<br/>AND a fresh untried/unknown pair exists"}
+    r2 -- yes --> combine[["combine &#123;a,b&#125; — inventor gamble &#40;luxury: surplus only&#41;"]]
     r2 -- no --> r2b{"&#40;2b&#41; off the ground<br/>AND no asteroid to work?"}
     r2b -- yes --> land[["land"]]
     r2b -- no --> r3{"&#40;3&#41; on ground AND<br/>composite &#8805; 2 AND metal &#8805; 8?"}
@@ -109,9 +112,39 @@ flowchart TD
 ```
 
 Economy targets ([`AgentBrain`](../src/NHA/Brain/AgentBrain.php) constants):
-`CREDIT_FLOOR` 300 · `RESOURCE_TARGET` 30 · `HOARD_CAP` 80. `sell` fires only
-below the floor or above the cap; harvesting and repositioning fill each raw
-toward the target.
+`CREDIT_FLOOR` 300 · `RESOURCE_TARGET` 30 · `HOARD_CAP` 80 · `RESEARCH_SURPLUS`
+60. `sell` fires only below the floor or above the cap; harvesting and
+repositioning fill each raw toward the target; research (rung 2) fires only when
+two raws each sit `RESEARCH_SURPLUS` deep.
+
+---
+
+## Stances — `Stance` ([`Stance.php`](../src/NHA/Brain/Stance.php))
+
+Picked each turn by `Stance::pick()` from the observation, with hysteresis
+(`MIN_DWELL_TICKS` 40) so it does not flip-flop — `aggressive` is the only one
+that pre-empts the dwell timer. Persisted in `state.json` (`agent_stance`). The
+stance re-flavours the system prompt (`Stance::briefing()`, spliced at the top)
+and adds ladder rung 1d; everything else — survive, defend, arm, the
+anti-patterns — is stance-independent.
+
+```mermaid
+flowchart TD
+    p([Stance::rank]) --> a{recent attack &amp; armed,<br/>OR a weaker agent &#8804; 15 &amp; armed?}
+    a -- yes --> AGG([aggressive])
+    a -- no --> e{in space / on a body,<br/>OR window open + thruster + fuel?}
+    e -- yes --> EXP([expansionist])
+    e -- no --> c{credits &#8805; 6 &#215; floor<br/>AND cannot build soon?}
+    c -- yes --> CAP([capitalist])
+    c -- no --> HOM([homestead — the default])
+```
+
+| stance | prompt steer + rung 1d |
+|---|---|
+| `homestead`   | dig in — stockpile, `construct` tall/varied, hold ground. No rung-1d move (the generic ladder is already this). |
+| `aggressive`  | keep the magazine deep (`buy slug` ×10 to 15), `move` to close on the weakest reachable agent so the combat rung finishes it. |
+| `capitalist`  | `fulfill` a contract you already cover; else `sell` any raw > 40 down to 30 regardless of the credit floor. |
+| `expansionist`| `construct shape=extractor` on a body · `dock` a nearby asteroid · else walk to an `elevator` when stocked. |
 
 ---
 

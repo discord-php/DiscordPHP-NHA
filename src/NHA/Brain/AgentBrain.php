@@ -51,9 +51,12 @@ final class AgentBrain
      * - `HOARD_CAP` — the one non-credit `sell` trigger: shed the excess above
      *   this so a "never sell" rule cannot deadlock into mining forever.
      */
-    private const CREDIT_FLOOR = 300;
-    private const RESOURCE_TARGET = 30;
-    private const HOARD_CAP = 80;
+    public const CREDIT_FLOOR = 300;
+    public const RESOURCE_TARGET = 30;
+    public const HOARD_CAP = 80;
+
+    /** Research only fires when at least two raws sit this deep — a genuine surplus, not the stockpile. */
+    public const RESEARCH_SURPLUS = 60;
 
     /**
      * @param OllamaClient $ollama The LLM client prompted for each decision.
@@ -70,10 +73,10 @@ final class AgentBrain
      * @return PromiseInterface<array{verb: string, args: array<string,mixed>, reason: string}|null>
      *                                                                                               `null` when the model chose `wait` or returned nothing usable.
      */
-    public function decide(AgentObservation $observation, ?array $lastDecision = null): PromiseInterface
+    public function decide(AgentObservation $observation, ?array $lastDecision = null, string $stance = 'homestead'): PromiseInterface
     {
         $messages = [
-            ['role' => 'system', 'content' => Playbook::systemPrompt()],
+            ['role' => 'system', 'content' => Playbook::systemPrompt($stance)],
             ['role' => 'user', 'content' => $this->summarize($observation, $lastDecision)],
         ];
 
@@ -471,7 +474,7 @@ final class AgentBrain
      *
      * @return array{verb: string, args: array<string,mixed>, why: string}|null
      */
-    public static function suggestion(array $raw, array $tried, array $worldKnown = [], bool $allowSpeculation = true): ?array
+    public static function suggestion(array $raw, array $tried, array $worldKnown = [], bool $allowSpeculation = true, string $stance = 'homestead'): ?array
     {
         $inv = (array) ($raw['inventory'] ?? []);
         $points = (int) ($raw['inventor_points'] ?? 0);
@@ -526,11 +529,18 @@ final class AgentBrain
             return $arm;
         }
 
-        // 2. One speculative combine: a pair of raws not submitted this session
-        //    and not already invented world-wide, while it is still a cheap
-        //    gamble (< 2 session tries, or points are already moving).
-        if ($allowSpeculation && count($raws) >= 2 && (count($tried) < 2 || $points > 0)) {
-            $names = array_keys($raws);
+        // 1d. STANCE steer. A few deterministic nudges toward the current stance
+        //     before the generic ladder. The prompt carries the rest.
+        if ($stanced = self::stanceMove($stance, $raw, $inv, $raws, $credits, $x, $y)) {
+            return $stanced;
+        }
+
+        // 2. One speculative combine — but ONLY on a genuine material surplus
+        //    (research is a luxury, not a grind): at least two raws sitting at
+        //    least RESEARCH_SURPLUS deep, on top of the normal stockpile.
+        $surplusRaws = array_filter($raws, static fn(int $q): bool => $q >= self::RESEARCH_SURPLUS);
+        if ($allowSpeculation && count($surplusRaws) >= 2) {
+            $names = array_keys($surplusRaws);
             for ($i = 0; $i < count($names); $i++) {
                 for ($j = $i + 1; $j < count($names); $j++) {
                     $pair = [$names[$i], $names[$j]];
@@ -815,6 +825,87 @@ final class AgentBrain
         }
         if ($has('energy_weapon') > 0 && $has('energy_cell') < 3 && $credits >= 40) {
             return ['verb' => 'buy', 'args' => ['resource' => 'energy_cell', 'n' => 3], 'why' => 'buy energy_cells for the energy_weapon'];
+        }
+
+        return null;
+    }
+
+    /**
+     * A deterministic nudge toward the active stance, ahead of the generic
+     * ladder. Returns `null` for `homestead` (the generic ladder already plays
+     * it) and whenever the stance has nothing pressing to add this turn.
+     *
+     * @param array<string,mixed> $raw
+     * @param array<string,mixed> $inv
+     * @param array<string,int>   $raws
+     *
+     * @return array{verb: string, args: array<string,mixed>, why: string}|null
+     */
+    private static function stanceMove(string $stance, array $raw, array $inv, array $raws, int $credits, int $x, int $y): ?array
+    {
+        $has = static fn(string $k): int => (int) ($inv[$k] ?? 0);
+
+        if ($stance === Stance::Aggressive->value) {
+            // Keep ammo deeper than the survival minimum.
+            if ($has('kinetic_gun') > 0 && $has('slug') < 15 && $credits >= 40) {
+                return ['verb' => 'buy', 'args' => ['resource' => 'slug', 'n' => 10], 'why' => 'aggressive stance — keep the magazine deep'];
+            }
+            // Close on the weakest reachable target so the combat rung can finish it.
+            $myHp = (float) ($raw['hp'] ?? 100);
+            $prey = null;
+            foreach ((array) ($raw['nearby_agents'] ?? []) as $ag) {
+                $ag = (array) $ag;
+                $d = (int) ($ag['dist'] ?? 99);
+                if ($d <= 15 && $d > 6 && (float) ($ag['hp'] ?? 100) < $myHp * 0.6 && isset($ag['x'], $ag['y'])
+                    && ($prey === null || $d < (int) ($prey['dist'] ?? 99))) {
+                    $prey = $ag;
+                }
+            }
+            if ($prey !== null) {
+                return ['verb' => 'move', 'args' => ['x' => (int) $prey['x'], 'y' => (int) $prey['y']], 'why' => 'aggressive stance — close on #' . (int) ($prey['id'] ?? 0) . ' for the kill'];
+            }
+        }
+
+        if ($stance === Stance::Capitalist->value) {
+            // Work an open contract you already cover.
+            foreach ((array) ($raw['contracts'] ?? []) as $c) {
+                $c = (array) $c;
+                $want = (array) ($c['want'] ?? []);
+                $covered = $want !== [];
+                foreach ($want as $res => $qty) {
+                    $covered = $covered && (int) ($inv[$res] ?? 0) >= (int) $qty;
+                }
+                if ($covered && isset($c['id'])) {
+                    return ['verb' => 'fulfill', 'args' => ['contract_id' => (int) $c['id']], 'why' => 'capitalist stance — fulfil a contract you already cover'];
+                }
+            }
+            // Convert any raw above the stockpile target straight to credits.
+            $biggest = $raws === [] ? null : array_key_first($raws);
+            if ($biggest !== null && $raws[$biggest] > self::RESOURCE_TARGET + 10) {
+                return ['verb' => 'sell', 'args' => ['resource' => $biggest, 'n' => min($raws[$biggest] - self::RESOURCE_TARGET, 20)], 'why' => "capitalist stance — bank the {$biggest} surplus"];
+            }
+        }
+
+        if ($stance === Stance::Expansionist->value) {
+            $onGround = ! ($raw['in_space'] ?? false) && (int) ($raw['altitude'] ?? 0) === 0;
+            // On a body → build an extractor for standing income.
+            if (! $onGround && ($raw['expansion']['at_body'] ?? null) !== null && $has('metal') >= 4) {
+                return ['verb' => 'construct', 'args' => ['shape' => 'extractor', 'kind' => 'mine'], 'why' => 'expansionist stance — an extractor keeps paying after you leave'];
+            }
+            // In orbit near an asteroid → latch on.
+            if (($raw['in_space'] ?? false) && (array) ($raw['asteroids'] ?? []) !== []) {
+                return ['verb' => 'dock', 'args' => [], 'why' => 'expansionist stance — dock the asteroid, then mine it'];
+            }
+            // On the ground and stocked → head for the elevator.
+            $stocked = $raws !== [] && (int) reset($raws) >= 15;
+            if ($onGround && $stocked) {
+                foreach ((array) ($raw['elevators'] ?? []) as $e) {
+                    $e = (array) $e;
+                    if (isset($e['x'], $e['y'])) {
+                        return ['verb' => 'move', 'args' => ['x' => (int) $e['x'], 'y' => (int) $e['y']], 'why' => 'expansionist stance — walk to the elevator and ride up'];
+                    }
+                }
+            }
         }
 
         return null;

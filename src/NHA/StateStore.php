@@ -509,6 +509,42 @@ class StateStore
     }
 
     /**
+     * The agent's persisted strategic stance and the tick it last changed
+     * (`{stance, tick}`). Defaults to `homestead` at tick 0.
+     *
+     * @return array{stance: string, tick: int}
+     *
+     * @since 3.1.23
+     */
+    public function getStance(int $agent_id): array
+    {
+        $e = $this->data['agent_stance'][(string) $agent_id] ?? null;
+
+        return [
+            'stance' => is_array($e) ? (string) ($e['stance'] ?? 'homestead') : 'homestead',
+            'tick' => is_array($e) ? (int) ($e['tick'] ?? 0) : 0,
+        ];
+    }
+
+    /**
+     * Records the agent's stance. `$tick` is only stamped when the stance
+     * actually changes, so it marks the last *switch* for the dwell timer.
+     *
+     * @since 3.1.23
+     */
+    public function setStance(int $agent_id, string $stance, int $tick): void
+    {
+        $key = (string) $agent_id;
+        $prev = $this->getStance($agent_id);
+        if ($prev['stance'] === $stance) {
+            return;
+        }
+
+        $this->data['agent_stance'][$key] = ['stance' => $stance, 'tick' => $tick];
+        $this->save();
+    }
+
+    /**
      * The objective {@see bumpForcedObjective()} WOULD return next, without
      * advancing the cursor or arming the cooldown — so the loop guard can name
      * the objective in the brain prompt and only commit it once the turn

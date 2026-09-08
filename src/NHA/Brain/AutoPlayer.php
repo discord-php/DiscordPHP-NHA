@@ -287,7 +287,7 @@ final class AutoPlayer
      *
      * @return array{verb: string, args: array<string, mixed>, reason: string}|null
      */
-    private function fallbackDecision(AgentObservation $observation, string $reasonLead, array $tried, array $known, bool $researchPaying): ?array
+    private function fallbackDecision(AgentObservation $observation, string $reasonLead, array $tried, array $known, bool $researchPaying, string $stance = 'homestead'): ?array
     {
         $raw = json_decode(json_encode($observation->jsonSerialize()), true);
         $raw = is_array($raw) ? $raw : [];
@@ -297,7 +297,7 @@ final class AutoPlayer
             $exhausted[$sig] = true;
         }
 
-        $suggestion = AgentBrain::suggestion($raw, $exhausted, $exhausted, $researchPaying);
+        $suggestion = AgentBrain::suggestion($raw, $exhausted, $exhausted, $researchPaying, $stance);
         if ($suggestion === null) {
             return null;
         }
@@ -537,10 +537,18 @@ final class AutoPlayer
                 return resolve("🩹 Agent #{$agent_id} is downed until tick {$downedUntil} — skipping.");
             }
 
+            $rawObs = json_decode(json_encode($observation->jsonSerialize()), true);
+            $rawObs = is_array($rawObs) ? $rawObs : [];
+
+            // Pick and persist the strategic stance for this turn (hysteresis in
+            // Stance::pick keeps it from flip-flopping).
+            $stancePrev = $this->state->getStance($agent_id);
+            $stance = Stance::pick($rawObs, $stancePrev['stance'], $stancePrev['tick'])->value;
+            $this->state->setStance($agent_id, $stance, $tick);
+
             // Combat overrides everything — defend before consulting the brain
             // or the loop guard. Heal, shoot back, or break contact.
-            $rawObs = json_decode(json_encode($observation->jsonSerialize()), true);
-            if (is_array($rawObs) && ($defence = AgentBrain::defensiveAction($rawObs)) !== null) {
+            if (($defence = AgentBrain::defensiveAction($rawObs)) !== null) {
                 $altNow = (int) ($observation->get('altitude') ?? 0);
 
                 return $this->nha->intentWithToken($agent_id, $token, $defence['verb'], $defence['args'])
@@ -604,7 +612,7 @@ final class AutoPlayer
 
             $altNow = (int) ($observation->get('altitude') ?? 0);
 
-            return $this->brain->decide($observation, $context ?: null)->then(function (?array $decision) use ($agent_id, $token, $tick, $altNow, $observation, $known, $tried, $dead, $researchPaying, $recent, $loop, $loopObjective) {
+            return $this->brain->decide($observation, $context ?: null, $stance)->then(function (?array $decision) use ($agent_id, $token, $tick, $altNow, $observation, $known, $tried, $dead, $researchPaying, $recent, $loop, $loopObjective, $stance) {
                 if ($decision === null && $loopObjective === null) {
                     // Record the pass so a wait-streak is visible to detectLoop.
                     $this->state->recordDecision($agent_id, ['verb' => 'wait', 'args' => [], 'reason' => '', 'queued_intent' => null, 'tick' => $tick, 'alt' => $altNow]);
@@ -665,7 +673,7 @@ final class AutoPlayer
                             $dipsReserve !== null => "combine `{$sig}` would dip below the {$dipsReserve} reserve",
                             default => "research set `{$sig}` spent",
                         };
-                        $decision = $this->fallbackDecision($observation, $lead, $tried, $known, $researchPaying);
+                        $decision = $this->fallbackDecision($observation, $lead, $tried, $known, $researchPaying, $stance);
                         if ($decision === null) {
                             // Record the skip so a skip-streak is visible to detectLoop.
                             $this->state->recordDecision($agent_id, ['verb' => 'wait', 'args' => [], 'reason' => 'nothing to do', 'queued_intent' => null, 'tick' => $tick, 'alt' => $altNow]);
@@ -679,7 +687,7 @@ final class AutoPlayer
                 // nothing to do off the ground, ride back down, and repeat. If it
                 // picks `ride` right after riding, take the ladder's move instead.
                 if ($verb === 'ride' && in_array('ride', $recentVerbs, true)) {
-                    $alt = $this->fallbackDecision($observation, 'riding the elevator in circles', $tried, $known, $researchPaying);
+                    $alt = $this->fallbackDecision($observation, 'riding the elevator in circles', $tried, $known, $researchPaying, $stance);
                     if ($alt !== null) {
                         $decision = $alt;
                     }
@@ -690,7 +698,7 @@ final class AutoPlayer
                 }
 
                 return $this->nha->intentWithToken($agent_id, $token, $decision['verb'], $decision['args'])
-                    ->then(function ($queued) use ($agent_id, $decision, $tick, $altNow, $loop, $loopObjective) {
+                    ->then(function ($queued) use ($agent_id, $decision, $tick, $altNow, $loop, $loopObjective, $stance) {
                         $queued = (array) $queued;
                         $queuedId = $queued['queued_intent'] ?? null;
 
@@ -708,7 +716,7 @@ final class AutoPlayer
                         $reason = $decision['reason'] !== '' ? "\n> {$decision['reason']}" : '';
                         $head = $loopObjective !== null
                             ? "♻️ Agent #{$agent_id} loop ({$loop}) → forced **{$loopObjective}**:"
-                            : "🤖 Agent #{$agent_id} →";
+                            : "🤖 [{$stance}] Agent #{$agent_id} →";
 
                         return "{$head} **{$decision['verb']}**{$args}{$ref}{$reason}";
                     });

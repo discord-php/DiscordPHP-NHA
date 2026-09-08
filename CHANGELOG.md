@@ -12,6 +12,26 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.1.23] - 2026-09-08
+
+### Added
+- Strategic **stances** — the agent is no longer one rigid ladder. Each turn
+  `Stance::pick()` chooses `homestead` (default) / `aggressive` / `capitalist` /
+  `expansionist` from the observation, with hysteresis (40-tick dwell; combat
+  pre-empts it) and persistence in `state.json`. The stance re-flavours the
+  system prompt (a `Stance::briefing()` block spliced at the top, framed as a
+  steer not a script) and adds a light deterministic nudge (ladder rung 1d):
+  aggressive tops ammo and closes on a weak target; capitalist fulfils a
+  covered contract or banks a raw surplus; expansionist builds an extractor,
+  docks an asteroid, or heads for the elevator. Survive / defend / arm and the
+  anti-patterns stay stance-independent. The status line shows `🤖 [stance]`.
+
+### Changed
+- Research is now a luxury, not a grind. Rung 2 (`combine` for inventor points)
+  fires only on a genuine surplus — at least two raws each `RESEARCH_SURPLUS`
+  (60) deep, on top of the normal stockpile — regardless of stance or whether
+  points are "paying". Below that, the agent builds or banks instead.
+
 ## [3.1.22] - 2026-09-08
 
 ### Added

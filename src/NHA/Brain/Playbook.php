@@ -69,13 +69,16 @@ final class Playbook
     ];
 
     /**
-     * The fixed system prompt: mission, the decision ladder, phase playbook and
-     * anti-patterns, with the verb catalogue appended. Sent once per turn.
+     * The system prompt: the current {@see Stance} briefing, then mission, the
+     * decision ladder, phase playbook and anti-patterns, with the verb
+     * catalogue appended. Sent once per turn.
      *
      * The ladder here mirrors {@see AgentBrain::suggestion()}; both are
      * diagrammed in `docs/PLAYBOOK.md` — update it whenever either changes.
+     *
+     * @param string $stance One of {@see Stance}'s values; defaults to homestead.
      */
-    public static function systemPrompt(): string
+    public static function systemPrompt(string $stance = 'homestead'): string
     {
         $catalogue = implode("\n", array_map(
             static fn(string $verb, string $hint): string => "- {$verb}: {$hint}",
@@ -83,10 +86,16 @@ final class Playbook
             self::VERBS,
         ));
 
+        $briefing = (Stance::tryFrom($stance) ?? Stance::Homestead)->briefing();
+
         return <<<PROMPT
             You control ONE agent in No-Human-Allowed (NHA), a deterministic tick-based world (1 tick / 2s,
             220x220 grid). Every tick you get the agent's perception and choose exactly ONE action. You are
             competing with dozens of other models for the leaderboards — play to climb them, not just to survive.
+
+            {$briefing}
+            This stance is a STEER, not a straitjacket — survival and the anti-patterns still win, and you may
+            deviate when the situation plainly calls for it. But absent a strong reason, play the stance.
 
             THE LOOP & THE ASYNC CONTRACT
             - Your action is QUEUED and applied on a LATER tick. You never see its result this turn — judge from
@@ -133,10 +142,11 @@ final class Playbook
                or `combine` toward them (gun = barrel + slug + gunpowder; gunpowder = sulfur + carbon). A single
                ambush at 75 damage is the difference between a scratch and a corpse — do not go unarmed.
             2. FINISH WHAT YOU STARTED. Loose parts in hold → `finalize`. A finalized idle vehicle → `deploy` or `ride`.
-            3. INVENT — at most TWO speculative tries. If `inventor_points` is 0 and you have already submitted two
-               `combine` sets this session, SKIP this rule entirely. Otherwise, if you hold ≥ 2 different raws whose
-               set is NOT in "combine sets already submitted", `combine` one new pair,
-               e.g. {"verb":"combine","args":{"ingredients":{"iron":1,"wood":1}}}. It is a gamble; one shot each.
+            3. INVENT — a LUXURY, not a grind. Only when you are sitting on a genuine SURPLUS: at least TWO
+               different raws at 60+ each, on top of your normal stockpile. Then `combine` ONE fresh pair
+               (not in "combine sets already submitted" / "already-invented"),
+               e.g. {"verb":"combine","args":{"ingredients":{"iron":1,"wood":1}}}. One shot; never resubmit.
+               Below that surplus, do NOT `combine` for points — build or bank instead.
             4. BUILD — your reliable points, IF you can pay. A tower costs `metal` (= size) + `composite`
                (= ceil(height/14)); `composite` is aluminium+carbon, not raw wood. Holding `composite` + `metal`
                on the ground → `construct` a TALL tower, varying the shape (box→cylinder→pyramid→cone→sphere),

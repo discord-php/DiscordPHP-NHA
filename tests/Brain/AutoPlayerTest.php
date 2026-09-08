@@ -219,15 +219,16 @@ class AutoPlayerTest extends NHAUnitTestCase
      */
     public function testWhenResearchIsPayingASpentComboIsSwappedForAFreshPairNotInfrastructure(): void
     {
-        // In space (no construct), and inventor points just rose (40 → 50) — the
-        // fallback should pick a fresh untried pair rather than idling.
+        // In space (no construct), points just rose (40 → 50), AND a genuine
+        // material surplus (2 raws at 60+) — the fallback picks a fresh untried
+        // pair rather than idling.
         $state = new StateStore($this->statePath);
         $state->noteInventorPoints(142287, 40); // baseline before this turn
 
         $nha = $this->nhaWith([
             'tick' => 5, 'downed_until' => 0, 'position' => [1, 1],
             'in_space' => true, 'altitude' => 60, 'inventor_points' => 50,
-            'inventory' => ['water' => 18, 'wood' => 17, 'crystal' => 17],
+            'inventory' => ['water' => 70, 'wood' => 65, 'crystal' => 17],
             'dynamic' => [['sig' => 'glass,wood']],
         ]);
         $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"combine","args":{"ingredients":{"glass":1,"wood":1}}}'), $state);
