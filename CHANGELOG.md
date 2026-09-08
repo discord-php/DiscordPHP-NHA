@@ -4,6 +4,17 @@ All notable changes to DiscordPHP-NHA are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 SemVer with the **major tracking the NHA world API version**.
 
+## [3.1.16] - 2026-09-07
+
+### Fixed
+- The buy-to-build pipeline was leaking. An audit showed the brain buying
+  `metal` / `aluminum` as suggested and then immediately combining them into
+  junk research sets, so `composite` never accumulated. The guardrail now
+  refuses any research `combine` whose ingredients include a tower material
+  (`metal`, `aluminum`, `carbon`, `composite`, `alloy`, `steel`, `titanium`,
+  `superalloy`) and falls through to the buy-to-build / construct ladder. The
+  one allowed use of those in a `combine` is `aluminium + carbon → composite`.
+
 ## [3.1.15] - 2026-09-07
 
 ### Added

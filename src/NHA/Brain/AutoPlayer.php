@@ -55,6 +55,18 @@ final class AutoPlayer
     ];
 
     /**
+     * Refined inputs a tower / vehicle needs. A research `combine` that consumes
+     * any of these is refused — they are bought and mined to be BUILT with, not
+     * burned on an invention gamble. (`aluminium+carbon → composite` is the one
+     * allowed use, handled by {@see self::PRODUCTION_COMBINES}.)
+     *
+     * @var list<string>
+     *
+     * @since 3.1.16
+     */
+    private const BUILD_MATERIALS = ['metal', 'alloy', 'steel', 'aluminum', 'aluminium', 'carbon', 'composite', 'titanium', 'superalloy'];
+
+    /**
      * `a+b => true` for every combine set the world has already invented, from
      * `GET /rules`, plus any set this loop has since seen a `combine` APPLY for.
      * Refreshed every {@see self::RULES_TTL}s — the codex only grows, so a stale
@@ -514,19 +526,28 @@ final class AutoPlayer
 
                 // Deterministic guardrail: never submit a `combine` set the world
                 // has already invented, that the Guild has rejected for this
-                // agent, or that this agent already tried this run — all mint
-                // nothing and the model loops here badly. A production recipe
-                // (PRODUCTION_COMBINES) is exempt UNLESS it is on the dead list.
+                // agent, that this agent already tried this run, or that would
+                // burn tower materials (metal / aluminium / carbon / composite)
+                // on a research gamble. A production recipe (PRODUCTION_COMBINES,
+                // i.e. aluminium+carbon → composite) is exempt UNLESS it is dead.
                 // When one is refused, fall through to the ladder rather than idle.
                 if ($verb === 'combine') {
                     $sig = self::combineSignature((array) ($decision['args'] ?? []));
+                    $ingredients = array_map('strval', array_keys((array) ($decision['args']['ingredients'] ?? [])));
                     $isDead = $sig !== '' && in_array($sig, $dead, true);
+                    $isProduction = isset(self::PRODUCTION_COMBINES[$sig]);
+                    $burnsBuildMats = ! $isProduction
+                        && array_intersect($ingredients, self::BUILD_MATERIALS) !== [];
                     $spent = $sig !== '' && ($isDead || (
-                        ! isset(self::PRODUCTION_COMBINES[$sig])
-                        && (isset($known[$sig]) || in_array($sig, $tried, true))
+                        ! $isProduction
+                        && ($burnsBuildMats || isset($known[$sig]) || in_array($sig, $tried, true))
                     ));
                     if ($spent) {
-                        $lead = $isDead ? "combine `{$sig}` was rejected by the Guild" : "research set `{$sig}` spent";
+                        $lead = match (true) {
+                            $isDead => "combine `{$sig}` was rejected by the Guild",
+                            $burnsBuildMats => "combine `{$sig}` would burn tower materials",
+                            default => "research set `{$sig}` spent",
+                        };
                         $decision = $this->fallbackDecision($observation, $lead, $tried, $known, $researchPaying);
                         if ($decision === null) {
                             return "🔁 Agent #{$agent_id}: no research left and no infrastructure move available — skipped `{$sig}` (tick {$tick}).";
