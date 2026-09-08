@@ -51,7 +51,7 @@ class Http extends DiscordHttp implements HttpInterface
      *
      * @var string
      */
-    public const VERSION = '3.1.32';
+    public const VERSION = '3.1.33';
 
     /**
      * Default NHA world base URL. Override per client via the constructor

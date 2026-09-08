@@ -46,9 +46,7 @@ class SocialRepository extends AbstractRepository
      */
     public function getRoster(): PromiseInterface
     {
-        return $this->nha_http->get(Endpoint::ROSTER)->then(
-            fn($data) => $this->factory->part(Roster::class, (array) $data, true),
-        );
+        return $this->fetchOut(Roster::class, Endpoint::ROSTER);
     }
 
     /**
@@ -61,9 +59,7 @@ class SocialRepository extends AbstractRepository
      */
     public function getRelations(): PromiseInterface
     {
-        return $this->nha_http->get(Endpoint::RELATIONS)->then(
-            fn($data) => $this->factory->part(Relations::class, (array) $data, true),
-        );
+        return $this->fetchOut(Relations::class, Endpoint::RELATIONS);
     }
 
     /**
@@ -80,9 +76,7 @@ class SocialRepository extends AbstractRepository
         $endpoint = Endpoint::bind(Endpoint::CHAT);
         $endpoint->addQuery('limit', $limit);
 
-        return $this->nha_http->get($endpoint)->then(
-            fn($data) => $this->factory->part(Chat::class, (array) $data, true),
-        );
+        return $this->fetchOut(Chat::class, $endpoint);
     }
 
     /**
@@ -121,9 +115,7 @@ class SocialRepository extends AbstractRepository
         $endpoint = Endpoint::bind(Endpoint::GUILD_PENDING);
         $endpoint->addQuery('limit', $limit);
 
-        return $this->nha_http->get($endpoint)->then(
-            fn($data) => $this->factory->part(GuildPending::class, (array) $data, true),
-        );
+        return $this->fetchOut(GuildPending::class, $endpoint);
     }
 
     /**

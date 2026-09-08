@@ -46,9 +46,7 @@ class MetaRepository extends AbstractRepository
      */
     public function getHealth(): PromiseInterface
     {
-        return $this->nha_http->get(Endpoint::HEALTHZ)->then(
-            fn($data) => $this->factory->part(Health::class, (array) $data, true),
-        );
+        return $this->fetchOut(Health::class, Endpoint::HEALTHZ);
     }
 
     /**
@@ -61,9 +59,7 @@ class MetaRepository extends AbstractRepository
      */
     public function getUpdates(): PromiseInterface
     {
-        return $this->nha_http->get(Endpoint::UPDATES)->then(
-            fn($data) => $this->factory->part(Updates::class, (array) $data, true),
-        );
+        return $this->fetchOut(Updates::class, Endpoint::UPDATES);
     }
 
     /**

@@ -46,9 +46,7 @@ class WorldRepository extends AbstractRepository
      */
     public function getWorld(): PromiseInterface
     {
-        return $this->nha_http->get(Endpoint::WORLD)->then(
-            fn($data) => $this->factory->part(World::class, (array) $data, true),
-        );
+        return $this->fetchOut(World::class, Endpoint::WORLD);
     }
 
     /**
@@ -60,9 +58,7 @@ class WorldRepository extends AbstractRepository
      */
     public function getMap(): PromiseInterface
     {
-        return $this->nha_http->get(Endpoint::MAP)->then(
-            fn($data) => $this->factory->part(Map::class, (array) $data, true),
-        );
+        return $this->fetchOut(Map::class, Endpoint::MAP);
     }
 
     /**
@@ -80,9 +76,7 @@ class WorldRepository extends AbstractRepository
         $endpoint = Endpoint::bind(Endpoint::SCENE);
         $endpoint->addQuery('static', $static ? 1 : 0);
 
-        return $this->nha_http->get($endpoint)->then(
-            fn($data) => $this->factory->part(Scene::class, (array) $data, true),
-        );
+        return $this->fetchOut(Scene::class, $endpoint);
     }
 
     /**
@@ -94,9 +88,7 @@ class WorldRepository extends AbstractRepository
      */
     public function getStructures(): PromiseInterface
     {
-        return $this->nha_http->get(Endpoint::STRUCTURES)->then(
-            fn($data) => $this->factory->part(Structures::class, (array) $data, true),
-        );
+        return $this->fetchOut(Structures::class, Endpoint::STRUCTURES);
     }
 
     /**
@@ -109,9 +101,7 @@ class WorldRepository extends AbstractRepository
      */
     public function getStation(): PromiseInterface
     {
-        return $this->nha_http->get(Endpoint::STATION)->then(
-            fn($data) => $this->factory->part(Station::class, (array) $data, true),
-        );
+        return $this->fetchOut(Station::class, Endpoint::STATION);
     }
 
     /**
@@ -170,8 +160,6 @@ class WorldRepository extends AbstractRepository
      */
     public function getRules(): PromiseInterface
     {
-        return $this->nha_http->get(Endpoint::RULES)->then(
-            fn($data) => $this->factory->part(Rules::class, (array) $data, true),
-        );
+        return $this->fetchOut(Rules::class, Endpoint::RULES);
     }
 }

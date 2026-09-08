@@ -12,6 +12,19 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.1.33] - 2026-09-08
+
+### Changed
+- `Repository\AbstractRepository` gains a protected `fetchOut($class, $endpoint)`
+  helper — `GET` the endpoint and hydrate the body into one `Out` part — and the
+  23 concrete `getX()` methods across `World`/`History`/`Social`/`Economy`/
+  `Meta`/`Agent` repositories that hand-rolled that exact
+  `->then(fn($data) => $this->factory->part(...))` now call it. The "fetch →
+  hydrate" contract lives in one place; `getArena()` (raw body),
+  `DepositsRepository` (list) and `IntentRepository::getIntentStatus()` (404/410
+  → synthetic `gone`) keep their bespoke bodies. `AbstractRepositoryTrait` is a
+  vendored port of DiscordPHP's trait and is deliberately left untouched.
+
 ## [3.1.32] - 2026-09-08
 
 ### Changed

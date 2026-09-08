@@ -50,9 +50,7 @@ class AgentRepository extends AbstractRepository
     {
         $endpoint = Endpoint::bind(Endpoint::AGENT)->bindAssoc(['agent_id' => $agent_id]);
 
-        return $this->nha_http->get($endpoint)->then(
-            fn($data) => $this->factory->part(AgentProfile::class, (array) $data, true),
-        );
+        return $this->fetchOut(AgentProfile::class, $endpoint);
     }
 
     /**
@@ -65,8 +63,6 @@ class AgentRepository extends AbstractRepository
      */
     public function getAgents(): PromiseInterface
     {
-        return $this->nha_http->get(Endpoint::AGENTS_LIST)->then(
-            fn($data) => $this->factory->part(Agents::class, (array) $data, true),
-        );
+        return $this->fetchOut(Agents::class, Endpoint::AGENTS_LIST);
     }
 }

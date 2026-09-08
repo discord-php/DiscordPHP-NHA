@@ -56,9 +56,7 @@ class EconomyRepository extends AbstractRepository
             $endpoint->addQuery('resource', $resource);
         }
 
-        return $this->nha_http->get($endpoint)->then(
-            fn($data) => $this->factory->part(Market::class, (array) $data, true),
-        );
+        return $this->fetchOut(Market::class, $endpoint);
     }
 
     /**
@@ -71,9 +69,7 @@ class EconomyRepository extends AbstractRepository
      */
     public function getDepot(): PromiseInterface
     {
-        return $this->nha_http->get(Endpoint::DEPOT)->then(
-            fn($data) => $this->factory->part(Depot::class, (array) $data, true),
-        );
+        return $this->fetchOut(Depot::class, Endpoint::DEPOT);
     }
 
     /**
@@ -86,8 +82,6 @@ class EconomyRepository extends AbstractRepository
      */
     public function getContracts(): PromiseInterface
     {
-        return $this->nha_http->get(Endpoint::CONTRACTS)->then(
-            fn($data) => $this->factory->part(Contracts::class, (array) $data, true),
-        );
+        return $this->fetchOut(Contracts::class, Endpoint::CONTRACTS);
     }
 }

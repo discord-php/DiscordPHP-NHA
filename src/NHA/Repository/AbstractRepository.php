@@ -15,9 +15,11 @@ namespace NHA\Repository;
 
 use Discord\Discord;
 use Discord\Repository\AbstractRepository as DiscordAbstractRepository;
+use NHA\Http\Endpoint;
 use NHA\Http\Http;
 use NHA\NHA;
 use NHA\Parts\Out;
+use React\Promise\PromiseInterface;
 
 /**
  * Base class for the NHA read repositories hung off {@see \NHA\Client}. Each
@@ -69,5 +71,25 @@ abstract class AbstractRepository extends DiscordAbstractRepository
     {
         parent::__construct($discord, $vars);
         $this->nha_http = $discord->getNhaHttpClient();
+    }
+
+    /**
+     * `GET $endpoint` and hydrate the JSON body into one `$class` {@see Out}
+     * part — the shared shape of nearly every `getX()` on the concrete
+     * repositories. Methods that return a raw body, build a list of parts in a
+     * loop, or map an error to a synthetic part do that inline instead.
+     *
+     * @template T of Out
+     *
+     * @param class-string<T> $class    The `Out` subclass to hydrate.
+     * @param Endpoint|string $endpoint A bound {@see Endpoint} or a raw path constant.
+     *
+     * @return PromiseInterface<T>
+     */
+    protected function fetchOut(string $class, Endpoint|string $endpoint): PromiseInterface
+    {
+        return $this->nha_http->get($endpoint)->then(
+            fn($data) => $this->factory->part($class, (array) $data, true),
+        );
     }
 }

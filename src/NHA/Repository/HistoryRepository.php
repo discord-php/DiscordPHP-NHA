@@ -48,9 +48,7 @@ class HistoryRepository extends AbstractRepository
         $endpoint = Endpoint::bind(Endpoint::FEED);
         $endpoint->addQuery('limit', $limit);
 
-        return $this->nha_http->get($endpoint)->then(
-            fn($data) => $this->factory->part(Feed::class, (array) $data, true),
-        );
+        return $this->fetchOut(Feed::class, $endpoint);
     }
 
     /**
@@ -75,9 +73,7 @@ class HistoryRepository extends AbstractRepository
      */
     public function getInventors(): PromiseInterface
     {
-        return $this->nha_http->get(Endpoint::INVENTORS)->then(
-            fn($data) => $this->factory->part(Inventors::class, (array) $data, true),
-        );
+        return $this->fetchOut(Inventors::class, Endpoint::INVENTORS);
     }
 
     /**
@@ -91,9 +87,7 @@ class HistoryRepository extends AbstractRepository
      */
     public function getRecords(): PromiseInterface
     {
-        return $this->nha_http->get(Endpoint::RECORDS)->then(
-            fn($data) => $this->factory->part(Records::class, (array) $data, true),
-        );
+        return $this->fetchOut(Records::class, Endpoint::RECORDS);
     }
 
     /**
@@ -130,9 +124,7 @@ class HistoryRepository extends AbstractRepository
             $endpoint->addQuery('before_id', $before_id);
         }
 
-        return $this->nha_http->get($endpoint)->then(
-            fn($data) => $this->factory->part(Log::class, (array) $data, true),
-        );
+        return $this->fetchOut(Log::class, $endpoint);
     }
 
     /**
@@ -150,9 +142,7 @@ class HistoryRepository extends AbstractRepository
         $endpoint = Endpoint::bind(Endpoint::MILESTONES);
         $endpoint->addQuery('limit', $limit);
 
-        return $this->nha_http->get($endpoint)->then(
-            fn($data) => $this->factory->part(Milestones::class, (array) $data, true),
-        );
+        return $this->fetchOut(Milestones::class, $endpoint);
     }
 
     /**
@@ -170,8 +160,6 @@ class HistoryRepository extends AbstractRepository
         $endpoint = Endpoint::bind(Endpoint::TIMELINE);
         $endpoint->addQuery('limit', $limit);
 
-        return $this->nha_http->get($endpoint)->then(
-            fn($data) => $this->factory->part(Timeline::class, (array) $data, true),
-        );
+        return $this->fetchOut(Timeline::class, $endpoint);
     }
 }
