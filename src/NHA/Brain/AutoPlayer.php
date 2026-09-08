@@ -324,13 +324,14 @@ final class AutoPlayer
                 if ($res === 'credits' || ! is_numeric($qty)) {
                     continue;
                 }
-                if ((int) $qty >= 5 && (int) $qty > $bestQty) {
+                if ((int) $qty >= 15 && (int) $qty > $bestQty) {
                     $best = (string) $res;
                     $bestQty = (int) $qty;
                 }
             }
             if ($best !== null) {
-                return ['verb' => 'sell', 'args' => ['resource' => $best, 'n' => min($bestQty, 20)], 'reason' => "{$lead}: sell {$best} for credits"];
+                // Keep a working 10 even when breaking a loop with a sale.
+                return ['verb' => 'sell', 'args' => ['resource' => $best, 'n' => min($bestQty - 10, 20)], 'reason' => "{$lead}: sell surplus {$best} for credits"];
             }
         }
 

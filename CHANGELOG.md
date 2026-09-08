@@ -12,6 +12,22 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.1.18] - 2026-09-07
+
+### Changed
+- Selling and harvesting are now conditional on need.
+  - `sell` fires only when credits are below `AgentBrain::CREDIT_FLOOR` (300)
+    or a single raw has piled past `HOARD_CAP` (80); it never dips below the
+    `RESOURCE_TARGET` (30) stockpile except in a genuine credit emergency
+    (then it keeps a token 10). The two old unconditional `sell` rungs are gone.
+  - Harvesting and repositioning fill each raw up to `RESOURCE_TARGET` (30)
+    instead of stopping at "not short (< 15)".
+  - Grabbing a resource you are standing on runs *before* spending credits on
+    buy-to-build; buy-to-build itself now gates on `CREDIT_FLOOR`.
+  - The loop-break `wealth` objective keeps a working 10 rather than dumping
+    the whole stack.
+  - `docs/PLAYBOOK.md` ladder diagram updated to match.
+
 ## [3.1.17] - 2026-09-07
 
 ### Changed

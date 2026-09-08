@@ -42,6 +42,20 @@ final class AgentBrain
     public const VERBS = Playbook::VERBS;
 
     /**
+     * Economy targets for the deterministic ladder ({@see suggestion()}).
+     *
+     * - `CREDIT_FLOOR` — keep at least this many credits; only `sell` to climb
+     *   back to it, or to fund a project (buy-to-build / invest).
+     * - `RESOURCE_TARGET` — stockpile each raw up to here (harvest / walk toward
+     *   deposits until reached); never `sell` below it outside a credit emergency.
+     * - `HOARD_CAP` — the one non-credit `sell` trigger: shed the excess above
+     *   this so a "never sell" rule cannot deadlock into mining forever.
+     */
+    private const CREDIT_FLOOR = 300;
+    private const RESOURCE_TARGET = 30;
+    private const HOARD_CAP = 80;
+
+    /**
      * @param OllamaClient $ollama The LLM client prompted for each decision.
      */
     public function __construct(private readonly OllamaClient $ollama) {}
@@ -536,11 +550,29 @@ final class AgentBrain
             ];
         }
 
+        // 3a. STOCKPILE what is under your feet before spending credits: standing
+        //     on a deposit of a raw held below target → harvest it up to target.
+        foreach ((array) ($raw['nearby_deposits'] ?? []) as $d) {
+            $d = (array) $d;
+            $res = (string) ($d['resource'] ?? '');
+            if ($res === '' || (int) ($d['dist'] ?? 9) !== 0) {
+                continue;
+            }
+            $held = $raws[$res] ?? 0;
+            if ($held < self::RESOURCE_TARGET) {
+                $verb = $res === 'wood' ? 'chop' : (in_array($res, ['herb', 'lichen', 'fungus', 'algae'], true) ? 'gather' : 'mine');
+                $n = min((int) ($d['amount'] ?? 10), self::RESOURCE_TARGET - $held, 15);
+                if ($n >= 1) {
+                    return ['verb' => $verb, 'args' => ['n' => $n], 'why' => "stockpiling {$res} ({$held}/" . self::RESOURCE_TARGET . ') — standing on a deposit'];
+                }
+            }
+        }
+
         // 3b. Spend the credit pile toward a tower: buy the metal, then buy
         //     aluminium + carbon and combine them into `composite`. Credits are
         //     only a means — turning them into builder points is the reliable
         //     scorer a stuck ground agent can always reach.
-        if ($onGround && $credits >= 150) {
+        if ($onGround && $credits >= self::CREDIT_FLOOR) {
             if ($has('metal') < 8 && $credits >= 60) {
                 return ['verb' => 'buy', 'args' => ['resource' => 'metal', 'n' => 8], 'why' => 'banking metal for a tower — credits are only useful spent'];
             }
@@ -565,44 +597,45 @@ final class AgentBrain
             }
         }
 
-        // 4. Turn a glut into credits (the depot buys raws from anywhere). A real
-        //    stockpile (30+) sells 20; when nothing better is on the table, a
-        //    smaller surplus (12+) still beats idling — sell it down toward a
-        //    working buffer.
-        if ($biggest !== null && $raws[$biggest] >= 30) {
-            return ['verb' => 'sell', 'args' => ['resource' => $biggest, 'n' => 20], 'why' => "you are sitting on {$raws[$biggest]} {$biggest} with nothing to craft — sell 20 for credits"];
+        // 4. SELL — only to keep credits working, or to shed an absurd hoard.
+        //    A healthy agent keeps its raws for building; it does not dump them
+        //    for cash it does not need. Never dips below the stockpile target
+        //    except in a genuine credit emergency (then keep a token 10).
+        if ($biggest !== null) {
+            $needCredits = $credits < self::CREDIT_FLOOR;
+            $overHoardCap = $raws[$biggest] >= self::HOARD_CAP;
+            if ($needCredits || $overHoardCap) {
+                $keep = ($needCredits && $raws[$biggest] <= self::RESOURCE_TARGET) ? 10 : self::RESOURCE_TARGET;
+                $n = min($raws[$biggest] - $keep, 20);
+                if ($n >= 1) {
+                    return [
+                        'verb' => 'sell',
+                        'args' => ['resource' => $biggest, 'n' => $n],
+                        'why' => $needCredits
+                            ? "credits {$credits} below the " . self::CREDIT_FLOOR . " floor — sell {$n} {$biggest}"
+                            : "hoarding {$raws[$biggest]} {$biggest} (cap " . self::HOARD_CAP . ") — sell {$n} of the excess",
+                    ];
+                }
+            }
         }
 
-        // 5. Harvest only a resource you are actually short on and standing on.
+        // 5. Nothing here to harvest — walk to the nearest deposit of whatever
+        //    you are furthest below target on, to top the stockpile up.
+        $wantRes = null;
+        $wantXy = null;
+        $wantHeld = self::RESOURCE_TARGET;
         foreach ((array) ($raw['nearby_deposits'] ?? []) as $d) {
             $d = (array) $d;
             $res = (string) ($d['resource'] ?? '');
-            if ($res === '' || (int) ($d['dist'] ?? 9) !== 0) {
-                continue;
-            }
-            if (($raws[$res] ?? 0) < 15) {
-                $verb = $res === 'wood' ? 'chop' : (in_array($res, ['herb', 'lichen', 'fungus', 'algae'], true) ? 'gather' : 'mine');
-                $n = min((int) ($d['amount'] ?? 10), 15);
-                return ['verb' => $verb, 'args' => ['n' => $n], 'why' => "you hold only " . ($raws[$res] ?? 0) . " {$res} and are standing on a deposit"];
+            $held = $raws[$res] ?? 0;
+            if ($res !== '' && $held < $wantHeld && isset($d['x'], $d['y'])) {
+                $wantRes = $res;
+                $wantHeld = $held;
+                $wantXy = [(int) $d['x'], (int) $d['y']];
             }
         }
-
-        // 6. Nothing to build and no shortage to fix — sell down a modest surplus
-        //    rather than skip the turn. (An elevator ride to space is deliberately
-        //    NOT suggested here: with no station/asteroid work lined up it just
-        //    bounces the agent between ground and orbit.)
-        if ($biggest !== null && $raws[$biggest] >= 12) {
-            $n = min($raws[$biggest] - 2, 15);
-            return ['verb' => 'sell', 'args' => ['resource' => $biggest, 'n' => $n], 'why' => "idle with {$raws[$biggest]} {$biggest} and nothing to craft — sell {$n} for credits"];
-        }
-
-        // 7. Nothing here — head toward the nearest deposit of something scarce.
-        foreach ((array) ($raw['nearby_deposits'] ?? []) as $d) {
-            $d = (array) $d;
-            $res = (string) ($d['resource'] ?? '');
-            if ($res !== '' && ($raws[$res] ?? 0) < 10 && isset($d['x'], $d['y'])) {
-                return ['verb' => 'move', 'args' => ['x' => (int) $d['x'], 'y' => (int) $d['y']], 'why' => "you are short on {$res} — walk to that deposit"];
-            }
+        if ($wantXy !== null) {
+            return ['verb' => 'move', 'args' => ['x' => $wantXy[0], 'y' => $wantXy[1]], 'why' => "stockpile low on {$wantRes} ({$wantHeld}/" . self::RESOURCE_TARGET . ') — walk to that deposit'];
         }
 
         return null;

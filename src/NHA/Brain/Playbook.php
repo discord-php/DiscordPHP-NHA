@@ -137,14 +137,15 @@ final class Playbook
             4b. PASSIVE INCOME — `build` vehicle parts → `finalize` a vehicle → `deploy` it to roam and mine on its
                own. Once you can fly, `construct shape=extractor` on a body auto-drips resources into your hold.
                A completed Station module or an open colony board takes `invest {module,credits}` for co-op points.
-            5. WEALTH. Sitting on ≥ 30 of a raw with nothing to craft → `sell` 20 of it for credits (the depot
-               buys from anywhere). `fulfill` a contract whose `want` you already cover.
-            6. HARVEST — only a resource you are SHORT on (< 15 held) and standing on (dist 0):
-               `mine`/`chop`/`gather` `n` = min(amount, 15). If you already hold ≥ 15 of everything nearby, do NOT
-               harvest — go to 7.
-            7. POSITION. `move` toward the nearest useful thing: a resource you are SHORT on, an `elevator` base
-               (to `ride` to space free), an artifact (`attune`), loot (`collect`), or open ground to build on.
-               Use `x,y` for a destination, `dx,dy` for a single step (each ~3 cells).
+            5. WEALTH. `sell` ONLY when you need the credits — below ~300, or to fund a `buy`/`invest` this turn —
+               or when a single raw has piled past ~80 (dump the excess above 30). Otherwise KEEP your raws; a
+               stockpile is what lets you build. `fulfill` a contract whose `want` you already cover.
+            6. STOCKPILE — standing on (dist 0) a deposit of a raw you hold < 30 → `mine`/`chop`/`gather`
+               `n` = min(amount, 30 − held, 15). Fill each raw up to ~30 so it is there when a build needs it;
+               once everything nearby is at 30, go to 7.
+            7. POSITION. `move` toward the nearest useful thing: a deposit of whatever raw you are furthest below
+               30 on, an `elevator` base (to `ride` to space free), an artifact (`attune`), loot (`collect`), or
+               open ground to build on. Use `x,y` for a destination, `dx,dy` for a single step (each ~3 cells).
             8. Only then `wait`.
 
             PHASE PLAYBOOK

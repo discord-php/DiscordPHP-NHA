@@ -82,7 +82,9 @@ flowchart TD
     r2b -- yes --> land[["land"]]
     r2b -- no --> r3{"&#40;3&#41; on ground AND<br/>composite &#8805; 2 AND metal &#8805; 8?"}
     r3 -- yes --> construct[["construct a tall tower — builder points"]]
-    r3 -- no --> r3b{"&#40;3b&#41; on ground AND credits &#8805; 150?"}
+    r3 -- no --> r3a{"&#40;3a&#41; standing on a deposit of<br/>a raw held &lt; 30 target?"}
+    r3a -- yes --> harvest[["chop / gather / mine up to the 30 target<br/><i>&#40;before spending credits&#41;</i>"]]
+    r3a -- no --> r3b{"&#40;3b&#41; on ground AND credits &#8805; 300 floor?"}
     r3b -- yes --> haveMetal{metal &#8805; 8?}
     haveMetal -- no --> buyMetal[["buy metal &#215;8"]]
     haveMetal -- yes --> haveFeed{aluminum &#8805; 2<br/>AND carbon &#8805; 2?}
@@ -90,16 +92,17 @@ flowchart TD
     haveFeed -- yes --> mkComp[["combine aluminium + carbon &#8594; composite"]]
     r3b -- no --> r3c{"&#40;3c&#41; in space AND an open<br/>station module AND credits &#8805; 200?"}
     r3c -- yes --> invest[["invest credits — co-op points"]]
-    r3c -- no --> r4{"&#40;4&#41; biggest raw &#8805; 30?"}
-    r4 -- yes --> sell20[["sell 20 for credits"]]
-    r4 -- no --> r5{"&#40;5&#41; standing on a deposit of<br/>something short &#40;&lt; 15 held&#41;?"}
-    r5 -- yes --> harvest[["chop / gather / mine"]]
-    r5 -- no --> r6{"&#40;6&#41; biggest raw &#8805; 12?"}
-    r6 -- yes --> sellSmall[["sell the surplus down"]]
-    r6 -- no --> r7{"&#40;7&#41; a nearby deposit of<br/>something scarce &#40;&lt; 10 held&#41;?"}
-    r7 -- yes --> move[["move toward it"]]
-    r7 -- no --> nul[["null — caller decides &#40;skip / wait&#41;"]]
+    r3c -- no --> r4{"&#40;4&#41; credits &lt; 300 floor<br/>OR a raw &#8805; 80 hoard cap?"}
+    r4 -- yes --> sell[["sell the excess &#8212; keep 30 &#40;or 10 in a credit emergency&#41;"]]
+    r4 -- no --> r5{"&#40;5&#41; a nearby deposit of<br/>a raw held &lt; 30 target?"}
+    r5 -- yes --> move[["move toward the most-depleted one"]]
+    r5 -- no --> nul[["null — caller decides &#40;skip / wait&#41;"]]
 ```
+
+Economy targets ([`AgentBrain`](../src/NHA/Brain/AgentBrain.php) constants):
+`CREDIT_FLOOR` 300 · `RESOURCE_TARGET` 30 · `HOARD_CAP` 80. `sell` fires only
+below the floor or above the cap; harvesting and repositioning fill each raw
+toward the target.
 
 ---
 

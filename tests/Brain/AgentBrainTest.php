@@ -243,6 +243,49 @@ class AgentBrainTest extends NHAUnitTestCase
     /**
      * @covers \NHA\Brain\AgentBrain::suggestion
      */
+    public function testSuggestionSellsOnlyWhenCreditsAreBelowTheFloor(): void
+    {
+        $ground = static fn(int $credits): array => [
+            'tick' => 1, 'in_space' => false, 'altitude' => 0,
+            'inventory' => ['credits' => $credits, 'wood' => 50],
+            'nearby_deposits' => [],
+        ];
+
+        // Below the 300 floor → sell the surplus (keep 10).
+        $poor = AgentBrain::suggestion($ground(100), [], [], false);
+        $this->assertSame('sell', $poor['verb']);
+        $this->assertSame('wood', $poor['args']['resource']);
+        $this->assertSame(20, $poor['args']['n']);
+
+        // Healthy credits → it never reaches a sell (buys toward a tower instead).
+        $rich = AgentBrain::suggestion($ground(1000), [], [], false);
+        $this->assertNotSame('sell', $rich['verb'], 'raws are kept when the credits are not needed');
+    }
+
+    /**
+     * @covers \NHA\Brain\AgentBrain::suggestion
+     */
+    public function testSuggestionHarvestsUpToTheStockpileTargetNotJustWhenShort(): void
+    {
+        $onDeposit = static fn(int $held): array => [
+            'tick' => 1, 'in_space' => false, 'altitude' => 0,
+            'inventory' => ['credits' => 1000, 'wood' => $held],
+            'nearby_deposits' => [['resource' => 'wood', 'amount' => 50, 'x' => 1, 'y' => 1, 'dist' => 0]],
+        ];
+
+        // Holding 20 — under the old "< 15" bar it would stop, now it tops up to 30.
+        $s = AgentBrain::suggestion($onDeposit(20), [], [], false);
+        $this->assertSame('chop', $s['verb']);
+        $this->assertSame(10, $s['args']['n'], 'harvest exactly up to the 30 target');
+
+        // Already at target — do not keep harvesting.
+        $atTarget = AgentBrain::suggestion($onDeposit(30), [], [], false);
+        $this->assertNotSame('chop', $atTarget['verb']);
+    }
+
+    /**
+     * @covers \NHA\Brain\AgentBrain::suggestion
+     */
     public function testSuggestionDeploysAnIdleVehicleForPassiveIncome(): void
     {
         $suggestion = AgentBrain::suggestion([
