@@ -21,3 +21,4 @@
 /linux             export-ignore
 /mac               export-ignore
 /windows           export-ignore
+/phpdoc.dist.xml     export-ignore

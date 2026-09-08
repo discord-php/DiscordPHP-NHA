@@ -42,3 +42,8 @@ phpunit.log
 
 # composer (library: lockfile not tracked, matches the sibling extensions)
 composer.lock
+/build/
+/.phpdoc/
+/tools/
+/phive.xml
+/.phive/
