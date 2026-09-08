@@ -12,6 +12,31 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.1] - 2026-09-08
+
+### Fixed
+- The 3.2.0 mission re-point flipped the stance and prompt but the agent still
+  could not execute the flight chain — it spammed short `construct` spires on
+  the ground and once rode the elevator up with no ship and spent a dozen turns
+  landing back down. Three changes make the ladder actually drive toward orbit:
+  - `Brain\Ladder` expansionist `stanceMove` gains a **GEAR UP** rung: on the
+    ground without a fuelled ion-thruster ship it deterministically
+    `combine`s the fixed-recipe flight-prep items (`ion_thruster` =
+    fusion fuel + motor + semiconductor, `hydrogen` = water + motor,
+    `heat_shield` = superalloy + composite), `finalize`s once it holds parts,
+    or buys a missing input — never `ride`/`launch` before the ship is ready.
+  - The `construct`-tower rung is **skipped** while an expansionist agent is
+    gearing a ship on the ground, even when it holds the composite + metal for
+    one. A ship already in hand re-opens towers as trip funding.
+  - `AutoPlayer` overrides a model `ride`/`launch`/`depart` pick when the
+    agent is expansionist, on the ground, and not flight-ready — substituting
+    the gear-up suggestion.
+- `AutoPlayer::detectLoop()` gains a two-verb-domination check: a window whose
+  top two args-stripped verbs own ~85%+ of it with no real forward step
+  (`finalize`/`build`/`depart`/`deploy`/`invest`/`land_*`/`dock`) is flagged
+  ("spinning on construct/move …"). Catches spire-spam, which slipped past the
+  churn check because `construct` counts as advancing.
+
 ## [3.2.0] - 2026-09-08
 
 ### Changed

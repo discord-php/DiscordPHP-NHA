@@ -355,6 +355,20 @@ final class AutoPlayer
             }
         }
 
+        // Two verbs (args stripped) own the whole window and neither is a real
+        // step toward a ship / the Accord — `construct ↔ move` spire-spam, a
+        // `combine ↔ move` fixation, etc. The churn check above misses these
+        // because `construct`/`combine` count as "advancing".
+        if ($n >= 8) {
+            $vcounts = array_count_values($verbs);
+            arsort($vcounts);
+            $top2 = array_sum(array_slice(array_values($vcounts), 0, 2));
+            $forward = ['finalize', 'depart', 'deploy', 'invest', 'build', 'land_moon', 'land_body', 'dock'];
+            if ($top2 >= (int) ceil($n * 0.85) && ! array_intersect($verbs, $forward)) {
+                return 'spinning on ' . implode('/', array_slice(array_keys($vcounts), 0, 2)) . ' — no step toward the goal';
+            }
+        }
+
         return null;
     }
 
@@ -790,6 +804,28 @@ final class AutoPlayer
                             $this->state->recordDecision($agent_id, ['verb' => 'wait', 'args' => [], 'reason' => 'nothing to do', 'queued_intent' => null, 'tick' => $tick, 'alt' => $altNow]);
 
                             return "🔁 Agent #{$agent_id}: no research left and no infrastructure move available — skipped `{$sig}` (tick {$tick}).";
+                        }
+                    }
+                }
+
+                // No riding to orbit before the ship is ready. An expansionist
+                // agent that picks `ride`/`launch`/`depart` while still on the
+                // ground with no fuelled ion-thruster ship gets the gear-up
+                // suggestion instead — this is the "ride up, find nothing, land"
+                // bounce the mission prompt otherwise invites.
+                if (in_array($verb, ['ride', 'launch', 'depart'], true)
+                    && $loopObjective === null
+                    && $stance === Stance::Expansionist->value
+                    && ! (bool) ($observation->get('in_space') ?? false)
+                    && (int) ($observation->get('altitude') ?? 0) === 0
+                ) {
+                    $held = (array) $observation->getInventory();
+                    $fuelled = ($held['hydrogen'] ?? 0) > 0 || ($held['cryo_fuel'] ?? 0) > 0 || ($held['helium3'] ?? 0) > 0;
+                    if (! (($held['ion_thruster'] ?? 0) > 0 && $fuelled)) {
+                        $gear = $this->fallbackDecision($observation, 'the ship is not ready — gear up before riding to orbit', $tried, $known, $researchPaying, $stance);
+                        if ($gear !== null && ($gear['verb'] ?? '') !== $verb) {
+                            $decision = $gear;
+                            $verb = (string) ($decision['verb'] ?? '');
                         }
                     }
                 }

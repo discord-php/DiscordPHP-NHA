@@ -164,7 +164,13 @@ final class Ladder
 
         // 3. Build for RELIABLE points — a `construct` tower costs metal (= size)
         //    plus `composite` (= ceil(height/14)); `composite` is aluminium+carbon.
-        if ($onGround && $has('composite') >= 2 && $has('metal') >= 8) {
+        //    Skipped while the expansionist stance is gearing a ship on the
+        //    ground: the mission is the Accord, not a field of spires. A ship
+        //    already in hand (ion_thruster + fuel) means gearing is done, so a
+        //    tower to fund the trip is fine again.
+        $gearingShip = $stance === Stance::Expansionist->value && $onGround
+            && ! ($has('ion_thruster') > 0 && ($has('hydrogen') > 0 || $has('cryo_fuel') > 0 || $has('helium3') > 0));
+        if ($onGround && ! $gearingShip && $has('composite') >= 2 && $has('metal') >= 8) {
             $shape = ['box', 'cylinder', 'pyramid', 'cone', 'sphere'][$tick % 5];
             $size = min(8, $has('metal'));
             $height = 14 * min($has('composite'), 3);
@@ -540,6 +546,44 @@ final class Ladder
             // In orbit by an asteroid → grab space metals for parts.
             if ($inSpace && (array) ($raw['asteroids'] ?? []) !== [] && ! ($raw['docked'] ?? false)) {
                 return ['verb' => 'dock', 'args' => [], 'why' => 'expansionist — dock the asteroid and mine iridium/nickel for ship parts'];
+            }
+
+            // On the ground and NOT flight-ready → GEAR UP, do not ride/launch.
+            // Drive the flight-prep recipes whose ingredient sets are fixed;
+            // `build`-ing the hull parts is left to the model (the prompt covers
+            // it). This runs ahead of the generic ladder's tower rung.
+            if ($onGround && ! $flightReady) {
+                if (count((array) ($raw['loose_parts'] ?? [])) >= 3) {
+                    return ['verb' => 'finalize', 'args' => [], 'why' => 'expansionist — assemble the parts you have into a ship'];
+                }
+                // ion_thruster = fusion fuel (helium3/iridium) + motor + semiconductor.
+                if ($has('ion_thruster') === 0 && $has('motor') > 0 && $has('silicon') > 0
+                    && ($has('helium3') > 0 || $has('iridium') > 0)) {
+                    $fusion = $has('helium3') > 0 ? 'helium3' : 'iridium';
+
+                    return ['verb' => 'combine', 'args' => ['ingredients' => [$fusion => 1, 'motor' => 1, 'silicon' => 1]], 'why' => 'expansionist — combine an ion_thruster (fusion fuel + motor + semiconductor)'];
+                }
+                // hydrogen = water electrolysed by a motor (no metal).
+                if (! $fuelled && $has('water') > 0 && $has('motor') > 0) {
+                    return ['verb' => 'combine', 'args' => ['ingredients' => ['water' => 1, 'motor' => 1]], 'why' => 'expansionist — combine hydrogen fuel (water + motor)'];
+                }
+                // heat_shield = superalloy + composite (needed for Mars/Venus).
+                if ($has('heat_shield') === 0 && $has('superalloy') > 0 && $has('composite') > 0) {
+                    return ['verb' => 'combine', 'args' => ['ingredients' => ['superalloy' => 1, 'composite' => 1]], 'why' => 'expansionist — combine a heat_shield for the Mars/Venus route'];
+                }
+                // Missing an input for the above and can afford it → buy the
+                // cheapest one rather than idle into a tower.
+                if ($credits >= 60) {
+                    foreach (['silicon' => $has('silicon'), 'motor' => $has('motor'), 'water' => $has('water')] as $res => $held) {
+                        if ($held === 0) {
+                            return ['verb' => 'buy', 'args' => ['resource' => $res, 'n' => 3], 'why' => "expansionist — buy {$res} toward the ship"];
+                        }
+                    }
+                }
+                // Nothing deterministic to do toward the ship this turn — let
+                // the generic ladder harvest/sell (it will NOT tower-spam
+                // because AutoPlayer's loop guard now catches that).
+                return null;
             }
 
             // On the ground and flight-ready → get to the elevator base.

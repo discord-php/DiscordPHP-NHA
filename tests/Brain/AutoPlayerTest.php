@@ -622,6 +622,25 @@ class AutoPlayerTest extends NHAUnitTestCase
     }
 
     /**
+     * `construct spire → move → construct spire → move …` — builder-points spam
+     * with no `finalize`/`build`/`depart`. `construct` counts as advancing so
+     * the churn check misses it; the two-verb-domination check catches it.
+     *
+     * @covers \NHA\Brain\AutoPlayer
+     */
+    public function testDetectLoopFlagsConstructMoveSpireSpam(): void
+    {
+        $recent = [];
+        $shapes = ['box', 'cylinder', 'pyramid', 'cone', 'sphere'];
+        for ($i = 0; $i < 6; $i++) {
+            $recent[] = ['verb' => 'construct', 'args' => ['shape' => $shapes[$i % 5], 'size' => 8, 'height' => 28, 'name' => "spire-{$i}"], 'tick' => $i * 2, 'alt' => 0];
+            $recent[] = ['verb' => 'move', 'args' => ['x' => 32 + ($i % 3), 'y' => 114], 'tick' => $i * 2 + 1, 'alt' => 0];
+        }
+
+        $this->assertStringContainsString('spinning on', (string) AutoPlayer::detectLoop($recent));
+    }
+
+    /**
      * @covers \NHA\Brain\AutoPlayer
      * @covers \NHA\StateStore
      */

@@ -244,6 +244,59 @@ class LadderTest extends NHAUnitTestCase
     /**
      * @covers \NHA\Brain\Ladder::suggestion
      */
+    public function testExpansionistGearsTheShipBeforeRidingUp(): void
+    {
+        $base = static fn(array $extra): array => [
+            'tick' => 5, 'in_space' => false, 'altitude' => 0, 'position' => [10, 10],
+            'inventory' => self::KIT + $extra,
+            'elevators' => [['x' => 10, 'y' => 10]], 'nearby_deposits' => [],
+        ];
+
+        // Loose parts in hold → assemble the ship.
+        $parts = Ladder::suggestion(
+            ['tick' => 5, 'in_space' => false, 'altitude' => 0, 'inventory' => self::KIT, 'loose_parts' => ['a', 'b', 'c']],
+            [],
+            [],
+            false,
+            'expansionist',
+        );
+        $this->assertSame('finalize', $parts['verb']);
+
+        // Fusion fuel + motor + semiconductor → combine an ion_thruster.
+        $thruster = Ladder::suggestion($base(['helium3' => 2, 'motor' => 1, 'silicon' => 3]), [], [], false, 'expansionist');
+        $this->assertSame('combine', $thruster['verb']);
+        $this->assertSame(['helium3' => 1, 'motor' => 1, 'silicon' => 1], $thruster['args']['ingredients']);
+
+        // Water + motor, no fuel yet → combine hydrogen.
+        $fuel = Ladder::suggestion($base(['water' => 3, 'motor' => 1, 'ion_thruster' => 1]), [], [], false, 'expansionist');
+        $this->assertSame('combine', $fuel['verb']);
+        $this->assertSame(['water' => 1, 'motor' => 1], $fuel['args']['ingredients']);
+    }
+
+    /**
+     * The gate: an expansionist agent on the ground without a ship does NOT
+     * `construct` a tower even when it holds the composite + metal for one —
+     * the mission is the Accord, not a field of spires.
+     *
+     * @covers \NHA\Brain\Ladder::suggestion
+     */
+    public function testExpansionistWithoutAShipDoesNotBuildTowers(): void
+    {
+        $raw = [
+            'tick' => 5, 'in_space' => false, 'altitude' => 0, 'position' => [10, 10],
+            'inventory' => self::KIT + ['composite' => 6, 'metal' => 20, 'credits' => 50],
+            'nearby_deposits' => [], 'elevators' => [],
+        ];
+        $pick = Ladder::suggestion($raw, [], [], false, 'expansionist');
+        $this->assertNotSame('construct', $pick['verb'] ?? null);
+
+        // Homestead in the same spot still towers.
+        $this->assertSame('construct', Ladder::suggestion($raw, [], [], false, 'homestead')['verb']);
+    }
+
+    /**
+     * @covers \NHA\Brain\Ladder::suggestion
+     */
     public function testExpansionistHeadsForTheElevatorWhenFlightReadyOnTheGround(): void
     {
         $onGround = [
