@@ -92,7 +92,7 @@ final class AutoPlayer
      * `"unknown part X"`. The gear-up rotation skips these and
      * {@see self::step()} rewrites a model `build` that names one.
      */
-    private const DEAD_BUILD_PARTS = ['thruster', 'ion_thruster', 'chassis', 'engine', 'motor'];
+    private const DEAD_BUILD_PARTS = ['thruster', 'ion_thruster', 'chassis', 'hull', 'rotor', 'airframe'];
 
     /**
      * `a+b => true` for every combine set the world has already invented, from

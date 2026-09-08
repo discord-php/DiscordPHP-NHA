@@ -263,15 +263,25 @@ class LadderTest extends NHAUnitTestCase
             'elevators' => [['x' => 10, 'y' => 10]], 'nearby_deposits' => [],
         ];
 
-        // Loose parts in hold → assemble the ship.
+        // Enough loose parts in hold (4+) → assemble the ship.
         $parts = Ladder::suggestion(
-            ['tick' => 5, 'in_space' => false, 'altitude' => 0, 'inventory' => self::KIT, 'loose_parts' => ['a', 'b', 'c']],
+            ['tick' => 5, 'in_space' => false, 'altitude' => 0, 'inventory' => self::KIT, 'loose_parts' => ['a', 'b', 'c', 'd']],
             [],
             [],
             false,
             'expansionist',
         );
         $this->assertSame('finalize', $parts['verb']);
+
+        // Too few parts (3) → keep building, don't finalize a stub.
+        $tooFew = Ladder::suggestion(
+            ['tick' => 5, 'in_space' => false, 'altitude' => 0, 'inventory' => self::KIT + ['ion_thruster' => 1, 'cryo_fuel' => 3, 'heat_shield' => 1], 'loose_parts' => ['a', 'b', 'c'], 'position' => [10, 10], 'nearby_deposits' => []],
+            [],
+            [],
+            false,
+            'expansionist',
+        );
+        $this->assertSame('build', $tooFew['verb']);
 
         // Credits, no ion_thruster → buy the one the depot stocks.
         $thruster = Ladder::suggestion($base(['credits' => 4000]), [], [], false, 'expansionist');

@@ -104,11 +104,11 @@ final class Ladder
             return $combat;
         }
 
-        // 1. Assemble crafted parts into a vehicle — but only once there are
-        //    enough for a working one. A lone `landing_gear` finalizes into an
-        //    inert hull (drives=false, flies=false, fuel_cap=0) that then jams
-        //    the `deploy` rung; wait for 3+ parts.
-        if (count((array) ($raw['loose_parts'] ?? [])) >= 3) {
+        // 1. Assemble crafted parts into a vehicle — once there are enough for a
+        //    working one (a lone part finalizes into an inert hull). Stop after
+        //    a couple of inert hulls: the recipe still lacks its drive part, so
+        //    hold the parts until the search turns one up.
+        if (count((array) ($raw['loose_parts'] ?? [])) >= 4 && self::inertVehicleCount($raw) < 2) {
             return ['verb' => 'finalize', 'args' => [], 'why' => 'you have enough loose parts — assemble them into a vehicle'];
         }
 
@@ -379,15 +379,29 @@ final class Ladder
      */
     public static function hasDeadHull(array $raw): bool
     {
+        return self::inertVehicleCount($raw) > 0;
+    }
+
+    /**
+     * How many `finalize`d-but-inert hulls the agent has piled up (no drive, no
+     * flight, no orbital engine, zero fuel capacity). Past a couple of these the
+     * `finalize` recipe is clearly still missing its drive part — stop spending
+     * loose parts on more junk and let the part search catch up.
+     *
+     * @param array<string,mixed> $raw
+     */
+    public static function inertVehicleCount(array $raw): int
+    {
+        $n = 0;
         foreach ((array) ($raw['vehicles'] ?? []) as $v) {
             $v = (array) $v;
             $useless = empty($v['drives']) && empty($v['flies']) && empty($v['orbital_engine']);
             if ($useless && (int) ($v['fuel_cap'] ?? 0) === 0) {
-                return true;
+                $n++;
             }
         }
 
-        return false;
+        return $n;
     }
 
     /**
@@ -401,7 +415,23 @@ final class Ladder
      * @var list<string>
      */
     public const SHIP_PART_ARCHETYPES = [
-        'fuel_tank', 'landing_gear', 'wing', 'wheel', 'hull', 'frame', 'cockpit', 'rotor', 'airframe', 'body',
+        // Confirmed valid by the live engine.
+        'landing_gear', 'cockpit', 'wing', 'frame',
+        // Untested but plausible — a drive part is what an inert hull is
+        // missing (drives / flies / fuel_cap all come out 0 without one).
+        'wheel', 'wheels', 'engine', 'motor', 'propeller', 'fuel_tank', 'body', 'tail',
+    ];
+
+    /**
+     * `part => [allowed with: upgrade items]`, as the engine reports them in its
+     * rejection text (e.g. `frame can't use ['ion_thruster'] (upgrade options:
+     * [...])`). Used so the gear-up rung fits a legal upgrade instead of drawing
+     * a rejection. Empty / absent → build the part bare.
+     *
+     * @var array<string, list<string>>
+     */
+    public const PART_UPGRADES = [
+        'frame' => ['steel', 'alloy', 'composite', 'superalloy'],
     ];
 
     /**
@@ -750,8 +780,10 @@ final class Ladder
             // This runs ahead of the generic ladder's tower rung.
             if ($onGround && ! $flightReady) {
                 // Enough loose parts for a working ship → bundle them. One
-                // stray part finalizes into an inert hull, so hold at 3+.
-                if (count((array) ($raw['loose_parts'] ?? [])) >= 3) {
+                // stray part finalizes into an inert hull; and once a couple of
+                // those have piled up, stop — the recipe still lacks its drive
+                // part, so keep building parts until one lands.
+                if (count((array) ($raw['loose_parts'] ?? [])) >= 4 && self::inertVehicleCount($raw) < 2) {
                     return ['verb' => 'finalize', 'args' => ['name' => 'accord_runner'], 'why' => 'expansionist — finalize the loose parts into a ship'];
                 }
                 // The orbital engine.
@@ -795,8 +827,16 @@ final class Ladder
                 if ($has('ion_thruster') > 0) {
                     $part = self::SHIP_PART_ARCHETYPES[(int) ($raw['tick'] ?? 0) % count(self::SHIP_PART_ARCHETYPES)];
                     $args = ['part' => $part];
-                    // Fit the orbital drive onto the last structural part.
-                    if (in_array($part, ['hull', 'frame', 'body', 'airframe'], true)) {
+                    // Fit a legal upgrade if this part takes one and we hold it.
+                    foreach (self::PART_UPGRADES[$part] ?? [] as $up) {
+                        if ($has($up) > 0) {
+                            $args['with'] = [$up => 1];
+                            break;
+                        }
+                    }
+                    // A drive part is the one an inert hull lacks — try to seat
+                    // the ion_thruster on the propulsion archetypes.
+                    if (! isset($args['with']) && in_array($part, ['engine', 'motor', 'propeller'], true)) {
                         $args['with'] = ['ion_thruster' => 1];
                     }
 

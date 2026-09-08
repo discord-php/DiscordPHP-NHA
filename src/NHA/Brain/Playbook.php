@@ -45,7 +45,7 @@ final class Playbook
         'gather' => 'n:int — forage the nearest plant within 8 (herb/lichen/fungus/algae → medicine)',
         'plant' => 'no args — spend 1 wood to top up the most-drained tree on your cell (cap 22); rejected if all full',
         'combine' => 'ingredients:{res:qty}, name?:string, n?:int — craft; matches the SET of physics tags, 1 of each per copy',
-        'build' => 'part:string, with?:{res:qty ≤3 upgrades} — craft ONE vehicle part into loose_parts. part names are an undocumented enum; the engine answers a wrong one with "unknown part X". Known archetypes to try: fuel_tank, landing_gear, chassis/frame, hull, wing, wheel, cockpit. Add with:{ion_thruster:1} to fit the orbital drive. Vary the guess — do not repeat a rejected part',
+        'build' => 'part:string, with?:{res:qty ≤3 upgrades} — craft ONE vehicle part into loose_parts. CONFIRMED parts: landing_gear, cockpit, wing, frame. REJECTED (do not retry): chassis, hull, rotor, airframe, thruster. `frame` takes with:{steel|alloy|composite|superalloy:1}, NOT ion_thruster. An inert finalize (drives=false) means the parts lack a DRIVE — try engine/motor/wheel/propeller next. Vary the guess; the engine lists valid upgrades in its reject text',
         'finalize' => 'name?:string — assemble ALL loose_parts into one vehicle (computes drive/fly/thrust/fuel_cap/gear). Needs ≥1 loose part first — build them',
         'deploy' => 'no args — send a finalized vehicle off to mine autonomously',
         'construct' => 'shape:string (box/cylinder/sphere/cone/pyramid/monument/extractor/colony/terraform/ziggurat/station), size?, height?, body?, module?, kind?, stage?, name? — raise a structure OR fund a co-op board',

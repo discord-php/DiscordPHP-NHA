@@ -12,6 +12,22 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.9] - 2026-09-08
+
+### Changed
+- More of the `build` vocabulary mapped from the 3.2.8 live run:
+  **valid** — `landing_gear`, `cockpit`, `wing`, `frame`; **rejected** —
+  `chassis`, `hull`, `rotor`, `airframe`, `thruster`. And `frame`'s `with:`
+  upgrades are `steel`/`alloy`/`composite`/`superalloy`, **not** `ion_thruster`
+  (`Ladder::PART_UPGRADES`). `SHIP_PART_ARCHETYPES` now leads with the confirmed
+  four and appends drive-part candidates (`wheel`, `engine`, `motor`,
+  `propeller`, …) — an inert `finalize` means the parts have no drive.
+  `DEAD_BUILD_PARTS` and the Playbook `build` hint updated to match.
+- `finalize` now needs **4+** loose parts (was 3 — three still produced an
+  inert hull), and stops once **2 inert hulls** have piled up: the recipe is
+  still missing its drive part, so parts are held for the search rather than
+  spent on more junk. `Ladder::inertVehicleCount()`.
+
 ## [3.2.8] - 2026-09-08
 
 ### Fixed
