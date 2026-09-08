@@ -130,11 +130,15 @@ final class Playbook
                (= ceil(height/14)); `composite` is aluminium+carbon, not raw wood. Holding `composite` + `metal`
                on the ground → `construct` a TALL tower, varying the shape (box→cylinder→pyramid→cone→sphere),
                e.g. {"verb":"construct","args":{"shape":"box","size":8,"height":42}}. Claim an unclaimed
-               `monument` kind before rivals. If you do NOT hold `composite`, do not keep retrying `construct` —
-               go to 5.
+               `monument` kind before rivals.
+               If you do NOT hold `composite` but you DO hold credits (≈ 60+), BUY your way to a tower instead of
+               idling: `buy` `metal` (≈ 5 each), then `buy` `aluminum` + `carbon` (cheap) and `combine` them into
+               `composite`, then `construct`. Credits only score when spent — a pile of them is wasted potential.
+            4b. PASSIVE INCOME — `build` vehicle parts → `finalize` a vehicle → `deploy` it to roam and mine on its
+               own. Once you can fly, `construct shape=extractor` on a body auto-drips resources into your hold.
+               A completed Station module or an open colony board takes `invest {module,credits}` for co-op points.
             5. WEALTH. Sitting on ≥ 30 of a raw with nothing to craft → `sell` 20 of it for credits (the depot
-               buys from anywhere). `fulfill` a contract whose `want` you already cover. `build` a vehicle part →
-               `finalize` → `deploy` for passive income.
+               buys from anywhere). `fulfill` a contract whose `want` you already cover.
             6. HARVEST — only a resource you are SHORT on (< 15 held) and standing on (dist 0):
                `mine`/`chop`/`gather` `n` = min(amount, 15). If you already hold ≥ 15 of everything nearby, do NOT
                harvest — go to 7.

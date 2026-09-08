@@ -472,9 +472,21 @@ final class AgentBrain
         }
         arsort($raws);
 
+        $has = static fn(string $k): int => (int) ($inv[$k] ?? 0);
+        $credits = $has('credits');
+
         // 1. Assemble anything already crafted.
         if (count((array) ($raw['loose_parts'] ?? [])) > 0) {
             return ['verb' => 'finalize', 'args' => [], 'why' => 'you have loose parts — assemble them into a vehicle'];
+        }
+
+        // 1b. Passive income: a finished vehicle that is not out working yet →
+        //     `deploy` it to roam and mine autonomously.
+        foreach ((array) ($raw['vehicles'] ?? []) as $vehicle) {
+            $vehicle = (array) $vehicle;
+            if (empty($vehicle['deployed']) && empty($vehicle['roaming']) && empty($vehicle['out'])) {
+                return ['verb' => 'deploy', 'args' => [], 'why' => 'you have a finished vehicle — deploy it for passive mining income'];
+            }
         }
 
         // 2. One speculative combine: a pair of raws not submitted this session
@@ -499,7 +511,6 @@ final class AgentBrain
         }
 
         $biggest = $raws === [] ? null : array_key_first($raws);
-        $has = static fn(string $k): int => (int) ($inv[$k] ?? 0);
 
         // 2b. Off the ground with no orbital work to do (no asteroid to dock and
         //     mine) — descend. `construct` and most harvesting need solid ground;
@@ -509,19 +520,47 @@ final class AgentBrain
             return ['verb' => 'land', 'args' => [], 'why' => 'nothing to do off the ground — land and build where the materials are'];
         }
 
-        // 3. Build for RELIABLE points — but a `construct` tower costs metal
-        //    (= size) plus `composite` (= ceil(height/14)), and `composite` is
-        //    aluminium+carbon, not something most ground agents hold. Only
-        //    suggest it when the exact material is on hand.
+        // 3. Build for RELIABLE points — a `construct` tower costs metal (= size)
+        //    plus `composite` (= ceil(height/14)); `composite` is aluminium+carbon.
         if ($onGround && $has('composite') >= 2 && $has('metal') >= 8) {
             $shape = ['box', 'cylinder', 'pyramid', 'cone', 'sphere'][$tick % 5];
             $size = min(8, $has('metal'));
             $height = 14 * min($has('composite'), 3);
+
             return [
                 'verb' => 'construct',
                 'args' => ['shape' => $shape, 'size' => $size, 'height' => $height, 'name' => 'spire-' . ($tick % 1000)],
                 'why' => "you hold the composite + metal a tall {$shape} needs — builder points score every time",
             ];
+        }
+
+        // 3b. Spend the credit pile toward a tower: buy the metal, then buy
+        //     aluminium + carbon and combine them into `composite`. Credits are
+        //     only a means — turning them into builder points is the reliable
+        //     scorer a stuck ground agent can always reach.
+        if ($onGround && $credits >= 150) {
+            if ($has('metal') < 8 && $credits >= 60) {
+                return ['verb' => 'buy', 'args' => ['resource' => 'metal', 'n' => 8], 'why' => 'banking metal for a tower — credits are only useful spent'];
+            }
+            if ($has('composite') < 2 && $has('metal') >= 8) {
+                if ($has('aluminum') < 2) {
+                    return ['verb' => 'buy', 'args' => ['resource' => 'aluminum', 'n' => 3], 'why' => 'buying aluminium for composite (aluminium + carbon)'];
+                }
+                if ($has('carbon') < 2) {
+                    return ['verb' => 'buy', 'args' => ['resource' => 'carbon', 'n' => 3], 'why' => 'buying carbon for composite (aluminium + carbon)'];
+                }
+
+                return ['verb' => 'combine', 'args' => ['ingredients' => ['aluminum' => 1, 'carbon' => 1]], 'why' => 'combining aluminium + carbon into composite for a tower'];
+            }
+        }
+
+        // 3c. Fund a Station module / colony that is still open — a credit sink
+        //     that pays co-op points. No-op while everything is already complete.
+        foreach ((array) ($raw['space_station']['modules'] ?? []) as $module) {
+            $module = (array) $module;
+            if (($raw['in_space'] ?? false) && empty($module['complete']) && $credits >= 200 && isset($module['module'])) {
+                return ['verb' => 'invest', 'args' => ['module' => (string) $module['module'], 'credits' => min(200, intdiv($credits, 3))], 'why' => "funding the {$module['module']} module — co-op points from spare credits"];
+            }
         }
 
         // 4. Turn a glut into credits (the depot buys raws from anywhere). A real

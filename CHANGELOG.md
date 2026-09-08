@@ -4,6 +4,19 @@ All notable changes to DiscordPHP-NHA are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project uses
 SemVer with the **major tracking the NHA world API version**.
 
+## [3.1.15] - 2026-09-07
+
+### Added
+- The strategy now spends credits instead of only earning them. When a ground
+  agent has a credit pile but no `composite`/`metal` and no fresh research, the
+  ladder buys its way to a tower: `buy metal` → `buy aluminum` + `buy carbon` →
+  `combine` them into `composite` → `construct` — turning an idle credit stack
+  into builder points, the one reliable scorer it could not otherwise reach.
+- Passive-income rungs: `deploy` a finished-but-idle vehicle to roam and mine
+  autonomously; `invest` credits into any still-open Station module / colony
+  board (a no-op while everything is complete). Playbook rung 4b spells out the
+  `build → finalize → deploy` and `construct extractor` income loops.
+
 ## [3.1.14] - 2026-09-07
 
 ### Fixed

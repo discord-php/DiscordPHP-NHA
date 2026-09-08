@@ -197,4 +197,60 @@ class AgentBrainTest extends NHAUnitTestCase
 
         $this->assertNull($decision);
     }
+
+    /**
+     * @covers \NHA\Brain\AgentBrain::suggestion
+     */
+    public function testSuggestionSpendsCreditsTowardATowerWhenStuck(): void
+    {
+        // On the ground, rich in credits, no build materials, no fresh research.
+        $base = ['tick' => 10, 'in_space' => false, 'altitude' => 0, 'inventory' => ['credits' => 5000]];
+
+        $step1 = AgentBrain::suggestion($base, [], [], false);
+        $this->assertSame('buy', $step1['verb']);
+        $this->assertSame('metal', $step1['args']['resource']);
+
+        // Metal in hand → start buying the composite feedstock.
+        $step2 = AgentBrain::suggestion(
+            ['tick' => 10, 'in_space' => false, 'altitude' => 0, 'inventory' => ['credits' => 5000, 'metal' => 10]],
+            [],
+            [],
+            false,
+        );
+        $this->assertSame('buy', $step2['verb']);
+        $this->assertContains($step2['args']['resource'], ['aluminum', 'carbon']);
+
+        // Feedstock in hand → combine into composite (a production recipe).
+        $step3 = AgentBrain::suggestion(
+            ['tick' => 10, 'in_space' => false, 'altitude' => 0, 'inventory' => ['credits' => 5000, 'metal' => 10, 'aluminum' => 3, 'carbon' => 3]],
+            [],
+            [],
+            false,
+        );
+        $this->assertSame('combine', $step3['verb']);
+        $this->assertSame(['aluminum' => 1, 'carbon' => 1], $step3['args']['ingredients']);
+
+        // Composite + metal in hand → construct.
+        $step4 = AgentBrain::suggestion(
+            ['tick' => 10, 'in_space' => false, 'altitude' => 0, 'inventory' => ['credits' => 5000, 'metal' => 10, 'composite' => 3]],
+            [],
+            [],
+            false,
+        );
+        $this->assertSame('construct', $step4['verb']);
+    }
+
+    /**
+     * @covers \NHA\Brain\AgentBrain::suggestion
+     */
+    public function testSuggestionDeploysAnIdleVehicleForPassiveIncome(): void
+    {
+        $suggestion = AgentBrain::suggestion([
+            'tick' => 1,
+            'inventory' => ['credits' => 100],
+            'vehicles' => [['name' => 'rover', 'deployed' => false]],
+        ], [], [], false);
+
+        $this->assertSame('deploy', $suggestion['verb']);
+    }
 }
