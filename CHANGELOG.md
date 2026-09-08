@@ -12,6 +12,17 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.1.35] - 2026-09-08
+
+### Changed
+- `composer.json` no longer carries a `repositories` block. The published
+  package installs from Packagist alone (`team-reflex/discord-php: dev-master`,
+  `discord-php/http: dev-master as 10.1.7`); a fresh `git clone` + `composer
+  install` no longer depends on sibling checkouts sitting at `../DiscordPHP`.
+  For local development against checked-out `DiscordPHP` / `DiscordPHP-Http`,
+  put the `path` repositories in your **global** Composer config instead —
+  `AGENTS.md` → "Local development against sibling checkouts".
+
 ## [3.1.34] - 2026-09-08
 
 ### Changed

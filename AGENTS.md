@@ -348,6 +348,20 @@ Discord repositories, gateway handlers, interaction type maps, builder validatio
 
 The NHA game engine is also an external authority. This repository adapts its API; it does not own the world simulation.
 
+### Local development against sibling checkouts
+
+`composer.json` **must not** carry a `repositories` block — the published package has to install from Packagist alone. To symlink locally checked-out `DiscordPHP` / `DiscordPHP-Http` while developing, put the path repositories in your **global** Composer config (`composer global config`), never in this repo:
+
+```jsonc
+// ~/.composer/config.json (or %APPDATA%/Composer/config.json)
+"repositories": {
+  "discordphp":      { "type": "path", "url": "/abs/path/DiscordPHP",      "options": { "symlink": true } },
+  "discordphp-http": { "type": "path", "url": "/abs/path/DiscordPHP-Http", "canonical": false, "options": { "symlink": true } }
+}
+```
+
+`discord-php/http` is `canonical: false` so a sibling that only needs it transitively (e.g. via `^10.1.7`) still resolves a real Packagist tag; this repo keeps `discord-php/http: "dev-master as 10.1.7"` in `require` so its own symlink wins.
+
 ## Repo worldview
 
 ### Runtime to response flow
