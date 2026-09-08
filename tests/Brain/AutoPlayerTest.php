@@ -356,23 +356,50 @@ class AutoPlayerTest extends NHAUnitTestCase
     }
 
     /**
+     * A production recipe (aluminium+carbon → composite) is known-good and
+     * re-craftable; a stale `dead` entry — almost always from one turn the agent
+     * was short an ingredient — must not block it. This is the wedge that stuck
+     * the composite build.
+     *
      * @covers \NHA\Brain\AutoPlayer
      * @covers \NHA\StateStore
      */
-    public function testADeadSetIsBlockedEvenIfItIsAProductionRecipe(): void
+    public function testAProductionRecipeIsNeverBlockedByAStaleDeadEntry(): void
     {
         $state = new StateStore($this->statePath);
-        $state->recordDeadCombine(142287, 'aluminium+carbon'); // the Guild said no, so it is not production after all
+        $state->recordDeadCombine(142287, 'aluminium+carbon');
 
         $nha = $this->nhaWith([
             'tick' => 5, 'downed_until' => 0, 'position' => [1, 1],
-            'inventory' => ['carbon' => 40],
+            'inventory' => ['aluminium' => 40, 'carbon' => 40],
         ]);
         $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"combine","args":{"ingredients":{"aluminium":1,"carbon":1}}}'), $state);
 
         $player->step(142287, 'tok');
 
-        $this->assertNotSame('combine', $this->posts[0][1]['verb'], 'a dead set overrides the production-recipe exemption');
+        $this->assertSame('combine', $this->posts[0][1]['verb'], 'the production recipe still goes out');
+    }
+
+    /**
+     * A combine rejected for lack of ingredients ("not enough carbon") is
+     * transient, not proven-dead — recording it would permanently kill a recipe
+     * over one bad turn.
+     *
+     * @covers \NHA\Brain\AutoPlayer
+     */
+    public function testARejectionForInsufficientStockIsNotRecordedDead(): void
+    {
+        $state = new StateStore($this->statePath);
+        $state->recordDecision(142287, ['verb' => 'combine', 'args' => ['ingredients' => ['crystal' => 1, 'lens' => 1]], 'reason' => '', 'queued_intent' => 999, 'tick' => 1]);
+
+        $nha = $this->nhaWith([
+            'tick' => 5, 'downed_until' => 0, 'position' => [1, 1],
+            'inventory' => ['wood' => 40],
+            'status' => 'rejected', 'result' => 'not enough crystal to combine',
+        ]);
+        (new AutoPlayer($nha, $this->brainReturning('{"verb":"mine","args":{"n":5}}'), $state))->step(142287, 'tok');
+
+        $this->assertNotContains('crystal+lens', $state->getDeadCombines(142287), 'a stock shortage does not blacklist the set');
     }
 
     /**

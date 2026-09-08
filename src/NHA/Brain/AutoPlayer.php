@@ -165,6 +165,23 @@ final class AutoPlayer
         return implode('+', $tokens);
     }
 
+    /**
+     * Whether a rejected-intent message reads as "you didn't have the
+     * ingredients" rather than "this set makes nothing" — the former is
+     * transient and must not blacklist the recipe.
+     */
+    private static function looksLikeStockShortage(string $result): bool
+    {
+        $result = strtolower($result);
+        foreach (['not enough', 'insufficient', "don't have", 'do not have', 'need ', 'needs ', 'requires ', 'missing', 'out of stock', 'too few'] as $needle) {
+            if (str_contains($result, $needle)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /** Verbs that only reposition the agent — a window full of these is "going nowhere". */
     private const TRAVERSAL_VERBS = ['move', 'ride', 'land', 'launch', 'wait'];
 
@@ -590,10 +607,17 @@ final class AutoPlayer
                             $this->knownCombines[$lastCombineSig] = true;
                         }
 
-                        // The Guild rejected it: this tag-set makes NOTHING and
-                        // never will. Record it as proven-dead so it is never
-                        // submitted again by this agent, not even once.
-                        if ($status === 'rejected') {
+                        // A rejected combine is only "proven dead" when the set
+                        // genuinely mints nothing — NOT when the agent simply
+                        // lacked the ingredients that turn. Blacklisting on a
+                        // stock shortage permanently kills a valid recipe (this
+                        // is what wedged the composite build: one short
+                        // `aluminum+carbon` got recorded dead forever). Production
+                        // recipes are known-good and never recorded.
+                        if ($status === 'rejected'
+                            && ! isset(self::PRODUCTION_COMBINES[$lastCombineSig])
+                            && ! self::looksLikeStockShortage((string) ($s->result ?? ''))
+                        ) {
                             $this->state->recordDeadCombine($agent_id, $lastCombineSig);
                         }
                     }
@@ -711,13 +735,14 @@ final class AutoPlayer
                 // agent, that this agent already tried this run, or that would
                 // dip a tower material below its reserve (research spends only
                 // the surplus). A production recipe (PRODUCTION_COMBINES, i.e.
-                // aluminium+carbon → composite) is exempt UNLESS it is dead.
+                // aluminium+carbon → composite) is fully exempt — it is known-good
+                // and re-craftable, and must not be blocked by a stale dead entry.
                 // When one is refused, fall through to the ladder rather than idle.
                 if ($verb === 'combine') {
                     $sig = self::combineSignature((array) ($decision['args'] ?? []));
                     $ingredients = (array) ($decision['args']['ingredients'] ?? []);
-                    $isDead = $sig !== '' && in_array($sig, $dead, true);
                     $isProduction = isset(self::PRODUCTION_COMBINES[$sig]);
+                    $isDead = $sig !== '' && ! $isProduction && in_array($sig, $dead, true);
 
                     $dipsReserve = null;
                     if (! $isProduction) {

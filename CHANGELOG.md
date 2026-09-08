@@ -24,6 +24,12 @@ SemVer with the **major tracking the NHA world API version**.
   Capitalist now also requires real market work — a contract whose `want` the
   agent covers, or a raw stockpiled past the hoard cap. With neither, the agent
   drops to homestead and spends its credits on a build.
+- `AutoPlayer` no longer permanently blacklists a `combine` set that was
+  rejected merely for lack of ingredients that turn (`recordDeadCombine` now
+  skips production recipes and stock-shortage rejections), and a production
+  recipe (`aluminium+carbon → composite`) is fully exempt from the dead list —
+  a known-good, re-craftable recipe can't legitimately be "dead". One short
+  `aluminum+carbon` had wedged the composite build for good.
 - `AutoPlayer::detectLoop()` no longer lets a single repeated `combine` set
   (a production recipe, or one fixation) count as "advancing" — a window whose
   only non-trade action is `combine aluminium+carbon` on repeat is now flagged
