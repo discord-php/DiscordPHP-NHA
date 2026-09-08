@@ -225,10 +225,12 @@ class LadderTest extends NHAUnitTestCase
     {
         $earthOrbit = [
             'tick' => 5, 'in_space' => true, 'altitude' => 320,
-            'inventory' => self::KIT + ['ion_thruster' => 1, 'hydrogen' => 4, 'heat_shield' => 1],
+            'inventory' => self::KIT + ['hydrogen' => 4, 'heat_shield' => 1],
+            'vehicles' => [['name' => 'runner', 'flies' => true, 'orbital_engine' => true]],
             'expansion' => ['at_body' => null, 'windows' => [
                 'mars' => ['open' => true], 'venus' => ['open' => false],
             ]],
+            'asteroids' => [],
         ];
         $pick = Ladder::suggestion($earthOrbit, [], [], false, 'expansionist');
         $this->assertSame('depart', $pick['verb']);
@@ -272,10 +274,17 @@ class LadderTest extends NHAUnitTestCase
         $this->assertSame('buy', $fuel['verb']);
         $this->assertSame('cryo_fuel', $fuel['args']['resource']);
 
-        // Thruster + fuel → flight-ready; no heat_shield is needed for a
-        // moon-first hop, so it heads for the elevator (it is standing on it).
-        $ready = Ladder::suggestion($base(['credits' => 4000, 'ion_thruster' => 1, 'cryo_fuel' => 3]), [], [], false, 'expansionist');
-        $this->assertSame('ride', $ready['verb']);
+        // Full kit (thruster + fuel + shield) but still NO vehicle → assemble
+        // one: `build` the thruster part (then `finalize`). A loose
+        // `ion_thruster` resource is cargo, not a ship — it must not ride yet.
+        $assemble = Ladder::suggestion($base(['credits' => 4000, 'ion_thruster' => 1, 'cryo_fuel' => 3, 'heat_shield' => 1]), [], [], false, 'expansionist');
+        $this->assertSame('build', $assemble['verb']);
+
+        // A finalized ship + fuel, standing on a tall elevator → NOW ride up.
+        $ready = $base(['credits' => 4000, 'cryo_fuel' => 3]);
+        $ready['vehicles'] = [['name' => 'runner', 'flies' => true, 'orbital_engine' => true]];
+        $ready['elevators'] = [['x' => 10, 'y' => 10, 'height' => 500]];
+        $this->assertSame('ride', Ladder::suggestion($ready, [], [], false, 'expansionist')['verb']);
 
         // Low on credits, not fuelled → combine cryo_fuel from ice + an energy source.
         $poor = Ladder::suggestion($base(['ice' => 3, 'coal' => 3, 'ion_thruster' => 1]), [], [], false, 'expansionist');
@@ -339,8 +348,10 @@ class LadderTest extends NHAUnitTestCase
     {
         $onGround = [
             'tick' => 5, 'in_space' => false, 'altitude' => 0, 'position' => [10, 10],
-            'inventory' => self::KIT + ['ion_thruster' => 1, 'hydrogen' => 4],
-            'elevators' => [['x' => 80, 'y' => 90]],
+            'inventory' => self::KIT + ['hydrogen' => 4],
+            'vehicles' => [['name' => 'runner', 'flies' => true, 'orbital_engine' => true]],
+            // A 120 m spire does NOT reach orbit — only the tall one counts.
+            'elevators' => [['x' => 12, 'y' => 12, 'height' => 120], ['x' => 80, 'y' => 90, 'height' => 620]],
             'nearby_deposits' => [],
         ];
         $walk = Ladder::suggestion($onGround, [], [], false, 'expansionist');
@@ -349,5 +360,49 @@ class LadderTest extends NHAUnitTestCase
 
         $onGround['position'] = [80, 90];
         $this->assertSame('ride', Ladder::suggestion($onGround, [], [], false, 'expansionist')['verb']);
+    }
+
+    /**
+     * With a finalized ship + fuel but no elevator that reaches orbit, the
+     * expansionist `launch`es toward 300+ rather than stalling on the ground.
+     *
+     * @covers \NHA\Brain\Ladder::suggestion
+     * @covers \NHA\Brain\Ladder::orbitElevator
+     */
+    public function testExpansionistLaunchesWhenNoElevatorReachesOrbit(): void
+    {
+        $onGround = [
+            'tick' => 5, 'in_space' => false, 'altitude' => 0, 'position' => [10, 10],
+            'inventory' => self::KIT + ['hydrogen' => 4],
+            'vehicles' => [['name' => 'runner', 'flies' => true, 'orbital_engine' => true]],
+            'elevators' => [['x' => 12, 'y' => 12, 'height' => 120]],
+            'nearby_deposits' => [],
+        ];
+        $this->assertSame('launch', Ladder::suggestion($onGround, [], [], false, 'expansionist')['verb']);
+    }
+
+    /**
+     * In space with only a loose `ion_thruster` resource and no finalized ship,
+     * the agent does NOT `land` (always rejected) — it rides the elevator down
+     * or waits out orbital decay to gear up on the ground.
+     *
+     * @covers \NHA\Brain\Ladder::suggestion
+     * @covers \NHA\Brain\Ladder::descentWithoutShip
+     */
+    public function testShiplessInSpaceComesDownInsteadOfLanding(): void
+    {
+        $inSpace = [
+            'tick' => 5, 'in_space' => true, 'altitude' => 120, 'position' => [33, 114],
+            'inventory' => self::KIT + ['ion_thruster' => 2, 'cryo_fuel' => 3],
+            'elevators' => [['x' => 33, 'y' => 114, 'height' => 120]],
+            'expansion' => ['at_body' => null],
+            'asteroids' => [],
+        ];
+        $pick = Ladder::suggestion($inSpace, [], [], false, 'expansionist');
+        $this->assertSame('ride', $pick['verb']);
+
+        // Off the elevator base → walk to it, still never `land`.
+        $inSpace['position'] = [40, 120];
+        $this->assertContains(Ladder::suggestion($inSpace, [], [], false, 'expansionist')['verb'], ['move', 'wait']);
     }
 }

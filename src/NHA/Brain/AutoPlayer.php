@@ -825,7 +825,9 @@ final class AutoPlayer
                 ) {
                     $held = (array) $observation->getInventory();
                     $fuelled = ($held['hydrogen'] ?? 0) > 0 || ($held['cryo_fuel'] ?? 0) > 0 || ($held['helium3'] ?? 0) > 0;
-                    $ready = $fuelled && (($held['ion_thruster'] ?? 0) > 0 || Ladder::hasOrbitalShip($rawObs));
+                    // A loose `ion_thruster` resource is not a ship — only a
+                    // `finalize`d orbital vehicle clears the flight verbs.
+                    $ready = $fuelled && Ladder::hasOrbitalShip($rawObs);
                     if (! $ready) {
                         $gear = $this->fallbackDecision($observation, 'stay on the mission — gear the ship, do not ' . ($vanityTower ? 'raise another spire' : 'ride to an empty orbit'), $tried, $known, $researchPaying, $stance);
                         if ($gear !== null && ($gear['verb'] ?? '') !== $verb) {
@@ -852,6 +854,29 @@ final class AutoPlayer
                         $verb = (string) ($decision['verb'] ?? '');
                     } else {
                         $decision = ['verb' => 'wait', 'args' => [], 'reason' => 'in orbit with a ship — holding for a transfer window'];
+                        $verb = 'wait';
+                    }
+                }
+
+                // A `land` / `land_body` / `land_moon` with no controllable
+                // vehicle is rejected every tick ("no controllable vehicle to
+                // land with") — the shipless elevator bounce. Substitute a real
+                // way down (ride the elevator, or wait out orbital decay).
+                if (in_array($verb, ['land', 'land_body', 'land_moon'], true) && ! Ladder::hasAnyVehicle($rawObs)) {
+                    $down = Ladder::descentWithoutShip($rawObs);
+                    $decision = $down ?? ['verb' => 'wait', 'args' => [], 'reason' => 'no vehicle to land with — waiting out orbital decay'];
+                    $verb = (string) ($decision['verb'] ?? '');
+                }
+
+                // `build` is a forward verb the loop guard will not flag, so a
+                // wrong `part` argument can spin quietly. If the last three
+                // turns were all `build` and still no vehicle, the guess is not
+                // landing — break for a tick (the server also un-throttles) and
+                // let the next pass re-evaluate (parts made → `finalize`).
+                if ($verb === 'build' && ! Ladder::hasAnyVehicle($rawObs)) {
+                    $lastThree = array_slice(array_map(static fn($r): string => (string) ($r['verb'] ?? ''), $recent), -3);
+                    if ($lastThree === ['build', 'build', 'build']) {
+                        $decision = ['verb' => 'wait', 'args' => [], 'reason' => 'three build attempts with no vehicle — pausing a tick before retrying the assembly'];
                         $verb = 'wait';
                     }
                 }

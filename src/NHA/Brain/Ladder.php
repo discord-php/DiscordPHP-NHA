@@ -169,6 +169,13 @@ final class Ladder
             && ($raw['expansion']['at_body'] ?? null) === null
             && self::hasOrbitalShip($raw);
         if ($offGround && (array) ($raw['asteroids'] ?? []) === [] && ! $holdingForWindow) {
+            // `land` needs a controllable vehicle; with none it is rejected
+            // every tick. Ride/decay down instead.
+            if (! self::hasAnyVehicle($raw)) {
+                return self::descentWithoutShip($raw)
+                    ?? ['verb' => 'wait', 'args' => [], 'why' => 'off the ground with no vehicle — wait out the decay'];
+            }
+
             return ['verb' => 'land', 'args' => [], 'why' => 'nothing to do off the ground — land and build where the materials are'];
         }
 
@@ -178,8 +185,12 @@ final class Ladder
         //    ground: the mission is the Accord, not a field of spires. A ship
         //    already in hand (ion_thruster + fuel) means gearing is done, so a
         //    tower to fund the trip is fine again.
+        // An expansionist with no finalized ship is still gearing — the mission
+        // is the Accord, not a field of vanity spires. Only once a real ship
+        // (not a loose `ion_thruster` resource) is in hold does a tower to fund
+        // the trip become fair game again.
         $gearingShip = $stance === Stance::Expansionist->value && $onGround
-            && ! ($has('ion_thruster') > 0 && ($has('hydrogen') > 0 || $has('cryo_fuel') > 0 || $has('helium3') > 0));
+            && ! self::hasOrbitalShip($raw);
         if ($onGround && ! $gearingShip && $has('composite') >= 2 && $has('metal') >= 8) {
             $shape = ['box', 'cylinder', 'pyramid', 'cone', 'sphere'][$tick % 5];
             $size = min(8, $has('metal'));
@@ -331,6 +342,77 @@ final class Ladder
         }
 
         return false;
+    }
+
+    /**
+     * Whether the agent has ANY finalized vehicle in hold — orbital or not. A
+     * loose `ion_thruster` *resource* in the inventory is NOT a vehicle: `land`,
+     * `land_body` and `land_moon` all reject with "no controllable vehicle to
+     * land with" until a `finalize` has actually produced one.
+     *
+     * @param array<string,mixed> $raw
+     */
+    public static function hasAnyVehicle(array $raw): bool
+    {
+        return (array) ($raw['vehicles'] ?? []) !== [];
+    }
+
+    /**
+     * A shipless way down from space: `ride` a completed elevator back to the
+     * ground if standing on its base cell, walk to the nearest base cell if not,
+     * otherwise `wait` and let orbital decay do it. Never returns `land` — with
+     * no vehicle that verb is always rejected. Returns `null` when the agent is
+     * not actually off the ground.
+     *
+     * @param array<string,mixed> $raw
+     *
+     * @return array{verb: string, args: array<string,mixed>, why: string}|null
+     */
+    public static function descentWithoutShip(array $raw): ?array
+    {
+        $inSpace = (bool) ($raw['in_space'] ?? false);
+        if (! $inSpace && (int) ($raw['altitude'] ?? 0) === 0) {
+            return null;
+        }
+
+        $pos = (array) ($raw['position'] ?? [0, 0]);
+        $x = (int) ($pos[0] ?? 0);
+        $y = (int) ($pos[1] ?? 0);
+        foreach ((array) ($raw['elevators'] ?? []) as $e) {
+            $e = (array) $e;
+            if (isset($e['x'], $e['y']) && (int) $e['x'] === $x && (int) $e['y'] === $y) {
+                return ['verb' => 'ride', 'args' => [], 'why' => 'no ship up here — ride the elevator back down to the ground'];
+            }
+        }
+        $e0 = (array) (($raw['elevators'][0]) ?? []);
+        if (isset($e0['x'], $e0['y'])) {
+            return ['verb' => 'move', 'args' => ['x' => (int) $e0['x'], 'y' => (int) $e0['y']], 'why' => 'no ship up here — get to an elevator base to ride down'];
+        }
+
+        return ['verb' => 'wait', 'args' => [], 'why' => 'no ship up here — hold for orbital decay back to the ground'];
+    }
+
+    /**
+     * The tallest completed elevator that actually reaches orbit (height ≥ 300),
+     * or `null`. Riding a 120 m spire to "space" only to decay straight back is
+     * the classic shipless bounce — the depart gate needs altitude 300–600.
+     *
+     * @param array<string,mixed> $raw
+     *
+     * @return array{x: int, y: int, height: int}|null
+     */
+    public static function orbitElevator(array $raw): ?array
+    {
+        $best = null;
+        foreach ((array) ($raw['elevators'] ?? []) as $e) {
+            $e = (array) $e;
+            $h = (int) ($e['height'] ?? 0);
+            if ($h >= 300 && isset($e['x'], $e['y']) && ($best === null || $h > $best['height'])) {
+                $best = ['x' => (int) $e['x'], 'y' => (int) $e['y'], 'height' => $h];
+            }
+        }
+
+        return $best;
     }
 
     /** Best self-heal medicine on hand, strongest first, or `null`. */
@@ -556,12 +638,23 @@ final class Ladder
                 }
             }
 
+            // A finalized ship is the gate for every flight verb. A loose
+            // `ion_thruster` *resource* is just cargo — it cannot `land`,
+            // `depart`, or hold an altitude; only a `finalize`d vehicle can.
+            $hasShip = self::hasOrbitalShip($raw);
+            $fuelled = $has('hydrogen') > 0 || $has('cryo_fuel') > 0 || $has('helium3') > 0;
+            $flightReady = $fuelled && $hasShip;
+
+            // In space with no ship → dead end. Altitude decays, every verb up
+            // here needs a vehicle, and `land` is rejected outright. Get back
+            // down and build one.
+            if ($inSpace && ! $hasShip) {
+                return self::descentWithoutShip($raw)
+                    ?? ['verb' => 'wait', 'args' => [], 'why' => 'expansionist — no ship in space, hold for decay then gear up'];
+            }
+
             // In Earth orbit, flight-ready, a window open you can afford → depart
             // (a moon first — a Forward Base discounts every later route).
-            // "flight-ready" = fuel + an orbital engine, whether that engine is
-            // still a loose `ion_thruster` or already `finalize`d into a ship.
-            $fuelled = $has('hydrogen') > 0 || $has('cryo_fuel') > 0 || $has('helium3') > 0;
-            $flightReady = $fuelled && ($has('ion_thruster') > 0 || self::hasOrbitalShip($raw));
             if ($inSpace && $alt >= 300 && $atBody === null && $flightReady) {
                 $order = ['deimos' => 50, 'phobos' => 55, 'mars' => 100, 'venus' => 130];
                 foreach ($order as $dest => $dv) {
@@ -587,8 +680,9 @@ final class Ladder
             // the agent has been banking; `combine` is the low-credit fallback.
             // This runs ahead of the generic ladder's tower rung.
             if ($onGround && ! $flightReady) {
-                if (count((array) ($raw['loose_parts'] ?? [])) >= 3) {
-                    return ['verb' => 'finalize', 'args' => [], 'why' => 'expansionist — assemble the parts you have into a ship'];
+                // Loose parts on hand → bundle them into the vehicle.
+                if (count((array) ($raw['loose_parts'] ?? [])) >= 1) {
+                    return ['verb' => 'finalize', 'args' => ['name' => 'accord_runner'], 'why' => 'expansionist — finalize the loose parts into a ship'];
                 }
                 // The orbital engine.
                 if ($has('ion_thruster') === 0) {
@@ -620,6 +714,15 @@ final class Ladder
                         return ['verb' => 'buy', 'args' => ['resource' => 'superalloy', 'n' => 1], 'why' => 'expansionist — buy superalloy toward a heat_shield'];
                     }
                 }
+                // Kit in hand (ion_thruster + fuel + shield) but still no
+                // vehicle → assemble one. `build` turns the ion_thruster
+                // (plus structural materials) into loose parts; `finalize`
+                // then bundles every loose part into one ship. If the depot
+                // engine is not enough on its own, the model — which has the
+                // full parts vocabulary from the Playbook — takes it from here.
+                if ($has('ion_thruster') > 0) {
+                    return ['verb' => 'build', 'args' => ['part' => 'thruster', 'with' => ['ion_thruster' => 1]], 'why' => 'expansionist — build the thruster part from the ion_thruster, then finalize'];
+                }
                 // Low on credits and can't craft yet → let the generic ladder
                 // earn (harvest / sell). It will NOT tower-spam: the tower rung
                 // is gated for a gearing expansionist and the loop guard catches
@@ -627,18 +730,20 @@ final class Ladder
                 return null;
             }
 
-            // On the ground and flight-ready → get to the elevator base.
+            // On the ground and flight-ready → get to the elevator that
+            // actually reaches orbit (300–600). Riding a 120 m spire only
+            // decays straight back; if there is no tall elevator, launch.
             if ($onGround && $flightReady) {
-                foreach ((array) ($raw['elevators'] ?? []) as $e) {
-                    $e = (array) $e;
-                    if (isset($e['x'], $e['y'])) {
-                        $here = (int) $e['x'] === $x && (int) $e['y'] === $y;
+                $orbitLift = self::orbitElevator($raw);
+                if ($orbitLift !== null) {
+                    $here = $orbitLift['x'] === $x && $orbitLift['y'] === $y;
 
-                        return $here
-                            ? ['verb' => 'ride', 'args' => [], 'why' => 'expansionist — ride the elevator to orbit and depart']
-                            : ['verb' => 'move', 'args' => ['x' => (int) $e['x'], 'y' => (int) $e['y']], 'why' => 'expansionist — walk to the elevator base, then ride up'];
-                    }
+                    return $here
+                        ? ['verb' => 'ride', 'args' => [], 'why' => "expansionist — ride the {$orbitLift['height']} m elevator to orbit and depart"]
+                        : ['verb' => 'move', 'args' => ['x' => $orbitLift['x'], 'y' => $orbitLift['y']], 'why' => 'expansionist — walk to the tall elevator base, then ride to orbit'];
                 }
+
+                return ['verb' => 'launch', 'args' => [], 'why' => 'expansionist — no elevator reaches orbit here; launch the ship toward 300+'];
             }
         }
 

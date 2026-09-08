@@ -245,24 +245,26 @@ class AutoPlayerTest extends NHAUnitTestCase
      * @covers \NHA\Brain\AutoPlayer
      * @covers \NHA\Brain\AgentBrain
      */
-    public function testFallbackLandsWhenStuckOffTheGroundWithNothingToDo(): void
+    public function testFallbackComesDownWhenStuckOffTheGroundWithNothingToDo(): void
     {
         $state = new StateStore($this->statePath);
         $state->recordCombineSignature(142287, 'glass+lens');
 
-        // In orbit, points stalled, no asteroid, no build materials, nothing to
-        // sell — the ladder should send it back to the ground, not skip.
+        // In space, points stalled, no asteroid, no build materials, nothing to
+        // sell, and NO vehicle — the ladder should send it back to the ground.
+        // `land` needs a ship, so with none it rides the elevator down instead.
         $nha = $this->nhaWith([
             'tick' => 9, 'downed_until' => 0, 'position' => [32, 114],
             'in_space' => true, 'altitude' => 16, 'inventor_points' => 72,
             'inventory' => ['salt' => 8, 'lens' => 4],
+            'elevators' => [['x' => 32, 'y' => 114, 'height' => 120]],
             'asteroids' => [],
         ]);
         $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"combine","args":{"ingredients":{"lens":1,"glass":1}}}'), $state);
 
         $player->step(142287, 'tok');
 
-        $this->assertSame('land', $this->posts[0][1]['verb']);
+        $this->assertSame('ride', $this->posts[0][1]['verb']);
     }
 
     /**
@@ -277,14 +279,18 @@ class AutoPlayerTest extends NHAUnitTestCase
             'tick' => 9, 'downed_until' => 0, 'position' => [32, 114],
             'in_space' => true, 'altitude' => 30,
             'inventory' => ['salt' => 20],
+            'elevators' => [['x' => 32, 'y' => 114, 'height' => 120]],
             'asteroids' => [],
         ]);
         $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"ride","args":{}}'), $state);
 
         $player->step(142287, 'tok');
 
-        $this->assertNotSame('ride', $this->posts[0][1]['verb'], 'a second ride straight after riding is swapped out');
-        $this->assertSame('land', $this->posts[0][1]['verb']);
+        // No ship in space is a dead end: the only sane move is down. `ride`
+        // from the base cell toggles the elevator DOWN; the agent must never be
+        // sent to `land` (rejected without a vehicle) or left idling in orbit.
+        $this->assertContains($this->posts[0][1]['verb'], ['ride', 'wait']);
+        $this->assertNotSame('land', $this->posts[0][1]['verb']);
     }
 
     /**

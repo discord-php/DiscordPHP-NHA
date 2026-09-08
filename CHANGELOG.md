@@ -12,6 +12,33 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.5] - 2026-09-08
+
+### Fixed
+- The real stall behind 3.2.1–3.2.4: the brain treated a loose **`ion_thruster`
+  resource** in the inventory as a flyable ship. It is not — a ship exists only
+  once `finalize` has produced a `vehicles[]` entry. So the agent believed it
+  was "flight-ready", rode a 120 m elevator spire into space, decayed straight
+  back, and then spammed `land` (rejected every tick: *"no controllable vehicle
+  to land with"*). Live `/observe` on the running agent confirmed `vehicles: []`
+  with `ion_thruster: 2` in hold.
+  - `$flightReady` now requires `Ladder::hasOrbitalShip()` (a finalized orbital
+    vehicle) — never a loose `ion_thruster` resource. Same correction in
+    `AutoPlayer`'s vanity-tower / ride / launch / depart override.
+  - New `Ladder::hasAnyVehicle()` + `descentWithoutShip()` — a `land` /
+    `land_body` / `land_moon` picked with no vehicle is swapped for the real way
+    down (ride the elevator, else wait out orbital decay), in the ladder's
+    rung 2b and as a hard `AutoPlayer` filter.
+  - New `Ladder::orbitElevator()` — ride only an elevator that actually reaches
+    orbit (height ≥ 300); a shipless bounce on a 120 m spire scores nothing.
+    With a real ship and no tall elevator, `launch` toward 300+ instead.
+  - Gear-up rung, kit complete but still no vehicle → issue `build`
+    (`part: thruster`, `with: {ion_thruster: 1}`) then `finalize`, rather than
+    riding up prematurely. `AutoPlayer` breaks a 3-in-a-row `build` with no
+    resulting vehicle so a wrong `part` arg cannot spin quietly.
+  - The vanity-spire gate (`$gearingShip`) now holds until a real ship is in
+    hand, not just until the kit is bought.
+
 ## [3.2.4] - 2026-09-08
 
 ### Fixed
