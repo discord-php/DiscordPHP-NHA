@@ -295,17 +295,46 @@ final class AutoPlayer
         // forever (`mine ↔ sell`, `buy ↔ sell`) slip past every check above —
         // each keeps the window "productive" and neither exact fingerprint
         // dominates — but the agent is going nowhere.
-        $churn = array_slice($verbs, -12);
-        if (count($churn) >= 10 && ! array_intersect($churn, self::ADVANCING_VERBS)) {
-            $trade = count(array_filter($churn, static fn(string $v): bool => $v === 'buy' || $v === 'sell'));
-            $distinct = array_values(array_unique($churn));
-            if ($trade >= 4 && in_array('buy', $churn, true) && in_array('sell', $churn, true)) {
-                return 'buy/sell churn — trading in circles, nothing built (' . count($churn) . ' turns)';
+        //
+        // `combine` is normally an advancing verb, but a window whose ONLY
+        // advancing action is one repeated `combine` set is still churn — the
+        // classic case being "buy carbon → combine aluminium+carbon → sell,
+        // forever" with no `construct`. So a single distinct combine set does
+        // not count; two or more (genuine research) does.
+        $tail = array_slice($recent, -12);
+        if (count($tail) >= 10) {
+            $advancing = 0;
+            $combineSigs = [];
+            $windowVerbs = [];
+            foreach ($tail as $r) {
+                $v = (string) ($r['verb'] ?? '');
+                if ($v === '' || $v === 'land' || $v === 'launch') {
+                    continue;
+                }
+                $windowVerbs[] = $v;
+                if ($v === 'combine') {
+                    $ing = array_keys((array) (($r['args'] ?? [])['ingredients'] ?? []));
+                    sort($ing);
+                    $combineSigs[implode('+', $ing)] = true;
+                } elseif (in_array($v, self::ADVANCING_VERBS, true)) {
+                    $advancing++;
+                }
             }
-            if (count($distinct) <= 4 || $trade >= 6) {
-                return count($distinct) <= 2
-                    ? 'churn: ' . implode('/', $distinct) . ' on repeat, no progress'
-                    : 'no advancing action for ' . count($churn) . ' turns';
+            if (count($combineSigs) >= 2) {
+                $advancing += count($combineSigs);
+            }
+
+            if ($advancing === 0 && count($windowVerbs) >= 10) {
+                $trade = count(array_filter($windowVerbs, static fn(string $v): bool => $v === 'buy' || $v === 'sell'));
+                $distinct = array_values(array_unique($windowVerbs));
+                if ($trade >= 4 && in_array('buy', $windowVerbs, true) && in_array('sell', $windowVerbs, true)) {
+                    return 'buy/sell churn — trading in circles, nothing built (' . count($windowVerbs) . ' turns)';
+                }
+                if (count($distinct) <= 5) {
+                    return count($distinct) <= 2
+                        ? 'churn: ' . implode('/', $distinct) . ' on repeat, no progress'
+                        : 'no advancing action for ' . count($windowVerbs) . ' turns';
+                }
             }
         }
 

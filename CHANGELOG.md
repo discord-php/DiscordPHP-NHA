@@ -12,6 +12,23 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.1.37] - 2026-09-08
+
+### Fixed
+- `Brain\Stance::rank()` could latch the **capitalist** stance permanently. It
+  ranked capitalist on "fat credit pile + not currently holding
+  `composite>=2 && metal>=8`", but the capitalist steer sells surplus and never
+  lets the agent assemble those materials — so the exit condition could never
+  become true and the agent day-traded forever (observed live: endless
+  `buy carbon -> combine aluminium+carbon -> sell` with no `construct`).
+  Capitalist now also requires real market work — a contract whose `want` the
+  agent covers, or a raw stockpiled past the hoard cap. With neither, the agent
+  drops to homestead and spends its credits on a build.
+- `AutoPlayer::detectLoop()` no longer lets a single repeated `combine` set
+  (a production recipe, or one fixation) count as "advancing" — a window whose
+  only non-trade action is `combine aluminium+carbon` on repeat is now flagged
+  as churn. Two or more distinct combine sets still count as genuine research.
+
 ## [3.1.36] - 2026-09-08
 
 ### Fixed

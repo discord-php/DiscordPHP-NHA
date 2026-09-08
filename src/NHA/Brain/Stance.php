@@ -104,15 +104,59 @@ enum Stance: string
             return self::Expansionist;
         }
 
-        // 3. A fat credit pile and nothing to build with it.
+        // 3. A fat credit pile, nothing to build with it right now, AND real
+        //    market work to do. The market-work clause is load-bearing: without
+        //    it the stance latches. Capitalist's own steer sells surplus and
+        //    never lets the agent assemble metal + composite, so `$canBuildSoon`
+        //    can never flip true and it is stuck day-trading forever (observed:
+        //    endless "buy carbon → combine aluminum+carbon → sell" with no
+        //    `construct`). On the ground a build is always fundable from a credit
+        //    pile, so only hold Capitalist while a contract or a genuine glut
+        //    actually needs working.
         $credits = $has('credits');
         $canBuildSoon = $has('composite') >= 2 && $has('metal') >= 8;
-        if ($credits >= Ladder::CREDIT_FLOOR * 6 && ! $canBuildSoon) {
+        if ($credits >= Ladder::CREDIT_FLOOR * 6 && ! $canBuildSoon && self::hasMarketWork($raw, $inv)) {
             return self::Capitalist;
         }
 
         // 4. Dig in.
         return self::Homestead;
+    }
+
+    /**
+     * Whether the Capitalist stance has something to actually do: a contract
+     * whose `want` the agent already covers, or a raw stockpiled past the hoard
+     * cap that should be sold down. When neither holds, day-trading is just
+     * spinning and the agent belongs in Homestead spending its credits on a
+     * build.
+     *
+     * @param array<string,mixed> $raw
+     * @param array<string,mixed> $inv
+     */
+    private static function hasMarketWork(array $raw, array $inv): bool
+    {
+        foreach ((array) ($raw['contracts'] ?? []) as $c) {
+            $c = (array) $c;
+            $want = (array) ($c['want'] ?? []);
+            if ($want === []) {
+                continue;
+            }
+            $covered = true;
+            foreach ($want as $res => $qty) {
+                $covered = $covered && (int) ($inv[$res] ?? 0) >= (int) $qty;
+            }
+            if ($covered) {
+                return true;
+            }
+        }
+
+        foreach ($inv as $res => $qty) {
+            if ((string) $res !== 'credits' && is_numeric($qty) && (int) $qty > Ladder::HOARD_CAP) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** The stance-specific block spliced into the system prompt. */
