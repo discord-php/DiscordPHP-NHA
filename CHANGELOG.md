@@ -12,6 +12,21 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.1.21] - 2026-09-07
+
+### Fixed
+Turn-flow review (`AutoPlayer::step()`):
+- The forced-objective cursor is no longer advanced (nor the cooldown armed)
+  before `brain->decide()`. The turn now *peeks* the next objective for the
+  prompt and only commits the rotation (`bumpForcedObjective`) once the brain
+  call has returned — a transient brain failure no longer burns a rotation.
+  New `StateStore::peekNextForcedObjective()`.
+- The `research` loop-break no longer picks a tower material that is only at
+  its reserve — the combine guardrail would just block it, defeating the break.
+- A `wait` turn and a `🔁` skipped turn now record a `wait` decision, so a
+  wait/skip streak is visible to `detectLoop()` (previously invisible — the
+  log did not grow, so the loop guard never fired).
+
 ## [3.1.20] - 2026-09-07
 
 ### Fixed

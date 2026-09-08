@@ -390,9 +390,16 @@ final class AutoPlayer
         if ($objective === 'research') {
             $raws = [];
             foreach ($inv as $res => $qty) {
-                if (! in_array($res, ['credits', 'engine', 'motor', 'chip', 'frame', 'fuel'], true) && is_numeric($qty) && $qty > 0) {
-                    $raws[] = (string) $res;
+                if (in_array($res, ['credits', 'engine', 'motor', 'chip', 'frame', 'fuel'], true) || ! is_numeric($qty) || $qty <= 0) {
+                    continue;
                 }
+                // Skip a tower material that is only at (or below) its reserve —
+                // spending it on research would just be blocked by the guardrail.
+                $reserve = self::BUILD_MATERIAL_RESERVE[strtolower((string) $res)] ?? 0;
+                if ($reserve > 0 && (int) $qty <= $reserve) {
+                    continue;
+                }
+                $raws[] = (string) $res;
             }
             sort($raws);
             $count = count($raws);
@@ -553,7 +560,10 @@ final class AutoPlayer
             $loop = ($loopRaw !== null && (str_starts_with($loopRaw, 'stuck ') || ! $this->state->loopBreakCooldownActive($agent_id, $tick)))
                 ? $loopRaw
                 : null;
-            $loopObjective = $loop !== null ? $this->state->bumpForcedObjective($agent_id, $tick) : null;
+            // Only PEEK the objective for the prompt; the cursor is advanced (and
+            // the cooldown armed) inside the decide-then, once we actually apply
+            // it — so a failed brain call does not burn a rotation.
+            $loopObjective = $loop !== null ? $this->state->peekNextForcedObjective($agent_id) : null;
 
             $context = ($last ?? []);
             if (($pre['outcome'] ?? null) !== null) {
@@ -568,14 +578,21 @@ final class AutoPlayer
                 $context['forced_objective'] = $loopObjective;
             }
 
-            return $this->brain->decide($observation, $context ?: null)->then(function (?array $decision) use ($agent_id, $token, $tick, $observation, $known, $tried, $dead, $researchPaying, $recent, $loop, $loopObjective) {
+            $altNow = (int) ($observation->get('altitude') ?? 0);
+
+            return $this->brain->decide($observation, $context ?: null)->then(function (?array $decision) use ($agent_id, $token, $tick, $altNow, $observation, $known, $tried, $dead, $researchPaying, $recent, $loop, $loopObjective) {
                 if ($decision === null && $loopObjective === null) {
+                    // Record the pass so a wait-streak is visible to detectLoop.
+                    $this->state->recordDecision($agent_id, ['verb' => 'wait', 'args' => [], 'reason' => '', 'queued_intent' => null, 'tick' => $tick, 'alt' => $altNow]);
+
                     return "💤 Agent #{$agent_id}: brain chose to wait (tick {$tick}).";
                 }
 
-                // Stuck in a loop — override with a deterministic move for the
-                // rotated objective so the situation actually changes.
+                // Stuck in a loop — commit the objective rotation now (we know
+                // the brain call succeeded) and override with a deterministic
+                // move for it so the situation actually changes.
                 if ($loopObjective !== null) {
+                    $loopObjective = $this->state->bumpForcedObjective($agent_id, $tick);
                     $decision = $this->loopBreakDecision($loopObjective, $observation, $known, $tried, $dead, $tick);
                 }
 
@@ -626,6 +643,9 @@ final class AutoPlayer
                         };
                         $decision = $this->fallbackDecision($observation, $lead, $tried, $known, $researchPaying);
                         if ($decision === null) {
+                            // Record the skip so a skip-streak is visible to detectLoop.
+                            $this->state->recordDecision($agent_id, ['verb' => 'wait', 'args' => [], 'reason' => 'nothing to do', 'queued_intent' => null, 'tick' => $tick, 'alt' => $altNow]);
+
                             return "🔁 Agent #{$agent_id}: no research left and no infrastructure move available — skipped `{$sig}` (tick {$tick}).";
                         }
                     }
@@ -644,8 +664,6 @@ final class AutoPlayer
                 if (($decision['verb'] ?? '') === 'combine') {
                     $this->state->recordCombineSignature($agent_id, self::combineSignature((array) ($decision['args'] ?? [])));
                 }
-
-                $altNow = (int) ($observation->get('altitude') ?? 0);
 
                 return $this->nha->intentWithToken($agent_id, $token, $decision['verb'], $decision['args'])
                     ->then(function ($queued) use ($agent_id, $decision, $tick, $altNow, $loop, $loopObjective) {

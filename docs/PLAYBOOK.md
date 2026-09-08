@@ -34,27 +34,30 @@ flowchart TD
     obs --> downed{downed?}
     downed -- yes --> skipD[["&#129657; skip"]]
     downed -- no --> ctx["build context:<br/>&#8226; known &#8746; dead combine sigs<br/>&#8226; tried sigs &#40;whole run&#41;<br/>&#8226; noteInventorPoints &#8594; researchPaying<br/>&#8226; recent 12 decisions"]
-    ctx --> cd{loopBreakCooldownActive?}
-    cd -- yes --> decide
-    cd -- no --> detect[detectLoop recent]
-    detect --> isloop{loop found?}
-    isloop -- no --> decide
-    isloop -- yes --> bump["state.bumpForcedObjective<br/>explore &#8594; wealth &#8594; build &#8594; research"]
-    bump --> decide[["brain.decide observation, context"]]
-    decide --> forced{forced objective<br/>set this turn?}
-    forced -- yes --> lbd[loopBreakDecision objective<br/><i>overrides the brain</i>]
+    ctx --> detect["detectLoop recent<br/>&#40;a 'stuck land/launch' bypasses the cooldown&#41;"]
+    detect --> isloop{loop found &amp;<br/>not in cooldown?}
+    isloop -- yes --> peek["state.peekNextForcedObjective<br/>&#40;name it for the prompt; do NOT commit yet&#41;"]
+    peek --> decide
+    isloop -- no --> decide[["brain.decide observation, context"]]
+    decide --> waited{decision == null<br/>AND no forced objective?}
+    waited -- yes --> recW["record a 'wait'<br/>&#40;visible to detectLoop&#41;"] --> done
+    waited -- no --> forced{forced objective<br/>this turn?}
+    forced -- yes --> commit["state.bumpForcedObjective<br/>&#40;commit the rotation — brain call succeeded&#41;"]
+    commit --> lbd[loopBreakDecision objective<br/><i>overrides the brain</i>]
     forced -- no --> g1
     lbd --> g1
     g1{verb == combine?}
     g1 -- yes --> spent{"dead sig?<br/>OR &#40;not aluminium+carbon AND<br/>&#40;dips a build material below its reserve<br/>OR world-known OR already tried&#41;&#41;"}
     spent -- yes --> fb["record the blocked sig as tried,<br/>then fallbackDecision &#8594; the ladder"]
+    fb --> fbnull{ladder empty?}
+    fbnull -- yes --> recW
+    fbnull -- no --> rec
     spent -- no --> g2
     g1 -- no --> g2{verb == ride AND<br/>rode in the last 4 turns?}
     g2 -- yes --> fb2[fallbackDecision<br/>&quot;riding the elevator in circles&quot;]
     g2 -- no --> rec
-    fb --> rec
     fb2 --> rec
-    rec[if final verb == combine:<br/>state.recordCombineSignature] --> submit[NHA::intentWithToken<br/>state.recordDecision]
+    rec[if final verb == combine:<br/>state.recordCombineSignature] --> submit[NHA::intentWithToken<br/>state.recordDecision &#40;with altitude&#41;]
     submit --> done([&#129302; / &#9851;&#65039; / &#128260; status line])
 ```
 

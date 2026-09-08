@@ -509,6 +509,22 @@ class StateStore
     }
 
     /**
+     * The objective {@see bumpForcedObjective()} WOULD return next, without
+     * advancing the cursor or arming the cooldown — so the loop guard can name
+     * the objective in the brain prompt and only commit it once the turn
+     * actually applies it.
+     *
+     * @since 3.1.21
+     */
+    public function peekNextForcedObjective(int $agent_id): string
+    {
+        $prev = $this->data['agent_forced_objective'][(string) $agent_id] ?? null;
+        $idx = (is_array($prev) ? (int) ($prev['idx'] ?? -1) : -1);
+
+        return self::OBJECTIVE_ROTATION[($idx + 1) % count(self::OBJECTIVE_ROTATION)];
+    }
+
+    /**
      * The objective forced by the most recent loop break, or `null` once it has
      * aged out ({@see self::FORCED_OBJECTIVE_TTL_TICKS} ticks) — after which the
      * agent is back on the normal ladder.

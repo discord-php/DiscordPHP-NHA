@@ -144,18 +144,30 @@ class AutoPlayerTest extends NHAUnitTestCase
     {
         // The world no longer retains last turn's intent: getIntentStatus() maps
         // the 404/410 to a `gone` status, and the loop must drop the id so it is
-        // not re-polled forever.
-        $nha = $this->nhaWith(['tick' => 42, 'downed_until' => 0, 'position' => [1, 1], 'status' => 'gone', 'result' => '']);
+        // not re-polled forever. (clearQueuedIntent itself is covered in
+        // StateStoreTest; here we just check the turn wires it up and does not
+        // re-poll a stale id.)
+        $polled = [];
+        $http = $this->getMockBuilder(Http::class)->disableOriginalConstructor()->onlyMethods(['get', 'post'])->getMock();
+        $http->method('get')->willReturnCallback(function ($e) use (&$polled) {
+            $polled[] = (string) $e;
+
+            return resolve(['tick' => 42, 'downed_until' => 0, 'position' => [1, 1], 'status' => 'gone']);
+        });
+        $http->method('post')->willReturnCallback(fn() => resolve(['queued_intent' => 999]));
+        $nha = getMockNha();
+        (new \ReflectionProperty(NHA::class, 'nha_http'))->setValue($nha, $http);
+
         $state = new StateStore($this->statePath);
         $state->recordDecision(142287, ['verb' => 'combine', 'args' => [], 'reason' => 'x', 'queued_intent' => 3168877, 'tick' => 1]);
 
-        // Brain waits, so nothing new is recorded over the cleared id.
-        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"wait"}'), $state);
-        $player->step(142287, 'tok');
+        (new AutoPlayer($nha, $this->brainReturning('{"verb":"wait"}'), $state))->step(142287, 'tok');
+        $this->assertNull($state->getLastDecision(142287)['queued_intent'], 'the aged-out id is forgotten this turn');
 
-        $last = $state->getLastDecision(142287);
-        $this->assertNull($last['queued_intent'], 'the aged-out id is forgotten');
-        $this->assertSame('combine', $last['verb'], 'the decision itself is left intact');
+        // Next turn must NOT poll intent/3168877 again.
+        $polled = [];
+        (new AutoPlayer($nha, $this->brainReturning('{"verb":"wait"}'), $state))->step(142287, 'tok');
+        $this->assertEmpty(array_filter($polled, static fn(string $e): bool => str_contains($e, '3168877')), 'the stale id is never polled again');
     }
 
     /**
@@ -435,6 +447,35 @@ class AutoPlayerTest extends NHAUnitTestCase
         $this->assertCount(1, $this->posts);
         $this->assertNotSame('chop', $this->posts[0][1]['verb'], 'the loop was broken with a different action');
         $this->assertNotNull($state->getForcedObjective(142287, 50), 'an objective was forced');
+    }
+
+    /**
+     * @covers \NHA\Brain\AutoPlayer
+     * @covers \NHA\StateStore
+     */
+    public function testLoopBreakResearchDoesNotSpendAReserveMaterial(): void
+    {
+        $state = new StateStore($this->statePath);
+        // Rotate the cursor so the next forced objective is `research`.
+        $state->bumpForcedObjective(142287, 1); // explore
+        $state->bumpForcedObjective(142287, 1); // wealth
+        $state->bumpForcedObjective(142287, 1); // build
+        for ($i = 1; $i <= 8; $i++) {
+            $state->recordDecision(142287, ['verb' => 'chop', 'args' => ['n' => 1], 'reason' => '', 'queued_intent' => null, 'tick' => $i]);
+        }
+
+        // composite sits exactly at its reserve (2); wood/iron are spare.
+        $nha = $this->nhaWith([
+            'tick' => 200, 'downed_until' => 0, 'position' => [1, 1],
+            'inventory' => ['composite' => 2, 'wood' => 20, 'iron' => 20],
+        ]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"chop","args":{"n":1}}'), $state);
+
+        $player->step(142287, 'tok');
+
+        $this->assertSame('research', $state->getForcedObjective(142287, 200));
+        $this->assertSame('combine', $this->posts[0][1]['verb']);
+        $this->assertArrayNotHasKey('composite', $this->posts[0][1]['args']['ingredients'], 'the composite reserve is left alone');
     }
 
     /**
