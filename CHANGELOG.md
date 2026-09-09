@@ -12,6 +12,21 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.25] - 2026-09-09
+
+### Fixed
+- `build` was not in `ADVANCING_VERBS`, so a long stretch of `build engine`
+  toward the mega-bundle tripped the loop guard's "nothing built" churn check
+  every 12 turns and kept yanking the agent off the build to sell/mine.
+  Building real parts IS progress — `build` now counts as advancing (the
+  same-part-3x guard and dead-part list still catch a rejected-build spin).
+
+### Notes
+- The mega-bundle build is working: `loose_parts` reached 15/34 (all 12
+  engines + 3 frames) before this fix, with the 2 auto-miners feeding income.
+  It is slow — ~5000 credits of materials against ~30 credits/turn — but
+  steady and loop-free.
+
 ## [3.2.24] - 2026-09-09
 
 ### Fixed

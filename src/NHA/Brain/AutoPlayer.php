@@ -233,7 +233,7 @@ final class AutoPlayer
      * progress. {@see detectLoop()} flags a long stretch with zero of these.
      */
     private const ADVANCING_VERBS = [
-        'construct', 'finalize', 'combine', 'deploy', 'invest', 'fulfill',
+        'construct', 'finalize', 'combine', 'build', 'deploy', 'invest', 'fulfill',
         'plant', 'ally', 'accept_ally', 'attack', 'heal', 'distress',
     ];
 
