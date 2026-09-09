@@ -12,6 +12,15 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.32] - 2026-09-09
+
+### Fixed
+- **Hold no longer `dock`-spams.** `dock` needs an asteroid within 2 cells;
+  the hold block was returning `dock` for any asteroid in view, and with
+  loop-break suppressed while holding it spun on a `dock` that missed every
+  turn (nearest was dist 4). It now only `dock`s within range, `mine`s once
+  docked, and otherwise idles.
+
 ## [3.2.31] - 2026-09-09
 
 ### Fixed

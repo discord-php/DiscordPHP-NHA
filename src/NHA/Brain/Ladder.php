@@ -1260,8 +1260,18 @@ final class Ladder
                         return ['verb' => 'buy', 'args' => ['resource' => 'superalloy', 'n' => 1], 'why' => 'expansionist — stock a heat_shield for the Mars/Venus legs while holding'];
                     }
                 }
-                if ((array) ($raw['asteroids'] ?? []) !== [] && ! ($raw['docked'] ?? false)) {
-                    return ['verb' => 'dock', 'args' => [], 'why' => 'expansionist — dock the asteroid and mine while holding for a window'];
+                // Mine an asteroid only when one is genuinely dockable — `dock`
+                // needs to be within 2 cells, and loop-break is suppressed while
+                // holding, so a `dock` that keeps missing would spin forever.
+                if ($raw['docked'] ?? false) {
+                    return ['verb' => 'mine', 'args' => ['n' => 15], 'why' => 'expansionist — mine the docked asteroid while holding for a window'];
+                }
+                $near = 99;
+                foreach ((array) ($raw['asteroids'] ?? []) as $a) {
+                    $near = min($near, (int) (((array) $a)['dist'] ?? 99));
+                }
+                if ($near <= 2) {
+                    return ['verb' => 'dock', 'args' => [], 'why' => 'expansionist — dock the adjacent asteroid and mine while holding for a window'];
                 }
 
                 return self::noop($raw, 'expansionist — flight-ready ship in orbit; holding for a transfer window to open');

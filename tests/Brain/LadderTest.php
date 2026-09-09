@@ -500,6 +500,17 @@ class LadderTest extends NHAUnitTestCase
         // Fuelled + shielded + no asteroid → a real idle (deposit), never land / mine.
         $idle = Ladder::suggestion($orbit(['credits' => 4000, 'cryo_fuel' => 120, 'heat_shield' => 1]), [], [], false, 'expansionist');
         $this->assertContains($idle['verb'], ['deposit', 'move']);
+
+        // An asteroid in view but OUT of dock range (dist > 2) → idle, not a
+        // `dock` that would miss every turn (loop-break is suppressed here).
+        $far = $orbit(['credits' => 4000, 'cryo_fuel' => 120, 'heat_shield' => 1]);
+        $far['asteroids'] = [['id' => 1, 'x' => 40, 'y' => 40, 'dist' => 4]];
+        $this->assertContains(Ladder::suggestion($far, [], [], false, 'expansionist')['verb'], ['deposit', 'move']);
+
+        // …within range → dock it.
+        $near = $far;
+        $near['asteroids'] = [['id' => 1, 'x' => 40, 'y' => 40, 'dist' => 2]];
+        $this->assertSame('dock', Ladder::suggestion($near, [], [], false, 'expansionist')['verb']);
     }
 
     /**
