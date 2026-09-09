@@ -493,11 +493,13 @@ final class Ladder
 
     /**
      * The agent is parked in Earth orbit with a `depart`-capable ship and no
-     * transfer window is open — the "wait for the launch window" state. There
-     * is exactly one productive move here (top up fuel / shield, dock+mine an
-     * asteroid, else idle); {@see AutoPlayer} suppresses loop-break while this
-     * holds and forces the {@see stanceMove()} hold action so the model cannot
-     * thrash `mine`/`move`/`ride`/`land` in a place none of them help.
+     * window it can actually service is open — the "wait for the launch window"
+     * state. There is exactly one productive move here (top up fuel / shield,
+     * dock+mine an asteroid, else idle); {@see AutoPlayer} suppresses loop-break
+     * while this holds and forces the {@see stanceMove()} hold action so the
+     * model cannot thrash `mine`/`move`/`ride`/`land` where none of them help.
+     * A window that IS open but the agent cannot service (Venus with no
+     * `acid_skin`) still counts as holding — {@see departTarget()} is null.
      *
      * @param array<string,mixed> $raw
      */
@@ -512,13 +514,8 @@ final class Ladder
         if (($raw['expansion']['at_body'] ?? null) !== null || ! self::hasOrbitalShip($raw)) {
             return false;
         }
-        foreach ((array) ($raw['expansion']['windows'] ?? []) as $w) {
-            if (! empty(((array) $w)['open'])) {
-                return false; // a window IS open — let the depart logic run
-            }
-        }
 
-        return true;
+        return self::departTarget($raw) === null;
     }
 
     /** Destinations ordered cheapest-Δv first, with the protective items each arrival consumes. */

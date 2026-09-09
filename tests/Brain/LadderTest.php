@@ -477,13 +477,20 @@ class LadderTest extends NHAUnitTestCase
             'asteroids' => [],
         ];
 
-        // isHoldingForWindow: true here, false the moment a window opens.
+        // isHoldingForWindow: true here, false the moment a SERVICEABLE window opens.
         $held = $orbit(['credits' => 4000, 'cryo_fuel' => 2, 'heat_shield' => 1]);
         $this->assertTrue(Ladder::isHoldingForWindow($held, 'expansionist'));
         $open = $held;
         $open['expansion']['windows']['deimos'] = ['open' => true];
+        $open['inventory']['cryo_fuel'] = 80;
         $this->assertFalse(Ladder::isHoldingForWindow($open, 'expansionist'));
         $this->assertFalse(Ladder::isHoldingForWindow($held, 'homestead'));
+
+        // A window that is open but UNSERVICEABLE (Venus, no acid_skin) still holds.
+        $venusOnly = $held;
+        $venusOnly['expansion']['windows'] = ['venus' => ['open' => true]];
+        $venusOnly['inventory']['cryo_fuel'] = 120;
+        $this->assertTrue(Ladder::isHoldingForWindow($venusOnly, 'expansionist'));
 
         // Under-fuelled + credits → stock cryo_fuel toward the transfer reserve.
         $buyFuel = Ladder::suggestion($held, [], [], false, 'expansionist');

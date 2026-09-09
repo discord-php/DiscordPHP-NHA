@@ -12,6 +12,14 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.31] - 2026-09-09
+
+### Fixed
+- **Unserviceable open window no longer strands the ship.** `isHoldingForWindow()`
+  now keys off `departTarget()` — a window that is open but the agent cannot
+  service (Venus with no `acid_skin`) counts as holding, so the agent docks and
+  mines while it waits instead of thrashing `chop`/`dock`/`mine` in orbit limbo.
+
 ## [3.2.30] - 2026-09-09
 
 ### Fixed
