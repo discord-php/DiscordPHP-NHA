@@ -187,6 +187,23 @@ trait LoopStrategyStateTrait
     }
 
     /**
+     * Forgets every `depart` verdict for an agent — the retry cooldown and the
+     * unreachable set. Called when a new hull is `finalize`d so the fresh ship
+     * is not pre-judged by the dead end it replaced.
+     *
+     * @since 3.2.36
+     */
+    public function clearDepartRejections(int $agent_id): void
+    {
+        $key = (string) $agent_id;
+        if (! isset($this->data['agent_depart_block'][$key]) && ! isset($this->data['agent_depart_unreachable'][$key])) {
+            return;
+        }
+        unset($this->data['agent_depart_block'][$key], $this->data['agent_depart_unreachable'][$key]);
+        $this->save();
+    }
+
+    /**
      * Records the agent's stance. `$tick` is only stamped when the stance
      * actually changes, so it marks the last *switch* for the dwell timer.
      *

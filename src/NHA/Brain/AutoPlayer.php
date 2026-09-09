@@ -707,9 +707,10 @@ final class AutoPlayer
             ? (string) (($last['args'] ?? [])['dest'] ?? '')
             : '';
         $lastDepartTick = (int) ($last['tick'] ?? 0);
+        $lastWasFinalize = $last !== null && ($last['verb'] ?? '') === 'finalize';
         $outcome = $lastQueued !== null
             ? $this->nha->intents->getIntentStatus($lastQueued)->then(
-                function ($s) use ($agent_id, $lastQueued, $lastCombineSig, $lastDepartDest, $lastDepartTick): array {
+                function ($s) use ($agent_id, $lastQueued, $lastCombineSig, $lastDepartDest, $lastDepartTick, $lastWasFinalize): array {
                     $status = (string) ($s->status ?? '?');
 
                     // Settled or aged out: forget the id so the next turn does
@@ -767,6 +768,13 @@ final class AutoPlayer
                                 }
                             }
                         }
+                    }
+
+                    // A fresh hull came off the pad — wipe the previous ship's
+                    // depart verdicts so the new one is judged on its own gear
+                    // and thrust, not the dead end it replaced.
+                    if ($lastWasFinalize && $status === 'applied') {
+                        $this->state->clearDepartRejections($agent_id);
                     }
 
                     return ['status' => $status, 'result' => (string) ($s->result ?? '')];

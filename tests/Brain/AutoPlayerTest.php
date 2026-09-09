@@ -1192,6 +1192,34 @@ class AutoPlayerTest extends NHAUnitTestCase
     }
 
     /**
+     * `finalize`-ing a new hull wipes the previous ship's depart verdicts, so
+     * the fresh (gear-carrying) flyer is judged on its own merits.
+     *
+     * @covers \NHA\Brain\AutoPlayer::step
+     */
+    public function testFinalizingANewShipClearsTheStaleDepartVerdicts(): void
+    {
+        $state = new StateStore($this->statePath);
+        foreach (['deimos', 'phobos', 'mars'] as $d) {
+            $state->recordDepartRejection(142287, $d, 400, true);
+        }
+        $state->recordDecision(142287, ['verb' => 'finalize', 'args' => [], 'reason' => '', 'queued_intent' => 999, 'tick' => 498]);
+        $this->assertSame(['deimos', 'phobos', 'mars'], $state->departUnreachable(142287));
+
+        $nha = $this->nhaWith([
+            'tick' => 500, 'downed_until' => 0, 'position' => [10, 10],
+            'in_space' => false, 'altitude' => 0, 'status' => 'applied',
+            'inventory' => ['credits' => 3000, 'stimpack' => 1, 'kinetic_gun' => 1, 'slug' => 5],
+            'vehicles' => [['name' => 'flyer2', 'flies' => true, 'orbital_engine' => true]],
+        ]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"mine","args":{"n":1}}'), $state);
+
+        $player->step(142287, 'tok');
+
+        $this->assertSame([], $state->departUnreachable(142287), 'the new hull starts with a clean slate');
+    }
+
+    /**
      * A loop-break research pass must never `combine` away survival gear.
      *
      * @covers \NHA\Brain\AutoPlayer::loopBreakDecision
