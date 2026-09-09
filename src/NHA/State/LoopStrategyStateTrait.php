@@ -121,7 +121,7 @@ trait LoopStrategyStateTrait
 
     /**
      * The agent's persisted strategic stance and the tick it last changed
-     * (`{stance, tick}`). Defaults to `homestead` at tick 0.
+     * (`{stance, tick}`). Defaults to `expansionist` (the mission stance) at tick 0.
      *
      * @return array{stance: string, tick: int}
      *
@@ -132,7 +132,7 @@ trait LoopStrategyStateTrait
         $e = $this->data['agent_stance'][(string) $agent_id] ?? null;
 
         return [
-            'stance' => is_array($e) ? (string) ($e['stance'] ?? 'homestead') : 'homestead',
+            'stance' => is_array($e) ? (string) ($e['stance'] ?? 'expansionist') : 'expansionist',
             'tick' => is_array($e) ? (int) ($e['tick'] ?? 0) : 0,
         ];
     }

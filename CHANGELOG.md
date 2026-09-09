@@ -12,6 +12,23 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.15] - 2026-09-09
+
+### Changed
+- **Stances now serve the one goal (the Solar Accord) and nothing else.**
+  `Stance::rank()` has two answers: `aggressive` (a live fight — survival is a
+  precondition, so it pre-empts) or `expansionist` (every other turn). It never
+  returns `homestead` ("dig in, do NOT fly") or `capitalist` ("credits are the
+  game") — those steer *away* from the mission, and the expansionist ladder
+  already arms, stockpiles and banks a glut as tactics in service of the flight.
+  The two cases stay in the enum only for a stale stored value (corrected on the
+  next `pick()` — the mission does not wait out the 40-tick dwell) and the
+  ladder's contract tactic; their briefings now point back at the mission.
+- Dropped the "weak passer-by within reach → `aggressive`" clause: hunting does
+  not further the Accord and only risks a `wanted` tag. Aggressive is now purely
+  defensive and hands straight back to `expansionist` once the threat is stale.
+- Defaults (`Playbook::systemPrompt()`, `getStance()`) default to `expansionist`.
+
 ## [3.2.14] - 2026-09-08
 
 ### Fixed

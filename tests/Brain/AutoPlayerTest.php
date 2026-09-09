@@ -177,10 +177,12 @@ class AutoPlayerTest extends NHAUnitTestCase
     public function testStepDropsACombineTheWorldAlreadyInventedAndFallsToInfrastructure(): void
     {
         // GET /rules (same mock as observe) reports glass+wood as a known recipe;
-        // the agent holds the composite + metal a tower needs.
+        // the agent holds the composite + metal a tower needs, and ship assembly
+        // is a proven dead end (3 inert hulls) so towers are the fallback.
         $nha = $this->nhaWith([
             'tick' => 42, 'downed_until' => 0, 'position' => [1, 1],
             'inventory' => ['composite' => 3, 'metal' => 12],
+            'vehicles' => array_fill(0, 3, ['name' => 'hull', 'drives' => false, 'flies' => false, 'fuel_cap' => 0]),
             'dynamic' => [['sig' => 'glass,wood']],
         ]);
         $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"combine","args":{"ingredients":{"glass":1,"wood":1}}}'), new StateStore($this->statePath));
@@ -229,6 +231,7 @@ class AutoPlayerTest extends NHAUnitTestCase
             'tick' => 5, 'downed_until' => 0, 'position' => [1, 1],
             'in_space' => true, 'altitude' => 60, 'inventor_points' => 50,
             'inventory' => ['water' => 70, 'wood' => 65, 'crystal' => 17],
+            'vehicles' => [['name' => 'skiff', 'flies' => true, 'orbital_engine' => true]],
             'dynamic' => [['sig' => 'glass,wood']],
         ]);
         $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"combine","args":{"ingredients":{"glass":1,"wood":1}}}'), $state);
@@ -348,11 +351,14 @@ class AutoPlayerTest extends NHAUnitTestCase
         $state = new StateStore($this->statePath);
         $state->recordDecision(142287, ['verb' => 'land', 'args' => [], 'reason' => '', 'queued_intent' => null, 'tick' => 1]);
 
-        // Last transit was 19 turns ago — the agent has earned the trip.
+        // Last transit was 19 turns ago — the agent has earned the trip. It is
+        // flight-ready (a finalized orbital ship + fuel), so `launch` is not
+        // swapped for gearing; only the dwell gate is under test here.
         $nha = $this->nhaWith([
             'tick' => 20, 'downed_until' => 0, 'position' => [10, 10],
             'in_space' => false, 'altitude' => 0,
-            'inventory' => [],
+            'inventory' => ['cryo_fuel' => 3],
+            'vehicles' => [['name' => 'runner', 'flies' => true, 'orbital_engine' => true]],
             'nearby_deposits' => [['resource' => 'iron', 'dist' => 0, 'amount' => 20]],
         ]);
         $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"launch","args":{}}'), $state);
@@ -767,8 +773,10 @@ class AutoPlayerTest extends NHAUnitTestCase
         $player->step(142287, 'tok');
 
         $this->assertNotSame('combine', $this->posts[0][1]['verb'], 'the metal reserve is protected');
-        $this->assertSame('buy', $this->posts[0][1]['verb'], 'credits go toward composite instead');
-        $this->assertContains($this->posts[0][1]['args']['resource'], ['aluminum', 'carbon']);
+        $this->assertSame('buy', $this->posts[0][1]['verb'], 'credits go toward the mission instead');
+        // Mission-first: a credit-rich grounded agent gears a ship, so the spare
+        // credits buy the `ion_thruster` rather than tower feedstock.
+        $this->assertSame('ion_thruster', $this->posts[0][1]['args']['resource']);
     }
 
     /**

@@ -82,9 +82,9 @@ final class Playbook
      * The ladder here mirrors {@see Ladder::suggestion()}; both are
      * diagrammed in `docs/PLAYBOOK.md` — update it whenever either changes.
      *
-     * @param string $stance One of {@see Stance}'s values; defaults to homestead.
+     * @param string $stance One of {@see Stance}'s values; defaults to expansionist (the mission stance).
      */
-    public static function systemPrompt(string $stance = 'homestead'): string
+    public static function systemPrompt(string $stance = 'expansionist'): string
     {
         $catalogue = implode("\n", array_map(
             static fn(string $verb, string $hint): string => "- {$verb}: {$hint}",
@@ -92,7 +92,7 @@ final class Playbook
             self::VERBS,
         ));
 
-        $briefing = (Stance::tryFrom($stance) ?? Stance::Homestead)->briefing();
+        $briefing = (Stance::tryFrom($stance) ?? Stance::Expansionist)->briefing();
 
         return <<<PROMPT
             You control ONE agent in No-Human-Allowed (NHA), a deterministic tick-based world (1 tick / 2s,

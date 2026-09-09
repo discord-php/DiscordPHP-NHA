@@ -19,13 +19,20 @@ namespace NHA\Brain;
  * lightly reorders the deterministic ladder {@see Ladder::suggestion()}, but
  * the survive / defend / arm rungs and the anti-patterns always apply.
  *
- *  - `homestead`   — dig in: stockpile, build towers, hold ground. The default.
- *  - `aggressive`  — a fight is on or a soft target is near, and you are armed:
- *                    press it, keep ammo topped, take bounties.
- *  - `capitalist`  — sitting on a fat credit pile with nothing to build: work
- *                    the depot / market / contracts, buy low and sell high.
- *  - `expansionist`— you are in space, on a body, or a transit window is open
- *                    and you can fly: ride up, invest, extract, colonise.
+ * There is exactly one goal — the **Solar Accord** (Mars terraformed, Venus
+ * held, a Moon base) — and stances exist only to serve it:
+ *
+ *  - `expansionist` — the mission stance, and the answer for every non-combat
+ *                     turn: gear a ship on Earth, fly, colonise, terraform.
+ *                     Arming, stockpiling and banking a surplus are tactics the
+ *                     expansionist ladder already does in service of the flight.
+ *  - `aggressive`   — you are being attacked and can fight back. Survival is a
+ *                     precondition for the mission, so this pre-empts it; then
+ *                     it hands straight back to `expansionist`.
+ *  - `homestead` / `capitalist` — legacy. "Dig in, do not fly" and "credits are
+ *                     the game" are not mission strategies, so {@see rank()}
+ *                     never chooses them; the cases remain only for a stored
+ *                     value mid-dwell and the ladder's contract tactic.
  *
  * @since 3.1.23
  */
@@ -41,8 +48,9 @@ enum Stance: string
 
     /**
      * Picks the stance for this turn from the observation, holding the current
-     * one unless a switch is clearly warranted (hysteresis). `aggressive` is the
-     * one stance that can pre-empt the dwell timer — a fight will not wait.
+     * one unless a switch is clearly warranted (hysteresis). `aggressive` (a
+     * fight) and `expansionist` (progress toward the Accord) both pre-empt the
+     * dwell timer — neither the fight nor the mission waits.
      *
      * @param array<string,mixed> $raw          The normalised observation.
      * @param string              $current      The stance in force (its `value`).
@@ -51,21 +59,27 @@ enum Stance: string
     public static function pick(array $raw, string $current, int $lastSwitchAt): self
     {
         $now = (int) ($raw['tick'] ?? 0);
-        $currentStance = self::tryFrom($current) ?? self::Homestead;
+        $currentStance = self::tryFrom($current) ?? self::Expansionist;
         $want = self::rank($raw);
 
         if ($want === $currentStance) {
             return $currentStance;
         }
-        // Combat is urgent; everything else waits out the dwell timer.
-        if ($want === self::Aggressive || ($now - $lastSwitchAt) >= self::MIN_DWELL_TICKS) {
+        if ($want === self::Aggressive || $want === self::Expansionist || ($now - $lastSwitchAt) >= self::MIN_DWELL_TICKS) {
             return $want;
         }
 
         return $currentStance;
     }
 
-    /** The stance the situation argues for, ignoring hysteresis. */
+    /**
+     * The stance the situation argues for, ignoring hysteresis. Only two
+     * answers: defend a live fight, or — for everything else — drive the
+     * mission. `homestead` / `capitalist` are never returned: holding ground
+     * and day-trading do not move the agent toward the Solar Accord, and the
+     * expansionist ladder already arms, stockpiles and banks a glut as tactics
+     * in service of the flight.
+     */
     private static function rank(array $raw): self
     {
         $inv = (array) ($raw['inventory'] ?? []);
@@ -73,101 +87,36 @@ enum Stance: string
         $tick = (int) ($raw['tick'] ?? 0);
         $armed = ($has('kinetic_gun') > 0 && $has('slug') > 0) || ($has('energy_weapon') > 0 && $has('energy_cell') > 0);
 
-        // 1. A live fight, and the means to fight back.
+        // A live fight, and the means to fight back — survival first, then the
+        // mission resumes. (Picking a fight with a passer-by is NOT a stance:
+        // it does not further the Accord and only invites a `wanted` tag.)
         foreach ((array) ($raw['alerts'] ?? []) as $a) {
             $a = (array) $a;
             if (in_array((string) ($a['kind'] ?? ''), ['attacked', 'robbed', 'hit'], true) && $tick - (int) ($a['tick'] ?? 0) <= 30 && $armed) {
                 return self::Aggressive;
             }
         }
-        // A soft target within reach while armed.
-        if ($armed) {
-            $myHp = (float) ($raw['hp'] ?? 100);
-            foreach ((array) ($raw['nearby_agents'] ?? []) as $ag) {
-                $ag = (array) $ag;
-                if ((int) ($ag['dist'] ?? 99) <= 15 && (float) ($ag['hp'] ?? 100) < $myHp * 0.6) {
-                    return self::Aggressive;
-                }
-            }
-        }
 
-        // 2. THE MISSION — expansion toward the Solar Accord is the default drive.
-        //    Off Earth or arrived at a body: obviously expansionist. On Earth:
-        //    expansionist the moment the agent is minimally geared (a weapon +
-        //    ammo AND a medicine), because from then on every turn should be a
-        //    step toward a body. Homestead is only the "not even survivable yet"
-        //    early phase.
-        $expansion = (array) ($raw['expansion'] ?? []);
-        if (($raw['in_space'] ?? false) || ($expansion['at_body'] ?? null) !== null) {
-            return self::Expansionist;
-        }
-        $hasMedicine = $has('medkit') > 0 || $has('stimpack') > 0 || $has('salve') > 0 || $has('antidote') > 0;
-        if ($armed && $hasMedicine) {
-            return self::Expansionist;
-        }
-
-        // 3. A fat credit pile with real market work to do (a covered contract or
-        //    a glut past the hoard cap) — bank it, then it funds the mission.
-        //    The market-work clause is load-bearing: without it the stance
-        //    latches (Capitalist sells surplus and never lets the agent gear up).
-        $credits = $has('credits');
-        if ($credits >= Ladder::CREDIT_FLOOR * 6 && self::hasMarketWork($raw, $inv)) {
-            return self::Capitalist;
-        }
-
-        // 4. Early game — gear up on Earth first.
-        return self::Homestead;
-    }
-
-    /**
-     * Whether the Capitalist stance has something to actually do: a contract
-     * whose `want` the agent already covers, or a raw stockpiled past the hoard
-     * cap that should be sold down. When neither holds, day-trading is just
-     * spinning and the agent belongs in Homestead spending its credits on a
-     * build.
-     *
-     * @param array<string,mixed> $raw
-     * @param array<string,mixed> $inv
-     */
-    private static function hasMarketWork(array $raw, array $inv): bool
-    {
-        foreach ((array) ($raw['contracts'] ?? []) as $c) {
-            $c = (array) $c;
-            $want = (array) ($c['want'] ?? []);
-            if ($want === []) {
-                continue;
-            }
-            $covered = true;
-            foreach ($want as $res => $qty) {
-                $covered = $covered && (int) ($inv[$res] ?? 0) >= (int) $qty;
-            }
-            if ($covered) {
-                return true;
-            }
-        }
-
-        foreach ($inv as $res => $qty) {
-            if ((string) $res !== 'credits' && is_numeric($qty) && (int) $qty > Ladder::HOARD_CAP) {
-                return true;
-            }
-        }
-
-        return false;
+        // Everything else is the mission.
+        return self::Expansionist;
     }
 
     /** The stance-specific block spliced into the system prompt. */
     public function briefing(): string
     {
         return match ($this) {
-            self::Homestead => 'STANCE: HOMESTEAD — dig in. Stockpile each raw to a working reserve, then `construct` '
-                . 'TALL varied towers and claim a `monument` title. Keep a weapon + ammo + a medicine on hand. '
-                . 'Do NOT fly, raid, or day-trade; hold your ground and out-build rivals.',
-            self::Aggressive => 'STANCE: AGGRESSIVE — you are armed and a target or a fight is in reach. Keep ammo '
-                . 'topped (`buy slug`/`energy_cell`), close to weapon range, and `attack` the weakest hostile or an '
-                . 'open bounty. Break off and `heal` below ~35% HP. Do not chase a fight you cannot win.',
-            self::Capitalist => 'STANCE: CAPITALIST — credits are the game now. `sell` surplus raws high, `fulfill` '
-                . 'contracts whose `want` you cover, post `order`s to buy low / sell high, and only `construct` when '
-                . 'a tower is basically free. Bank the pile, then convert it to builder points later.',
+            self::Homestead => 'STANCE: HOMESTEAD (bootstrap for the mission) — you are not geared for the Accord yet. '
+                . 'Buy a weapon + ammo + a medicine, stockpile the metal / composite / credits a ship needs, then '
+                . 'gear that ship. Towers are only a credit faucet while you save — the goal is the Solar Accord, so '
+                . 'switch to gearing the moment you can afford to.',
+            self::Aggressive => 'STANCE: AGGRESSIVE (defend, then resume) — you are under attack and armed. Keep ammo '
+                . 'topped (`buy slug`/`energy_cell`), stay at weapon range, and `attack` the one who hit you. Break off '
+                . 'and `heal` below ~35% HP. Do NOT hunt passers-by or chase a bounty — clear the threat and get back '
+                . 'to the mission.',
+            self::Capitalist => 'STANCE: CAPITALIST (fund the mission) — you are sitting on credits the Accord needs '
+                . 'spent. `fulfill` a contract whose `want` you already cover, or `sell` a glut past its cap, then pour '
+                . 'the cash into ship parts, `heat_shield` / `acid_skin` inputs, or an open colony / terraform / Station '
+                . 'board. Do not day-trade for its own sake.',
             self::Expansionist => 'STANCE: EXPANSIONIST — drive for the Solar Accord (Mars terraformed, Venus held, a '
                 . 'Moon base). On a body: `land_body`/`land_moon`, then `construct{shape:colony|extractor|terraform}` '
                 . 'and fund the board — this is the win. In Earth orbit with a fuelled ion-thruster ship and an open '

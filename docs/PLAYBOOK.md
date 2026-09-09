@@ -34,7 +34,7 @@ flowchart TD
     rules[knownCombines&#40;&#41;<br/>re-pull GET /rules &#8804; every 90s] --> obs[NHA::observe]
     obs --> downed{downed?}
     downed -- yes --> skipD[["&#129657; skip"]]
-    downed -- no --> stance["Stance::pick &#8594; homestead / aggressive /<br/>capitalist / expansionist<br/>&#40;hysteresis; persisted&#41;"]
+    downed -- no --> stance["Stance::pick &#8594; aggressive &#40;defend&#41; / expansionist &#40;the mission&#41;<br/>&#40;persisted&#41;"]
     stance --> combat{Ladder::defensiveAction<br/>&#40;recent attack / robber / hostile closing while hurt&#41;?}
     combat -- yes --> defend[["&#128737;&#65039; heal / attack back / break contact<br/>&#8594; submit &amp; record, skip the brain entirely"]]
     combat -- no --> ctx["build context:<br/>&#8226; known &#8746; dead combine sigs<br/>&#8226; tried sigs &#40;whole run&#41;<br/>&#8226; noteInventorPoints &#8594; researchPaying<br/>&#8226; recent 12 decisions"]
@@ -125,30 +125,29 @@ two raws each sit `RESEARCH_SURPLUS` deep.
 
 ## Stances — `Stance` ([`Stance.php`](../src/NHA/Brain/Stance.php))
 
-Picked each turn by `Stance::pick()` from the observation, with hysteresis
-(`MIN_DWELL_TICKS` 40) so it does not flip-flop — `aggressive` is the only one
-that pre-empts the dwell timer. Persisted in `state.json` (`agent_stance`). The
-stance re-flavours the system prompt (`Stance::briefing()`, spliced at the top)
-and adds ladder rung 1d; everything else — survive, defend, arm, the
-anti-patterns — is stance-independent.
+Picked each turn by `Stance::pick()` from the observation. There is one goal —
+the **Solar Accord** — so `rank()` has only two answers: **defend a live fight**
+(`aggressive`) or **drive the mission** (`expansionist`). Both pre-empt the
+`MIN_DWELL_TICKS` (40) hysteresis — neither a fight nor progress toward the
+Accord waits. `homestead` / `capitalist` are never ranked (holding ground and
+day-trading are not mission strategies); the cases survive only for a stored
+value read mid-dwell and the ladder's contract tactic. Persisted in
+`state.json` (`agent_stance`). The stance re-flavours the system prompt
+(`Stance::briefing()`) and adds ladder rung 1d; survive / defend / arm / the
+anti-patterns are stance-independent.
 
 ```mermaid
 flowchart TD
-    p([Stance::rank]) --> a{recent attack &amp; armed,<br/>OR a weaker agent &#8804; 15 &amp; armed?}
-    a -- yes --> AGG([aggressive])
-    a -- no --> e{in space / on a body,<br/>OR window open + thruster + fuel?}
-    e -- yes --> EXP([expansionist])
-    e -- no --> c{credits &#8805; 6 &#215; floor<br/>AND cannot build soon?}
-    c -- yes --> CAP([capitalist])
-    c -- no --> HOM([homestead — the default])
+    p([Stance::rank]) --> a{recent attack &amp; armed?}
+    a -- yes --> AGG([aggressive — defend, then resume])
+    a -- no --> EXP([expansionist — the mission, always])
 ```
 
 | stance | prompt steer + rung 1d |
 |---|---|
-| `homestead`   | dig in — stockpile, `construct` tall/varied, hold ground. No rung-1d move (the generic ladder is already this). |
-| `aggressive`  | keep the magazine deep (`buy slug` ×10 to 15), `move` to close on the weakest reachable agent so the combat rung finishes it. |
-| `capitalist`  | `fulfill` a contract you already cover; else `sell` any raw > 40 down to 30 regardless of the credit floor. |
-| `expansionist`| `construct shape=extractor` on a body · `dock` a nearby asteroid · else walk to an `elevator` when stocked. |
+| `expansionist`| the mission stance for every non-combat turn — gear a ship, fly, `construct shape=colony/extractor/terraform` on a body, `dock` an asteroid, `invest` spare credits, else stockpile/earn toward the flight. Falls back to towers only once ship assembly is a proven dead end (`shipBuildStuck`: 3+ inert hulls). |
+| `aggressive`  | defensive only — keep the magazine deep (`buy slug`), stay at weapon range and `attack` the agent who hit you, `heal` below ~35% HP; do **not** hunt passers-by or bounties. Hands back to `expansionist` once the threat is stale. |
+| `homestead` / `capitalist` | not ranked. If a stale value is read mid-dwell the briefing points back at the mission (bootstrap the kit / fund the boards). |
 
 ---
 
