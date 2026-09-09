@@ -66,6 +66,14 @@ final class GameData
     ];
 
     /**
+     * Destinations whose `depart` also demands a `landing_gear` part ON the ship
+     * (`engine.py`: `need_gear = target in ("deimos", "phobos", "mars")` — Venus
+     * is a cloud-deck aerostat, no touchdown). A gearless flyer clears the
+     * TWR/Δv gates and is still rejected here, so {@see assess()} folds it in.
+     */
+    public const GEAR_BODIES = ['deimos', 'phobos', 'mars'];
+
+    /**
      * Per-part integer physics constants (`vehicles.py` `PART`). A `build{part}`
      * with no `with:` adds exactly this row to the bundle.
      *
@@ -404,7 +412,8 @@ final class GameData
             $depart[$dest] = $stats['flies']
                 && $stats['controllable']
                 && $orbital
-                && $thrust >= $twr * self::GRAVITY * $mass;
+                && $thrust >= $twr * self::GRAVITY * $mass
+                && (! in_array($dest, self::GEAR_BODIES, true) || ($stats['gear'] ?? 0) >= 1);
         }
 
         return $stats + [

@@ -748,10 +748,25 @@ final class AutoPlayer
                     // destination as unreachable for the run.
                     if ($lastDepartDest !== '' && $status === 'rejected') {
                         $why = strtolower((string) ($s->result ?? ''));
-                        $permanent = str_contains($why, 'thrust/(mass')
+                        // Permanent for THIS hull: thrust-to-weight it can never
+                        // meet, or a missing part `finalize` cannot add now
+                        // (landing_gear for the moons / Mars).
+                        $noGear = str_contains($why, 'landing gear');
+                        $permanent = $noGear
+                            || str_contains($why, 'thrust/(mass')
                             || str_contains($why, 'thrust-to-weight')
                             || str_contains($why, 'ion_thruster (orbital drive)');
                         $this->state->recordDepartRejection($agent_id, $lastDepartDest, $lastDepartTick, $permanent);
+                        // A gearless hull fails IDENTICALLY for every body that
+                        // needs a touchdown — park them all at once so the agent
+                        // reaches "rebuild" without burning a window on each.
+                        if ($noGear) {
+                            foreach (GameData::GEAR_BODIES as $body) {
+                                if ($body !== $lastDepartDest) {
+                                    $this->state->recordDepartRejection($agent_id, $body, $lastDepartTick, true);
+                                }
+                            }
+                        }
                     }
 
                     return ['status' => $status, 'result' => (string) ($s->result ?? '')];
@@ -833,8 +848,15 @@ final class AutoPlayer
             $departCooldown = $this->state->departRetryCooldownActive($agent_id, $tick);
             $departServiceable = Ladder::departTarget($rawObs, $departUnreachable); // null unless a window we can take is open
             $departNow = $departServiceable !== null && ! $departCooldown;
-            $holdingForWindow = Ladder::isHoldingForWindow($rawObs, $stance, $departUnreachable)
-                || ($departCooldown && ($rawObs['in_space'] ?? false) && Ladder::hasOrbitalShip($rawObs));
+            // The current hull has been `depart`-rejected for every body — a
+            // dead end. Don't hold or force-depart; let the ladder gear a fresh
+            // (gear-carrying) flyer.
+            $shipStranded = Ladder::hasOrbitalShip($rawObs)
+                && ! Ladder::hasDepartCapableShip($rawObs, $departUnreachable);
+            $holdingForWindow = ! $shipStranded && (
+                Ladder::isHoldingForWindow($rawObs, $stance, $departUnreachable)
+                || ($departCooldown && ($rawObs['in_space'] ?? false) && Ladder::hasOrbitalShip($rawObs))
+            );
             $loopRaw = self::detectLoop($recent);
             $loop = ($loopRaw !== null && ! $holdingForWindow
                 && (str_starts_with($loopRaw, 'stuck ') || ! $this->state->loopBreakCooldownActive($agent_id, $tick)))
@@ -860,7 +882,7 @@ final class AutoPlayer
 
             $altNow = (int) ($observation->get('altitude') ?? 0);
 
-            return $this->brain->decide($observation, $context ?: null, $stance)->then(function (?array $decision) use ($agent_id, $token, $tick, $altNow, $observation, $rawObs, $known, $tried, $dead, $researchPaying, $recent, $loop, $loopObjective, $stance, $holdingForWindow, $departNow, $departServiceable, $departCooldown) {
+            return $this->brain->decide($observation, $context ?: null, $stance)->then(function (?array $decision) use ($agent_id, $token, $tick, $altNow, $observation, $rawObs, $known, $tried, $dead, $researchPaying, $recent, $loop, $loopObjective, $stance, $holdingForWindow, $departNow, $departServiceable, $departCooldown, $departUnreachable, $shipStranded) {
                 if ($decision === null && $loopObjective === null && ! $holdingForWindow) {
                     // Record the pass so a wait-streak is visible to detectLoop.
                     $this->state->recordDecision($agent_id, ['verb' => 'wait', 'args' => [], 'reason' => '', 'queued_intent' => null, 'tick' => $tick, 'alt' => $altNow]);
@@ -965,8 +987,9 @@ final class AutoPlayer
                     $held = (array) $observation->getInventory();
                     $fuelled = ($held['hydrogen'] ?? 0) > 0 || ($held['cryo_fuel'] ?? 0) > 0 || ($held['helium3'] ?? 0) > 0;
                     // A loose `ion_thruster` resource is not a ship — only a
-                    // `finalize`d orbital vehicle clears the flight verbs.
-                    $ready = $fuelled && Ladder::hasOrbitalShip($rawObs);
+                    // `finalize`d orbital vehicle clears the flight verbs, and a
+                    // hull rejected for every body doesn't count.
+                    $ready = $fuelled && Ladder::hasDepartCapableShip($rawObs, $departUnreachable);
                     if (! $ready) {
                         $gear = $this->fallbackDecision($observation, 'stay on the mission — gear the ship, do not ' . ($vanityTower ? 'raise another spire' : 'ride to an empty orbit'), $tried, $known, $researchPaying, $stance);
                         if ($gear !== null && ($gear['verb'] ?? '') !== $verb) {
@@ -1001,7 +1024,7 @@ final class AutoPlayer
                         if ($departNow) {
                             $decision = ['verb' => 'depart', 'args' => ['dest' => $departServiceable], 'reason' => "{$departServiceable} is the serviceable window — go there instead"];
                         } else {
-                            $hold = Ladder::suggestion($rawObs, $tried, $known, false, $stance);
+                            $hold = Ladder::suggestion($rawObs, $tried, $known, false, $stance, $departUnreachable);
                             $decision = ($hold !== null && ! in_array((string) ($hold['verb'] ?? ''), ['land', 'depart'], true))
                                 ? ['verb' => (string) $hold['verb'], 'args' => (array) ($hold['args'] ?? []), 'reason' => (string) ($hold['why'] ?? '')]
                                 : self::idle($rawObs, $departCooldown ? 'backing off after a rejected depart' : 'no serviceable transfer window — hold');
@@ -1023,7 +1046,7 @@ final class AutoPlayer
                     // post-rejection cooldown), so a `depart` coming back from
                     // `Ladder::suggestion()` here is stale — drop it with `land`
                     // and fall through to the idle hold.
-                    $hold = Ladder::suggestion($rawObs, $tried, $known, false, $stance);
+                    $hold = Ladder::suggestion($rawObs, $tried, $known, false, $stance, $departUnreachable);
                     if ($hold !== null && ! in_array((string) ($hold['verb'] ?? ''), ['land', 'depart'], true)) {
                         $decision = ['verb' => (string) $hold['verb'], 'args' => (array) ($hold['args'] ?? []), 'reason' => (string) ($hold['why'] ?? '')];
                         $verb = (string) $decision['verb'];
@@ -1051,9 +1074,9 @@ final class AutoPlayer
                     && $verb !== 'depart'
                     && ! ($rawObs['in_space'] ?? false)
                     && (int) ($observation->get('altitude') ?? 0) === 0
-                    && Ladder::hasOrbitalShip($rawObs)
+                    && Ladder::hasDepartCapableShip($rawObs, $departUnreachable)
                 ) {
-                    $up = Ladder::suggestion($rawObs, $tried, $known, false, $stance);
+                    $up = Ladder::suggestion($rawObs, $tried, $known, false, $stance, $departUnreachable);
                     if ($up !== null && ! in_array((string) ($up['verb'] ?? ''), ['land', $verb], true)) {
                         $decision = ['verb' => (string) $up['verb'], 'args' => (array) ($up['args'] ?? []), 'reason' => (string) ($up['why'] ?? '')];
                         $verb = (string) $decision['verb'];
@@ -1065,7 +1088,7 @@ final class AutoPlayer
                 // fallback (finalize a ready flyer / earn / hold).
                 if ($verb === 'build'
                     && $stance === Stance::Expansionist->value
-                    && Ladder::hasOrbitalShip($rawObs)
+                    && Ladder::hasDepartCapableShip($rawObs, $departUnreachable)
                 ) {
                     $alt = $this->fallbackDecision($observation, 'you already have a flying ship — do not build a second', $tried, $known, $researchPaying, $stance);
                     if ($alt !== null && ($alt['verb'] ?? '') !== 'build') {
@@ -1152,7 +1175,7 @@ final class AutoPlayer
                 // Don't `finalize` a stub. Hold `finalize` until the bundle is a
                 // finished flyer (cockpit + engines + propellers + wings + jet);
                 // until then, work the ship craft chain / build the next part.
-                if ($verb === 'finalize' && ! Ladder::hasOrbitalShip($rawObs)) {
+                if ($verb === 'finalize' && ! Ladder::hasDepartCapableShip($rawObs, $departUnreachable)) {
                     $held0 = Ladder::looseParts($rawObs);
                     if (! Ladder::flyerReady($held0)) {
                         $held = (array) $observation->getInventory();

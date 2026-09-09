@@ -1159,6 +1159,39 @@ class AutoPlayerTest extends NHAUnitTestCase
     }
 
     /**
+     * A `depart` rejected because the ship has no `landing_gear` part is
+     * permanent for that hull (finalize cannot amend a vehicle), so the
+     * destination is parked as unreachable — no more spamming it every window.
+     *
+     * @covers \NHA\Brain\AutoPlayer::step
+     */
+    public function testALandingGearRejectionMarksTheDestinationUnreachable(): void
+    {
+        $state = new StateStore($this->statePath);
+        $state->recordDecision(142287, ['verb' => 'depart', 'args' => ['dest' => 'deimos'], 'reason' => '', 'queued_intent' => 999, 'tick' => 498]);
+
+        $nha = $this->nhaWith([
+            'tick' => 500, 'downed_until' => 0, 'position' => [30, 110],
+            'in_space' => true, 'altitude' => 480,
+            'status' => 'rejected',
+            'result' => 'Deimos needs LANDING GEAR on the ship (build a landing_gear part before finalizing the rocket)',
+            'inventory' => ['credits' => 3000, 'cryo_fuel' => 95,
+                'stimpack' => 1, 'kinetic_gun' => 1, 'slug' => 5],
+            'vehicles' => [['name' => 'skiff', 'flies' => true, 'orbital_engine' => true]],
+            'expansion' => ['at_body' => null, 'windows' => ['deimos' => ['open' => true]]],
+            'asteroids' => [],
+        ]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"depart","args":{"dest":"deimos"}}'), $state);
+
+        $player->step(142287, 'tok');
+
+        $unreachable = $state->departUnreachable(142287);
+        $this->assertContains('deimos', $unreachable, 'the landing-gear rejection parked deimos');
+        $this->assertContains('phobos', $unreachable, 'a gearless hull fails identically for phobos');
+        $this->assertContains('mars', $unreachable, 'and for mars — parked in one shot, no window burned on each');
+    }
+
+    /**
      * A loop-break research pass must never `combine` away survival gear.
      *
      * @covers \NHA\Brain\AutoPlayer::loopBreakDecision

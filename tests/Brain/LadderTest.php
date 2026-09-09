@@ -460,6 +460,57 @@ class LadderTest extends NHAUnitTestCase
     }
 
     /**
+     * A hull that has been `depart`-rejected for every body (gearless moons /
+     * Mars, low-TWR Venus) is a dead end: `hasDepartCapableShip()` goes false,
+     * and an on-ground expansionist gears a fresh flyer instead of holding.
+     *
+     * @covers \NHA\Brain\Ladder::hasDepartCapableShip
+     * @covers \NHA\Brain\Ladder::suggestion
+     */
+    public function testAShipRejectedForEveryBodyIsADeadEndAndTriggersARebuild(): void
+    {
+        $ship = ['vehicles' => [['name' => 'skiff', 'flies' => true, 'orbital_engine' => true]]];
+        $all = ['deimos', 'phobos', 'mars', 'venus'];
+
+        $this->assertTrue(Ladder::hasDepartCapableShip($ship));
+        $this->assertTrue(Ladder::hasDepartCapableShip($ship, ['deimos', 'phobos']), 'mars/venus still open');
+        $this->assertFalse(Ladder::hasDepartCapableShip($ship, $all), 'nowhere left to go');
+        $this->assertFalse(Ladder::hasDepartCapableShip(['vehicles' => []], []), 'no ship at all');
+
+        // On the ground with the dead-end ship + parts stock → GEAR UP a new
+        // flyer (build / craft a part), not hold or ride.
+        $grounded = [
+            'tick' => 5, 'in_space' => false, 'altitude' => 0, 'position' => [10, 10],
+            'inventory' => self::KIT + ['metal' => 120, 'credits' => 8000, 'composite' => 8, 'chip' => 2, 'bearing' => 3, 'wire' => 6, 'ion_thruster' => 1, 'cryo_fuel' => 95],
+            'vehicles' => [['name' => 'deadend', 'flies' => true, 'orbital_engine' => true]],
+            'loose_parts' => [], 'elevators' => [['x' => 10, 'y' => 10, 'height' => 500]], 'nearby_deposits' => [],
+        ];
+        $pick = Ladder::suggestion($grounded, [], [], false, 'expansionist', $all);
+        $this->assertContains($pick['verb'], ['build', 'combine', 'buy'], 'rebuilding the flyer, not riding up');
+    }
+
+    /**
+     * `flyerReady()` requires a `landing_gear` part now — a bundle without one
+     * still `flies` but every moon / Mars `depart` would be rejected, so it is
+     * not "ready" to finalize.
+     *
+     * @covers \NHA\Brain\Ladder::flyerReady
+     */
+    public function testFlyerReadyRequiresLandingGear(): void
+    {
+        $full = array_merge(
+            ['frame', 'cockpit', 'jet', 'tail', 'fuel_tank', 'landing_gear'],
+            array_fill(0, 3, 'engine'),
+            array_fill(0, 2, 'propeller'),
+            array_fill(0, 3, 'wing'),
+        );
+        $this->assertTrue(Ladder::flyerReady($full));
+
+        $noGear = array_values(array_filter($full, static fn(string $p): bool => $p !== 'landing_gear'));
+        $this->assertFalse(Ladder::flyerReady($noGear));
+    }
+
+    /**
      * The "wait for a launch window" hold: a depart-capable ship parked in
      * Earth orbit with every window shut stocks the transfer fuel first, then a
      * shield, then idles — it never thrashes mine/move/land up there.

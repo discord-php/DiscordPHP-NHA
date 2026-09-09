@@ -12,6 +12,31 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.36] - 2026-09-09
+
+### Fixed
+- **The agent's flyer had no landing gear, so every `depart` to a moon or Mars
+  was rejected — and the bot never learned why.** The engine requires a
+  `landing_gear` part on the ship for `deimos`/`phobos`/`mars` (Venus is an
+  aerostat, exempt), but `GameData::assess()` and `Ladder::flyerReady()` never
+  checked for it, so the agent `finalize`d a gearless hull, marked it
+  flight-complete, and then spammed `depart deimos` — rejected every time with
+  "needs LANDING GEAR", a reason 3.2.34 treated as a transient timing blip.
+  - `GameData::assess()['depart'][$body]` now also requires `gear >= 1` for
+    `GameData::GEAR_BODIES` (deimos/phobos/mars).
+  - `Ladder::flyerReady()` requires a `landing_gear` part in the structural
+    floor, so the gear-up ladder builds one before finalizing.
+  - A "landing gear" `depart` rejection is now **permanent** for that hull, and
+    parks deimos + phobos + mars unreachable in one shot (a gearless ship fails
+    identically for all three — no need to burn a window on each).
+  - `Ladder::hasDepartCapableShip($raw, $unreachable)` — a flying orbital ship
+    that can still reach at least one body. When every destination has been
+    rejected the hull is a dead end (`finalize` bundles parts into one vehicle
+    and cannot amend it); `AutoPlayer` and the gear-up ladder now treat that as
+    "no ship" and build a fresh, gear-carrying flyer instead of holding forever.
+  `Ladder::suggestion()` / `stanceMove()` take an optional `$departUnreachable`
+  so the ladder sees the dead-end state.
+
 ## [3.2.35] - 2026-09-09
 
 ### Fixed

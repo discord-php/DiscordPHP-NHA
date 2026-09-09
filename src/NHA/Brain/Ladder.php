@@ -157,7 +157,7 @@ final class Ladder
      *
      * @return array{verb: string, args: array<string,mixed>, why: string}|null
      */
-    public static function suggestion(array $raw, array $tried, array $worldKnown = [], bool $allowSpeculation = true, string $stance = 'homestead'): ?array
+    public static function suggestion(array $raw, array $tried, array $worldKnown = [], bool $allowSpeculation = true, string $stance = 'homestead', array $departUnreachable = []): ?array
     {
         $inv = (array) ($raw['inventory'] ?? []);
         $tick = (int) ($raw['tick'] ?? 0);
@@ -200,8 +200,8 @@ final class Ladder
         // 1. Assemble a finished flyer (cockpit + engines + propellers + wings
         //    + an ion_thruster jet). `finalize_stats` closed-form: this shape
         //    returns flies=true + orbital_engine — ready to launch and depart.
-        if (self::flyerReady(self::looseParts($raw)) && ! self::hasOrbitalShip($raw)) {
-            return ['verb' => 'finalize', 'args' => [], 'why' => 'a finished flyer is on hand — finalise it (flies + orbital drive)'];
+        if (self::flyerReady(self::looseParts($raw)) && ! self::hasDepartCapableShip($raw, $departUnreachable)) {
+            return ['verb' => 'finalize', 'args' => [], 'why' => 'a finished flyer is on hand — finalise it (flies + orbital drive + landing gear)'];
         }
 
         // 1b. Passive income: a freshly finalized `drives`/`flies` vehicle →
@@ -236,7 +236,7 @@ final class Ladder
 
         // 1d. STANCE steer. A few deterministic nudges toward the current stance
         //     before the generic ladder. The prompt carries the rest.
-        if ($stanced = self::stanceMove($stance, $raw, $inv, $raws, $credits, $x, $y, $tried, $worldKnown, $allowSpeculation, $plan)) {
+        if ($stanced = self::stanceMove($stance, $raw, $inv, $raws, $credits, $x, $y, $tried, $worldKnown, $allowSpeculation, $plan, $departUnreachable)) {
             return $stanced;
         }
 
@@ -489,6 +489,27 @@ final class Ladder
         }
 
         return false;
+    }
+
+    /**
+     * Whether the agent has a flying orbital ship that can still reach at least
+     * one expansion body. A hull that has been `depart`-rejected for every
+     * destination — no `landing_gear` for the moons/Mars, and too little
+     * thrust-to-weight for Venus — is a dead end: `finalize` bundles parts into
+     * ONE vehicle and cannot be amended, so the mission needs a fresh build.
+     * When this is false but {@see hasOrbitalShip()} is true, the gear-up path
+     * runs again for a new (this time gear-carrying) flyer.
+     *
+     * @param array<string,mixed> $raw
+     * @param list<string>        $unreachable dests every `depart` was rejected for (state: `agent_depart_unreachable`)
+     */
+    public static function hasDepartCapableShip(array $raw, array $unreachable = []): bool
+    {
+        if (! self::hasOrbitalShip($raw)) {
+            return false;
+        }
+
+        return array_diff(array_keys(self::DEPART_ORDER), $unreachable) !== [];
     }
 
     /**
@@ -920,9 +941,11 @@ final class Ladder
     {
         $n = static fn(string $p): int => count(array_filter($parts, static fn(string $q): bool => $q === $p));
 
-        // Structural floor: the cheap mandatory pieces + something for thrust and lift.
+        // Structural floor: the cheap mandatory pieces + something for thrust
+        // and lift + landing_gear (the engine's `depart` rejects a gearless
+        // ship for deimos/phobos/mars — see GameData::GEAR_BODIES).
         if ($n('cockpit') < 1 || $n('frame') < 1 || $n('jet') < 1 || $n('fuel_tank') < 1
-            || $n('engine') < 1 || $n('propeller') < 1 || $n('wing') < 1) {
+            || $n('engine') < 1 || $n('propeller') < 1 || $n('wing') < 1 || $n('landing_gear') < 1) {
             return false;
         }
 
@@ -1164,7 +1187,7 @@ final class Ladder
      *
      * @return array{verb: string, args: array<string,mixed>, why: string}|null
      */
-    private static function stanceMove(string $stance, array $raw, array $inv, array $raws, int $credits, int $x, int $y, array $tried = [], array $worldKnown = [], bool $allowSpeculation = true, array $plan = []): ?array
+    private static function stanceMove(string $stance, array $raw, array $inv, array $raws, int $credits, int $x, int $y, array $tried = [], array $worldKnown = [], bool $allowSpeculation = true, array $plan = [], array $departUnreachable = []): ?array
     {
         $has = static fn(string $k): int => (int) ($inv[$k] ?? 0);
 
@@ -1252,7 +1275,11 @@ final class Ladder
             // A finalized ship is the gate for every flight verb. A loose
             // `ion_thruster` *resource* is just cargo — it cannot `land`,
             // `depart`, or hold an altitude; only a `finalize`d vehicle can.
-            $hasShip = self::hasOrbitalShip($raw);
+            // "Has a ship" for mission purposes = has one that can still reach
+            // a body. A hull rejected for every destination (gearless moons /
+            // Mars, low-TWR Venus) is a dead end — fall through to GEAR UP a
+            // fresh flyer, since finalize cannot amend the existing one.
+            $hasShip = self::hasDepartCapableShip($raw, $departUnreachable);
             $fuelUnits = $has('hydrogen') + $has('cryo_fuel') + $has('helium3');
             $fuelled = $fuelUnits > 0;
             // "flight-ready" means the ship can actually make a transfer, not

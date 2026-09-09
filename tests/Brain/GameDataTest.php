@@ -65,6 +65,26 @@ class GameDataTest extends NHAUnitTestCase
         $this->assertFalse($v['depart']['mars']);
     }
 
+    /**
+     * A gearless flyer clears the TWR / Δv gates but the engine still rejects
+     * its `depart` for the moons and Mars ("needs LANDING GEAR"). Venus is a
+     * cloud-deck aerostat — no touchdown, so gear is not required there.
+     */
+    public function testDepartToAGearBodyNeedsALandingGearPart(): void
+    {
+        $recipe = GameData::FLYER;
+        unset($recipe['landing_gear']);
+
+        $v = GameData::assess($recipe);
+
+        $this->assertTrue($v['flies'], 'still a flyer without the gear');
+        $this->assertTrue($v['orbital_engine']);
+        $this->assertFalse($v['depart']['deimos'], 'deimos touchdown needs landing_gear');
+        $this->assertFalse($v['depart']['phobos'], 'phobos touchdown needs landing_gear');
+        $this->assertFalse($v['depart']['mars'], 'mars touchdown needs landing_gear');
+        $this->assertTrue($v['depart']['venus'], 'venus is an aerostat — no gear needed');
+    }
+
     /** A bare jet (no `ion_thruster`) is not an orbital engine, so `depart` stays closed even if it flies. */
     public function testOrbitalEngineNeedsTheIonThrusterUpgrade(): void
     {

@@ -26,7 +26,7 @@ flowchart TD
     poll --> pollC{status}
     pollC -- "applied &amp; was combine" --> mergeK[knownCombines&#91;sig&#93; = true]
     pollC -- "rejected &amp; was combine" --> dead[state.recordDeadCombine sig]
-    pollC -- "rejected &amp; was depart" --> deprej["state.recordDepartRejection<br/>&#8594; 12-tick retry cooldown;<br/>TWR / capability reason<br/>&#8594; park the dest unreachable for the run"]
+    pollC -- "rejected &amp; was depart" --> deprej["state.recordDepartRejection<br/>&#8594; 12-tick retry cooldown;<br/>TWR / no-landing_gear reason<br/>&#8594; park the dest &#40;+ all gear bodies&#41; unreachable for the run"]
     pollC -- applied / rejected / gone --> clr[state.clearQueuedIntent]
     pollC -- pending / none --> rules
     mergeK --> rules
@@ -66,7 +66,7 @@ flowchart TD
     stay -- no --> exp
     useStay --> exp
     g2 -- no --> exp
-    exp{"&#40;expansionist flight guardrails&#41;<br/>on the ground w/ a finished ship &#8594; force toward orbit;<br/>in orbit &amp; a window we can service is open &amp; no retry cooldown &#8594; force depart;<br/>a depart to any other dest &#40;model or ladder&#41; &#8594; force the deterministic hold;<br/>hold = station-keep: alt &lt; 300 &#8594; bounce the elevator back to the band &#40;no fuel&#41;, else stock fuel/shield &#8594; dock &#8594; idle"}
+    exp{"&#40;expansionist flight guardrails&#41;<br/>dead-end hull &#40;depart rejected for every body: no landing_gear, low Venus TWR&#41; &#8594; gear a fresh flyer;<br/>on the ground w/ a depart-capable ship &#8594; force toward orbit;<br/>in orbit &amp; a window we can service is open &amp; no retry cooldown &#8594; force depart;<br/>a depart to any other dest &#40;model or ladder&#41; &#8594; force the deterministic hold;<br/>hold = station-keep: alt &lt; 300 &#8594; bounce the elevator back to the band &#40;no fuel&#41;, else stock fuel/shield &#8594; dock &#8594; idle"}
     exp --> rec
     rec[if final verb == combine:<br/>state.recordCombineSignature] --> submit[NHA::intentWithToken<br/>state.recordDecision &#40;with altitude&#41;]
     submit --> done([&#129302; &#91;stance&#93; / &#128737;&#65039; / &#9851;&#65039; / &#128260; status line])
