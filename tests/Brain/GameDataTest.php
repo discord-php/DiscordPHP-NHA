@@ -119,4 +119,57 @@ class GameDataTest extends NHAUnitTestCase
         unset($noWheels['wheel']);
         $this->assertFalse(GameData::assess($noWheels)['drives']);
     }
+
+    private const BUNDLE = [
+        'frame' => 1, 'cockpit' => 1, 'jet' => 1, 'engine' => 3, 'propeller' => 2,
+        'wing' => 3, 'tail' => 1, 'fuel_tank' => 2, 'landing_gear' => 1,
+    ];
+
+    private const UPGRADE = [
+        'frame' => 'composite', 'cockpit' => 'chip', 'jet' => 'ion_thruster',
+        'engine' => 'engine', 'propeller' => 'bearing', 'wing' => 'composite',
+        'fuel_tank' => 'casing', 'wheel' => 'alloy', 'tail' => 'alloy',
+    ];
+
+    /** With nothing built and nothing on hand, the bill is the whole bundle expanded to raws. */
+    public function testRemainingShipBillForAnUnstartedFlyer(): void
+    {
+        $bill = GameData::remainingShipBill(self::BUNDLE, self::UPGRADE, [], []);
+
+        // BUILD_COST metal: 5+4+10+24+8+12+2+6+3 = 74, plus 2 bearings (metal+oil) + 1 alloy tail (metal 2).
+        $this->assertSame(78, $bill['metal']);
+        $this->assertSame(6, $bill['crystal']);
+        // composite for frame + 3 wings → 4 aluminium + 4 carbon; chip → 1 silicon + 1 copper.
+        $this->assertSame(4, $bill['aluminum']);
+        $this->assertSame(4, $bill['carbon']);
+        $this->assertSame(1, $bill['silicon']);
+        $this->assertSame(1, $bill['copper']);
+        $this->assertSame(2, $bill['oil']);
+    }
+
+    /**
+     * The bill SHRINKS as parts get built and stock comes in — the "decrease
+     * after having built it" half of the feature.
+     */
+    public function testRemainingShipBillShrinksAsPartsAreBuilt(): void
+    {
+        $full = GameData::remainingShipBill(self::BUNDLE, self::UPGRADE, [], []);
+        $part = GameData::remainingShipBill(
+            self::BUNDLE,
+            self::UPGRADE,
+            ['frame' => 1, 'cockpit' => 1, 'jet' => 1, 'engine' => 3],
+            ['metal' => 20, 'composite' => 2],
+        );
+
+        $this->assertLessThan($full['metal'], $part['metal']);
+        $this->assertLessThan($full['aluminum'], $part['aluminum']);
+        $this->assertArrayNotHasKey('crystal', $part, 'the crystal parts (jet + 3 engines) are built — no crystal left to buy');
+        $this->assertArrayNotHasKey('silicon', $part, 'the chip cockpit is built');
+    }
+
+    /** A fully built bundle (everything in loose_parts) needs nothing more. */
+    public function testRemainingShipBillIsEmptyForACompleteBundle(): void
+    {
+        $this->assertSame([], GameData::remainingShipBill(self::BUNDLE, self::UPGRADE, self::BUNDLE, []));
+    }
 }

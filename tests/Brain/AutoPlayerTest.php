@@ -801,6 +801,28 @@ class AutoPlayerTest extends NHAUnitTestCase
     }
 
     /**
+     * The reserve is not static: once ship parts are on the bench, the metal a
+     * half-built flyer still needs is protected from a research `combine` even
+     * though it sits well above the 8-unit base reserve.
+     *
+     * @covers \NHA\Brain\AutoPlayer::reserveFor
+     */
+    public function testACombineIsRefusedWhenItDipsBelowTheLiveShipBillReserve(): void
+    {
+        $state = new StateStore($this->statePath);
+        $nha = $this->nhaWith([
+            'tick' => 5, 'downed_until' => 0, 'position' => [1, 1],
+            'loose_parts' => ['frame', 'cockpit'],
+            'inventory' => ['credits' => 40, 'metal' => 15, 'water' => 5, 'stimpack' => 1, 'kinetic_gun' => 1, 'slug' => 5],
+        ]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"combine","args":{"ingredients":{"metal":1,"water":1}}}'), $state);
+
+        $player->step(142287, 'tok');
+
+        $this->assertNotSame('combine', $this->posts[0][1]['verb'], 'the flyer still needs that metal — reserve raised above the base 8');
+    }
+
+    /**
      * @covers \NHA\Brain\AutoPlayer
      */
     public function testStepAllowsAProductionCombineEvenWhenWorldKnown(): void

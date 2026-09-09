@@ -84,6 +84,67 @@ class LadderTest extends NHAUnitTestCase
     }
 
     /**
+     * The material hold window widens for what an upcoming craft needs and
+     * relaxes once the parts are built.
+     *
+     * @covers \NHA\Brain\Ladder::shipMaterialPlan
+     * @covers \NHA\Brain\Ladder::floorFor
+     * @covers \NHA\Brain\Ladder::capFor
+     */
+    public function testTheHoldWindowTracksThePendingShipCraft(): void
+    {
+        $gearing = static fn(array $loose, array $inv): array => [
+            'tick' => 1, 'in_space' => false, 'altitude' => 0,
+            'stance' => 'expansionist', 'vehicles' => [],
+            'loose_parts' => $loose, 'inventory' => $inv,
+        ];
+
+        // Not gearing (no ship objective) → defaults, no widening.
+        $this->assertSame([], Ladder::shipMaterialPlan(['in_space' => false, 'altitude' => 0, 'inventory' => []]));
+        $this->assertSame(Ladder::RESOURCE_TARGET, Ladder::floorFor('metal', []));
+        $this->assertSame(Ladder::HOARD_CAP, Ladder::capFor('metal', []));
+
+        // Gearing, ship barely started → metal floor climbs toward the bill (capped),
+        // and the sell cap rises above the default so metal is not dumped.
+        $early = Ladder::shipMaterialPlan($gearing(['frame'], ['credits' => 500]), true);
+        $this->assertGreaterThan(Ladder::RESOURCE_TARGET, $early['metal']);
+        $this->assertSame(Ladder::PLAN_FLOOR_CEIL, Ladder::floorFor('metal', $early));
+        $this->assertGreaterThan(Ladder::HOARD_CAP, Ladder::capFor('metal', $early));
+
+        // Most parts built + stock on hand → the bill shrinks, the floor relaxes.
+        $late = Ladder::shipMaterialPlan($gearing(
+            ['frame', 'cockpit', 'jet', 'engine', 'engine', 'engine', 'propeller', 'propeller', 'wing', 'wing', 'wing'],
+            ['credits' => 500, 'metal' => 25, 'composite' => 3],
+        ), true);
+        $this->assertLessThan($early['metal'] ?? 0, $late['metal'] ?? 0);
+        $this->assertSame(Ladder::RESOURCE_TARGET, Ladder::floorFor('metal', $late), 'floor back to default once enough metal is covered');
+    }
+
+    /**
+     * A speculative research `combine` never spends a raw an upcoming ship
+     * craft still needs, even when that raw sits above the research bar.
+     *
+     * @covers \NHA\Brain\Ladder::speculativeCombine
+     */
+    public function testSpeculativeCombineHoldsBackMaterialAPendingCraftNeeds(): void
+    {
+        $raws = ['metal' => 45, 'herb' => 45, 'lichen' => 45];
+
+        // No plan → metal is fair game, the first pair wins.
+        $free = Ladder::speculativeCombine($raws, [], []);
+        $this->assertSame('combine', $free['verb']);
+        $this->assertArrayHasKey('metal', $free['args']['ingredients']);
+
+        // A flyer bill wants ~50 metal → metal drops out of the surplus and the
+        // pair is drawn from the other two raws instead.
+        $plan = ['metal' => 55];
+        $held = Ladder::speculativeCombine($raws, [], [], $plan);
+        $this->assertSame('combine', $held['verb']);
+        $this->assertArrayNotHasKey('metal', $held['args']['ingredients'], 'metal is reserved for the ship');
+        $this->assertSame(['herb' => 1, 'lichen' => 1], $held['args']['ingredients']);
+    }
+
+    /**
      * @covers \NHA\Brain\Ladder::defensiveAction
      */
     public function testDefensiveActionHealsWhenBadlyHurtWithAMedicineOnHand(): void

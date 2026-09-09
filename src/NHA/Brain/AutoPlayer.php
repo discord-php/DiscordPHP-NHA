@@ -131,6 +131,25 @@ final class AutoPlayer
     }
 
     /**
+     * How much of a build material to keep untouchable: the static
+     * {@see BUILD_MATERIAL_RESERVE} floor, raised to whatever the live ship
+     * bill still needs ({@see Ladder::shipMaterialPlan()}). So a research /
+     * loop-break `combine` will not eat aluminium the agent is about to turn
+     * into `composite`, or metal earmarked for the next part — and the reserve
+     * drops back once those parts are built.
+     *
+     * @param array<string,mixed> $raw the observation array
+     */
+    private function reserveFor(string $res, array $raw): int
+    {
+        $key = strtolower($res);
+        $base = self::BUILD_MATERIAL_RESERVE[$key] ?? 0;
+        $bill = Ladder::shipMaterialPlan($raw);
+
+        return max($base, (int) ($bill[$key] ?? 0));
+    }
+
+    /**
      * The set of already-invented `combine` signatures (`"herb+wood"`, …), so
      * the brain does not waste turns re-submitting a set that mints nothing.
      * Resolves to `[]` when the codex cannot be read.
@@ -558,9 +577,10 @@ final class AutoPlayer
                 if (in_array($res, ['credits', 'engine', 'motor', 'chip', 'frame', 'fuel'], true) || ! is_numeric($qty) || $qty <= 0) {
                     continue;
                 }
-                // Skip a tower material that is only at (or below) its reserve —
+                // Skip a build material that is only at (or below) its reserve —
                 // spending it on research would just be blocked by the guardrail.
-                $reserve = self::BUILD_MATERIAL_RESERVE[strtolower((string) $res)] ?? 0;
+                // The reserve rises to cover whatever the live ship bill needs.
+                $reserve = $this->reserveFor((string) $res, $raw);
                 if ($reserve > 0 && (int) $qty <= $reserve) {
                     continue;
                 }
@@ -820,8 +840,10 @@ final class AutoPlayer
                     if (! $isProduction) {
                         $held = (array) $observation->getInventory();
                         foreach ($ingredients as $res => $qty) {
-                            $reserve = self::BUILD_MATERIAL_RESERVE[strtolower((string) $res)] ?? null;
-                            if ($reserve !== null && (int) ($held[$res] ?? 0) < $reserve + max(1, (int) $qty)) {
+                            // Reserve = the static floor, raised to what the live
+                            // ship bill still needs; 0 means unprotected.
+                            $reserve = $this->reserveFor((string) $res, $rawObs);
+                            if ($reserve > 0 && (int) ($held[$res] ?? 0) < $reserve + max(1, (int) $qty)) {
                                 $dipsReserve = (string) $res;
                                 break;
                             }

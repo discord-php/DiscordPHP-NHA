@@ -12,6 +12,27 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.28] - 2026-09-09
+
+### Added
+- **Dynamic material hold window.** The stockpile floor and sell cap are no
+  longer fixed at `RESOURCE_TARGET` / `HOARD_CAP` — while the agent is gearing a
+  ship they widen for exactly the materials the unbuilt parts still consume, and
+  relax again as the parts get built.
+  - `GameData::remainingShipBill()` — a live bill of materials: the target bundle
+    minus what is already in `loose_parts`, each part's upgrade item expanded to
+    raws through the new `CRAFT_INPUTS` map, netted against stock. It shrinks as
+    parts are built and empties once the ship is finalized.
+  - `Ladder::shipMaterialPlan()` / `floorFor()` / `capFor()` — the per-resource
+    floor is raised toward the bill (capped at `PLAN_FLOOR_CEIL` = 50) and the
+    sell cap toward `need + 10`. Threaded through the stockpile, sell, walk-to-
+    deposit and capitalist-sell rungs, and `speculativeCombine()` now skips a raw
+    the pending craft still needs even when it is above the research bar.
+  - `AutoPlayer::reserveFor()` — the `BUILD_MATERIAL_RESERVE` floor a research /
+    loop-break `combine` may not dip below is raised to whatever the live ship
+    bill needs, so a research turn can't eat the metal earmarked for the next
+    part (it drops back once those parts exist).
+
 ## [3.2.27] - 2026-09-09
 
 ### Added

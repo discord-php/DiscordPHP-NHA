@@ -172,6 +172,100 @@ final class GameData
     ];
 
     /**
+     * Raw / near-raw inputs each flyer upgrade item is crafted from — one level
+     * of `crafting.py`'s recipe tree, enough to expand a parts bill down to what
+     * the agent must actually harvest or buy. `wire` recurses to `copper`;
+     * `ion_thruster` stops at its fusion fuel (it is normally bought, and its
+     * `motor` / `chip` carry their own reserves).
+     *
+     * @var array<string,array<string,int>>
+     */
+    public const CRAFT_INPUTS = [
+        'wire' => ['copper' => 1],
+        'composite' => ['aluminum' => 1, 'carbon' => 1],
+        'chip' => ['silicon' => 1, 'wire' => 1],
+        'bearing' => ['metal' => 1, 'oil' => 1],
+        'steel' => ['iron' => 1, 'carbon' => 1],
+        'alloy' => ['metal' => 2],
+        'ion_thruster' => ['helium3' => 1],
+    ];
+
+    /**
+     * The live bill of materials for a partly-built ship — `resource => units
+     * still to acquire`.
+     *
+     * For every part in `$bundleTarget` not yet in `$looseCounts`: its
+     * {@see BUILD_COST} raws, plus its `$partUpgrade` with-item expanded through
+     * {@see CRAFT_INPUTS} to raws — then the whole thing netted against what is
+     * already on hand (`$have`). Callers widen their stockpile floor and sell
+     * cap to cover this while it is non-empty; it shrinks to `[]` as the parts
+     * get built and empties entirely once the ship is finalized, so the hold
+     * window closes on its own.
+     *
+     * @param array<string,int>       $bundleTarget `part => wanted count`
+     * @param array<string,string>    $partUpgrade  `part => with-item`
+     * @param array<string,int>       $looseCounts  `part => count already in loose_parts`
+     * @param array<string,int|float> $have         `item => qty on hand`
+     *
+     * @return array<string,int>
+     */
+    public static function remainingShipBill(array $bundleTarget, array $partUpgrade, array $looseCounts, array $have): array
+    {
+        $need = [];
+        $add = static function (string $res, int $qty) use (&$need): void {
+            if ($qty > 0) {
+                $need[$res] = ($need[$res] ?? 0) + $qty;
+            }
+        };
+        $stock = static fn(string $k): int => (int) ($have[$k] ?? 0);
+
+        $items = [];
+        foreach ($bundleTarget as $part => $want) {
+            $missing = max(0, (int) $want - (int) ($looseCounts[$part] ?? 0));
+            if ($missing === 0) {
+                continue;
+            }
+            foreach (self::BUILD_COST[$part] ?? [] as $res => $per) {
+                $add((string) $res, $per * $missing);
+            }
+            $item = $partUpgrade[$part] ?? null;
+            if ($item !== null) {
+                $items[$item] = ($items[$item] ?? 0) + $missing;
+            }
+        }
+
+        // Expand each still-needed with-item to its raws (gross — the whole
+        // bill is netted against stock in one pass below).
+        foreach ($items as $item => $qty) {
+            $short = max(0, $qty - $stock((string) $item));
+            if ($short === 0) {
+                continue;
+            }
+            foreach (self::CRAFT_INPUTS[$item] ?? [] as $res => $per) {
+                if (isset(self::CRAFT_INPUTS[$res])) {          // second level (wire → copper)
+                    foreach (self::CRAFT_INPUTS[$res] as $r2 => $p2) {
+                        $add((string) $r2, $p2 * $per * $short);
+                    }
+                } else {
+                    $add((string) $res, $per * $short);
+                }
+            }
+        }
+
+        // One netting pass: subtract what is already on hand, drop anything covered.
+        foreach ($need as $res => $qty) {
+            $net = $qty - $stock((string) $res);
+            if ($net > 0) {
+                $need[$res] = $net;
+            } else {
+                unset($need[$res]);
+            }
+        }
+
+        return $need;
+    }
+
+    /**
      * The reference FLYER — the lightest bundle {@see finalizeStats()} scores as
      * `flies` + `orbital_engine` + launch-capable. Keep {@see Ladder::SHIP_BUNDLE_TARGET}
      * in step with this; {@see GameDataTest} asserts this exact bundle flies.

@@ -42,10 +42,23 @@ final class Ladder
      *   deposits until reached); never `sell` below it outside a credit emergency.
      * - `HOARD_CAP` — the one non-credit `sell` trigger: shed the excess above
      *   this so a "never sell" rule cannot deadlock into mining forever.
+     *
+     * `RESOURCE_TARGET` and `HOARD_CAP` are the *defaults*. While the agent is
+     * gearing a ship, {@see floorFor()} / {@see capFor()} raise both for exactly
+     * the materials the unbuilt parts still consume ({@see shipMaterialPlan()}),
+     * and lower them back as the parts get built — so the agent holds what an
+     * upcoming craft needs and frees it again once the craft is done.
      */
     public const CREDIT_FLOOR = 300;
     public const RESOURCE_TARGET = 30;
     public const HOARD_CAP = 80;
+
+    /**
+     * Ceiling on a craft-plan-raised stockpile floor. A large bill (the full
+     * flyer wants ~78 metal) must not wedge the agent into mining one resource
+     * forever — it stockpiles to here, then buys / builds the rest.
+     */
+    public const PLAN_FLOOR_CEIL = 50;
 
     /**
      * Research fires when at least two raws sit this deep — the stockpile
@@ -161,6 +174,12 @@ final class Ladder
         $hp = (float) ($raw['hp'] ?? $raw['health'] ?? 100);
         $hpMax = (float) ($raw['hp_max'] ?? $raw['max_hp'] ?? 100) ?: 100;
 
+        // While the agent is gearing a ship, the stockpile floor / sell cap for
+        // the materials the unbuilt parts still consume are raised to cover the
+        // pending crafts ({@see shipMaterialPlan()}) and relax as parts are built.
+        $gearingShip = self::isGearingShip($raw, $stance);
+        $plan = $gearingShip ? self::shipMaterialPlan($raw, true) : [];
+
         // 0. DEFEND. A recent "attacked" alert, a known robber, or a hostile
         //    close by while hurt = combat. Heal if badly hurt and able, shoot
         //    back if armed and in range, otherwise break contact.
@@ -207,14 +226,14 @@ final class Ladder
 
         // 1d. STANCE steer. A few deterministic nudges toward the current stance
         //     before the generic ladder. The prompt carries the rest.
-        if ($stanced = self::stanceMove($stance, $raw, $inv, $raws, $credits, $x, $y, $tried, $worldKnown, $allowSpeculation)) {
+        if ($stanced = self::stanceMove($stance, $raw, $inv, $raws, $credits, $x, $y, $tried, $worldKnown, $allowSpeculation, $plan)) {
             return $stanced;
         }
 
         // 2. One speculative combine on a material surplus — research toward the
         //    goal, not a grind: it only spends raws that sit a margin above the
         //    stockpile target, and never a set already tried or invented.
-        if ($allowSpeculation && ($research = self::speculativeCombine($raws, $tried, $worldKnown))) {
+        if ($allowSpeculation && ($research = self::speculativeCombine($raws, $tried, $worldKnown, $plan))) {
             return $research;
         }
 
@@ -254,8 +273,6 @@ final class Ladder
         // Accord, not a field of vanity spires. (A grounded expansionist that
         // cannot yet build a working ship keeps *experimenting* with parts;
         // grinding builder points is not a substitute for the goal.)
-        $gearingShip = $stance === Stance::Expansionist->value && $onGround
-            && ! self::hasOrbitalShip($raw);
         if ($onGround && ! $gearingShip && $has('composite') >= 2 && $has('metal') >= 8) {
             if (self::cellOccupied($raw)) {
                 return self::stepToClearGround($raw);
@@ -317,11 +334,14 @@ final class Ladder
                 continue;
             }
             $held = $raws[$res] ?? 0;
-            if ($held < self::RESOURCE_TARGET) {
+            $floor = self::floorFor($res, $plan);
+            if ($held < $floor) {
                 $verb = $res === 'wood' ? 'chop' : (in_array($res, ['herb', 'lichen', 'fungus', 'algae'], true) ? 'gather' : 'mine');
-                $n = min((int) ($d['amount'] ?? 10), self::RESOURCE_TARGET - $held, 15);
+                $n = min((int) ($d['amount'] ?? 10), $floor - $held, 15);
                 if ($n >= 1) {
-                    return ['verb' => $verb, 'args' => ['n' => $n], 'why' => "stockpiling {$res} ({$held}/" . self::RESOURCE_TARGET . ') — standing on a deposit'];
+                    $tag = $floor > self::RESOURCE_TARGET ? ' — a pending craft needs it' : ' — standing on a deposit';
+
+                    return ['verb' => $verb, 'args' => ['n' => $n], 'why' => "stockpiling {$res} ({$held}/{$floor})" . $tag];
                 }
             }
         }
@@ -364,39 +384,48 @@ final class Ladder
         $sellRes = self::sellableBiggest($raws);
         if ($sellRes !== null) {
             $needCredits = $credits < self::CREDIT_FLOOR;
-            $overHoardCap = $raws[$sellRes] >= self::HOARD_CAP;
+            $keepFloor = self::floorFor($sellRes, $plan);
+            $sellCap = self::capFor($sellRes, $plan);
+            $overHoardCap = $raws[$sellRes] >= $sellCap;
             if ($needCredits || $overHoardCap) {
-                $keep = ($needCredits && $raws[$sellRes] <= self::RESOURCE_TARGET) ? 10 : self::RESOURCE_TARGET;
+                $keep = ($needCredits && $raws[$sellRes] <= $keepFloor) ? 10 : $keepFloor;
                 $n = min($raws[$sellRes] - $keep, 20);
                 if ($n >= 1) {
                     return [
                         'verb' => 'sell',
                         'args' => ['resource' => $sellRes, 'n' => $n],
                         'why' => $needCredits
-                            ? "credits {$credits} below the " . self::CREDIT_FLOOR . " floor — sell {$n} {$sellRes}"
-                            : "hoarding {$raws[$sellRes]} {$sellRes} (cap " . self::HOARD_CAP . ") — sell {$n} of the excess",
+                            ? "credits {$credits} below the " . self::CREDIT_FLOOR . " floor — sell {$n} {$sellRes} (keep {$keep})"
+                            : "hoarding {$raws[$sellRes]} {$sellRes} (cap {$sellCap}) — sell {$n} of the excess",
                     ];
                 }
             }
         }
 
         // 5. Nothing here to harvest — walk to the nearest deposit of whatever
-        //    you are furthest below target on, to top the stockpile up.
+        //    you are furthest below its floor on (a pending craft raises that
+        //    floor), to top the stockpile up.
         $wantRes = null;
         $wantXy = null;
-        $wantHeld = self::RESOURCE_TARGET;
+        $wantFloor = self::RESOURCE_TARGET;
+        $wantGap = 0;
         foreach ((array) ($raw['nearby_deposits'] ?? []) as $d) {
             $d = (array) $d;
             $res = (string) ($d['resource'] ?? '');
+            if ($res === '' || ! isset($d['x'], $d['y'])) {
+                continue;
+            }
             $held = $raws[$res] ?? 0;
-            if ($res !== '' && $held < $wantHeld && isset($d['x'], $d['y'])) {
+            $floor = self::floorFor($res, $plan);
+            if ($held < $floor && $floor - $held > $wantGap) {
                 $wantRes = $res;
-                $wantHeld = $held;
+                $wantFloor = $floor;
+                $wantGap = $floor - $held;
                 $wantXy = [(int) $d['x'], (int) $d['y']];
             }
         }
         if ($wantXy !== null) {
-            return ['verb' => 'move', 'args' => ['x' => $wantXy[0], 'y' => $wantXy[1]], 'why' => "stockpile low on {$wantRes} ({$wantHeld}/" . self::RESOURCE_TARGET . ') — walk to that deposit'];
+            return ['verb' => 'move', 'args' => ['x' => $wantXy[0], 'y' => $wantXy[1]], 'why' => "stockpile low on {$wantRes} (" . ($raws[$wantRes] ?? 0) . "/{$wantFloor}) — walk to that deposit"];
         }
 
         return null;
@@ -525,6 +554,81 @@ final class Ladder
     }
 
     /**
+     * Is the agent gearing a ship right now — on Earth's surface, no orbital
+     * ship yet? The single predicate behind the ship-material hold window and
+     * the "no vanity towers while gearing" rule.
+     *
+     * @param array<string,mixed> $raw
+     */
+    public static function isGearingShip(array $raw, string $stance): bool
+    {
+        $onGround = ! ($raw['in_space'] ?? false) && (int) ($raw['altitude'] ?? 0) === 0;
+
+        return $stance === Stance::Expansionist->value && $onGround && ! self::hasOrbitalShip($raw);
+    }
+
+    /**
+     * The live bill of materials for the ship the agent is currently gearing —
+     * `resource => units still to acquire` — computed from the target bundle
+     * minus the parts already in `loose_parts`, with each part's upgrade item
+     * expanded to raws and the whole thing netted against stock
+     * ({@see GameData::remainingShipBill()}). `[]` when the agent is not gearing
+     * a ship, so the hold window is only widened when a craft really is pending
+     * and relaxes automatically as parts get built.
+     *
+     * @param array<string,mixed> $raw
+     * @param bool                $force skip the loose-parts-started check (the
+     *                                   expansionist ladder KNOWS the crafts are coming)
+     *
+     * @return array<string,int>
+     */
+    public static function shipMaterialPlan(array $raw, bool $force = false): array
+    {
+        $onGround = ! ($raw['in_space'] ?? false) && (int) ($raw['altitude'] ?? 0) === 0;
+        if (! $onGround || self::hasOrbitalShip($raw)) {
+            return [];
+        }
+
+        $counts = array_count_values(self::looseParts($raw));
+        if ($counts === [] && ! $force) {
+            return [];
+        }
+
+        $have = [];
+        foreach ((array) ($raw['inventory'] ?? []) as $k => $v) {
+            if (is_numeric($v)) {
+                $have[(string) $k] = (int) $v;
+            }
+        }
+
+        return GameData::remainingShipBill(self::SHIP_BUNDLE_TARGET, self::SHIP_PART_UPGRADE, $counts, $have);
+    }
+
+    /**
+     * Stockpile floor for one resource: the default {@see RESOURCE_TARGET},
+     * raised to cover a pending craft's need for it (capped at
+     * {@see PLAN_FLOOR_CEIL}).
+     *
+     * @param array<string,int> $plan a {@see shipMaterialPlan()} result
+     */
+    public static function floorFor(string $res, array $plan): int
+    {
+        return max(self::RESOURCE_TARGET, min(self::PLAN_FLOOR_CEIL, $plan[$res] ?? 0));
+    }
+
+    /**
+     * Sell cap for one resource: the default {@see HOARD_CAP}, or the pending
+     * craft's need plus a small buffer when that is higher — so a `sell` never
+     * dumps material an upcoming craft is about to consume.
+     *
+     * @param array<string,int> $plan a {@see shipMaterialPlan()} result
+     */
+    public static function capFor(string $res, array $plan): int
+    {
+        return max(self::HOARD_CAP, ($plan[$res] ?? 0) + 10);
+    }
+
+    /**
      * Craft the ONE upgrade item the flyer still needs, or `null` when the
      * cupboard is stocked. From the real engine source (`engine/vehicles.py`,
      * `engine/crafting.py`): a flying, `depart`-capable ship is
@@ -602,19 +706,25 @@ final class Ladder
 
     /**
      * The first novel `combine` the agent can afford from its surplus: two raws
-     * that each sit at least {@see RESEARCH_SURPLUS} deep, whose sorted `a+b`
-     * signature is neither in `$tried` (this run) nor `$worldKnown` (already
-     * invented). Returns `null` when there is no surplus pair left to gamble.
+     * that each sit at least {@see RESEARCH_SURPLUS} deep AND above their
+     * (craft-raised) {@see floorFor()} floor, whose sorted `a+b` signature is
+     * neither in `$tried` (this run) nor `$worldKnown` (already invented).
+     * Returns `null` when there is no surplus pair left to gamble.
      *
      * @param array<string,int>  $raws       Raw resources on hand, sorted desc.
      * @param array<string,bool> $tried      `a+b => true` for sets submitted this run.
      * @param array<string,bool> $worldKnown `a+b => true` for sets already invented.
+     * @param array<string,int>  $plan       a {@see shipMaterialPlan()} result — raws an upcoming craft needs are held back
      *
      * @return array{verb: string, args: array<string,mixed>, why: string}|null
      */
-    public static function speculativeCombine(array $raws, array $tried, array $worldKnown): ?array
+    public static function speculativeCombine(array $raws, array $tried, array $worldKnown, array $plan = []): ?array
     {
-        $surplus = array_keys(array_filter($raws, static fn(int $q): bool => $q >= self::RESEARCH_SURPLUS));
+        $surplus = array_keys(array_filter(
+            $raws,
+            static fn(int $q, string $r): bool => $q >= self::RESEARCH_SURPLUS && $q > self::floorFor($r, $plan),
+            ARRAY_FILTER_USE_BOTH,
+        ));
         for ($i = 0; $i < count($surplus); $i++) {
             for ($j = $i + 1; $j < count($surplus); $j++) {
                 $pair = [$surplus[$i], $surplus[$j]];
@@ -939,7 +1049,7 @@ final class Ladder
      *
      * @return array{verb: string, args: array<string,mixed>, why: string}|null
      */
-    private static function stanceMove(string $stance, array $raw, array $inv, array $raws, int $credits, int $x, int $y, array $tried = [], array $worldKnown = [], bool $allowSpeculation = true): ?array
+    private static function stanceMove(string $stance, array $raw, array $inv, array $raws, int $credits, int $x, int $y, array $tried = [], array $worldKnown = [], bool $allowSpeculation = true, array $plan = []): ?array
     {
         $has = static fn(string $k): int => (int) ($inv[$k] ?? 0);
 
@@ -977,10 +1087,14 @@ final class Ladder
                     return ['verb' => 'fulfill', 'args' => ['contract_id' => (int) $c['id']], 'why' => 'capitalist stance — fulfil a contract you already cover'];
                 }
             }
-            // Convert any depot-tradeable raw above the stockpile target to credits.
+            // Convert any depot-tradeable raw above its stockpile floor (a
+            // pending craft raises that floor) to credits.
             $sellRes = self::sellableBiggest($raws);
-            if ($sellRes !== null && $raws[$sellRes] > self::RESOURCE_TARGET + 10) {
-                return ['verb' => 'sell', 'args' => ['resource' => $sellRes, 'n' => min($raws[$sellRes] - self::RESOURCE_TARGET, 20)], 'why' => "capitalist stance — bank the {$sellRes} surplus"];
+            if ($sellRes !== null) {
+                $floor = self::floorFor($sellRes, $plan);
+                if ($raws[$sellRes] > $floor + 10) {
+                    return ['verb' => 'sell', 'args' => ['resource' => $sellRes, 'n' => min($raws[$sellRes] - $floor, 20)], 'why' => "capitalist stance — bank the {$sellRes} surplus (keep {$floor})"];
+                }
             }
         }
 
@@ -1138,7 +1252,7 @@ final class Ladder
                 // 4. Drive chain + airframe done and it still won't fly → a
                 //    novel `combine` off the raw surplus (a real shot at the
                 //    missing piece, and inventor points), then harvest.
-                if ($allowSpeculation && ($research = self::speculativeCombine($raws, $tried, $worldKnown))) {
+                if ($allowSpeculation && ($research = self::speculativeCombine($raws, $tried, $worldKnown, $plan))) {
                     return $research;
                 }
 
