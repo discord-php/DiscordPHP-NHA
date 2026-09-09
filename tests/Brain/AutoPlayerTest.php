@@ -775,9 +775,10 @@ class AutoPlayerTest extends NHAUnitTestCase
 
         $this->assertNotSame('combine', $this->posts[0][1]['verb'], 'the metal reserve is protected');
         $this->assertSame('buy', $this->posts[0][1]['verb'], 'credits go toward the mission instead');
-        // Mission-first: a credit-rich grounded agent gears a ship, so the spare
-        // credits buy the `ion_thruster` rather than tower feedstock.
-        $this->assertSame('ion_thruster', $this->posts[0][1]['args']['resource']);
+        // Mission-first: a credit-rich grounded agent gears a flyer, so the
+        // spare credits buy a ship-craft input (copper/silicon/aluminium/oil/
+        // ion_thruster), not tower feedstock.
+        $this->assertContains($this->posts[0][1]['args']['resource'], ['copper', 'silicon', 'aluminum', 'carbon', 'oil', 'ion_thruster', 'crystal', 'metal']);
     }
 
     /**

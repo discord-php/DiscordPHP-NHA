@@ -12,6 +12,55 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.27] - 2026-09-09
+
+### Added
+- **`NHA\Brain\GameData`** — a single in-repo transcription of the game's public
+  source (`github.com/Recluse/nha-mmo`): the `PART` / `BUILD_COST` /
+  `PART_UPGRADES` tables, the `GRAVITY` / `TWR_DEPART` / `DV_NEED` gates, the
+  `crafting.py` recipe tree, and `finalizeStats()` — a faithful integer port of
+  `finalize_stats` so the brain can *predict* whether a bundle drives / flies /
+  can depart **before** it spends the credits. `Ladder::flyerReady()` now calls
+  it instead of hand-checking a part count. `GameDataTest` pins the port against
+  the source so a future edit that breaks the flyer fails CI, not the live
+  server. This is the durable fix for "the brain ran for weeks on guessed
+  mechanics" — corrections land in `GameData` now, not scattered prose.
+
+### Changed
+- **Ship logic rebuilt on the real physics.** Found the game's public source
+  (`github.com/Recluse/nha-mmo`); `engine/vehicles.py` `finalize_stats()` is
+  closed-form over summed integer PART constants — there is **no scale / part-count
+  gate**. The 3.2.20-26 "mega-bundle" premise was wrong on two counts: the small
+  probe bundles finalised inert for lack of a **`cockpit`** (control 0 → cannot
+  drive or fly), and the 82-engine bundle failed because mass kills v_air.
+  - `flies = control≥1 AND wing_area·v_air² ≥ 10·mass`;
+    `v_air = isqrt(90·thrust // drag)`, `drag = max(1, mass//20)`,
+    `thrust = Σ jet.thrust + (Σ propeller.thrust_pp)·(Σ engine.power)`.
+    Propellers **multiply** engine power → a light frame with a few engines +
+    propellers beats an engine stack.
+  - `launch` needs `thrust ≥ 4·mass` (`GRAVITY = 4`); `depart` also needs
+    `orbital_engine`, which is **`true` iff a part was built `with:{ion_thruster}`**
+    — and only the `jet` part accepts it (`+300 thrust, -40 mass`). This is the
+    seat the 3.2.11 notes flagged as unsolved.
+- `Ladder`: `megaBundleReady()` → `flyerReady()` (cockpit + frame + jet + 3
+  engines + 2 propellers + 3 wings + fuel_tank); `driveChainStep()` →
+  `shipCraftStep()` (crafts the one upgrade item the flyer still lacks, in order:
+  wire → composite → chip → bearing → ion_thruster). New `SHIP_BUNDLE_TARGET`
+  (~14-part flyer), `SHIP_PART_UPGRADE`, and source-accurate `PART_UPGRADES` /
+  `SHIP_PART_ARCHETYPES`. The expansionist gear-up block builds each part `with`
+  its upgrade item, buying `metal`/`crystal` as needed.
+- `AutoPlayer`: engine-cap and finalize-stub guards re-pointed at
+  `flyerReady` / `shipCraftStep` / the new bundle target.
+- `Playbook`: `build`/`finalize` hints and mission steps 1/3/5/6 rewritten for
+  the flyer recipe and the `flies`/`launch`/`depart` formulas — the old
+  "~34-part MEGA-bundle / engine-heavy / drive chain" text is gone.
+
+### Notes
+- Target flyer (checked against the formulas): frame+composite · cockpit+chip ·
+  jet+ion_thruster · engine ×3 · propeller ×2 (bearing) · wing ×3 (composite) ·
+  tail · fuel_tank ×2 · landing_gear ≈ mass 880, thrust 4900, twr 5.6,
+  v_air ~100, wing_area ~54 → flies + orbital_engine, ~900-1500 credits.
+
 ## [3.2.26] - 2026-09-09
 
 ### Added

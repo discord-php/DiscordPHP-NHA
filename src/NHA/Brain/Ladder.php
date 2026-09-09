@@ -168,12 +168,11 @@ final class Ladder
             return $combat;
         }
 
-        // 1. Assemble the airframe once the full mega-bundle is on hand. Probed
-        //    live: a ~34-part spread with 12 engines, wheels, wings ≤ engines,
-        //    a tail and a cockpit finalises `drives=true`; a lighter one, or one
-        //    missing the tail/cockpit, is an inert hull.
-        if (self::megaBundleReady(self::looseParts($raw)) && ! self::hasOrbitalShip($raw)) {
-            return ['verb' => 'finalize', 'args' => [], 'why' => 'full mega-airframe on hand — finalise it (drives=true) and deploy'];
+        // 1. Assemble a finished flyer (cockpit + engines + propellers + wings
+        //    + an ion_thruster jet). `finalize_stats` closed-form: this shape
+        //    returns flies=true + orbital_engine — ready to launch and depart.
+        if (self::flyerReady(self::looseParts($raw)) && ! self::hasOrbitalShip($raw)) {
+            return ['verb' => 'finalize', 'args' => [], 'why' => 'a finished flyer is on hand — finalise it (flies + orbital drive)'];
         }
 
         // 1b. Passive income: a freshly finalized `drives`/`flies` vehicle →
@@ -526,69 +525,75 @@ final class Ladder
     }
 
     /**
-     * The DIRECTED drive-research chain — the concrete craft path a working
-     * ship needs, reverse-engineered from the agents that have flying vehicles
-     * (`codex-inventor`'s "steel-engine" / "penta-engine" ships) and the live
-     * `/rules` dynamic recipes:
+     * Craft the ONE upgrade item the flyer still needs, or `null` when the
+     * cupboard is stocked. From the real engine source (`engine/vehicles.py`,
+     * `engine/crafting.py`): a flying, `depart`-capable ship is
      *
-     *   iron + magnet + wire        → motor
-     *   engine + motor              → rocket_engine   (engine + composite also works)
-     *   engine + magnet + motor     → advanced_motor
-     *   metal + salt + silicon      → battery         (feeds a richer motor line)
+     *   frame +composite · cockpit +chip · jet +ion_thruster · N×engine +engine
+     *   · M×propeller +bearing · K×wing +composite · tail · fuel_tank · landing_gear
      *
-     * Then the airframe is built ENGINE-HEAVY: `build{part:engine, with:{<the
-     * best propulsion item held>}}` several times before `finalize`. This takes
-     * priority over the random {@see speculativeCombine} — it is the actual
-     * blocker, not a gamble.
+     * and `flies` / `launch` are closed-form on the summed part stats:
+     *   thrust = Σ jet.thrust + (Σ propeller.thrust_pp) × Σ engine.power
+     *   flies  = control≥1 AND wing_area × v_air² ≥ 10·mass   (v_air = isqrt(90·thrust/drag), drag = mass/20)
+     *   launch = thrust ≥ 4·mass  ;  depart = flies AND orbital_engine AND thrust ≥ twr·4·mass
+     * Propellers multiply engine power into thrust, so a few engines + a few
+     * propellers on a LIGHT (composite) frame beat a stack of bare engines.
      *
      * @param array<string,mixed> $inv
      *
      * @return array{verb: string, args: array<string,mixed>, why: string}|null
      */
-    public static function driveChainStep(array $inv): ?array
+    public static function shipCraftStep(array $inv): ?array
     {
         $has = static fn(string $k): int => (int) ($inv[$k] ?? 0);
+        $credits = $has('credits');
         $c = static fn(array $ing, string $why): array => ['verb' => 'combine', 'args' => ['ingredients' => $ing], 'why' => $why];
+        $buy = static fn(string $r, int $n, string $why): array => ['verb' => 'buy', 'args' => ['resource' => $r, 'n' => $n], 'why' => $why];
 
-        // steel — the flagship engine upgrade ("steel-engine"). Need ~1 per
-        // engine part, so keep a deep stack (iron + carbon). Buy carbon if the
-        // smelt is stalled on it and there are credits.
-        if ($has('steel') < 6 && $has('iron') > 0) {
-            if ($has('carbon') > 0) {
-                return $c(['iron' => 1, 'carbon' => 1], 'drive chain — smelt steel (iron + carbon) for steel-engines');
+        // wire — a conductor for chips / motors (draw copper or aluminium).
+        if ($has('wire') < 4) {
+            if ($has('copper') > 0) {
+                return $c(['copper' => 1], 'ship — draw wire from copper (for chips)');
             }
-            if ((int) ($inv['credits'] ?? 0) >= 60) {
-                return ['verb' => 'buy', 'args' => ['resource' => 'carbon', 'n' => 6], 'why' => 'drive chain — buy carbon to smelt steel for engines'];
+            if ($credits >= 60) {
+                return $buy('copper', 6, 'ship — buy copper to draw wire');
             }
         }
-        // motor — the fallback engine upgrade + a rocket_engine input.
-        if ($has('motor') < 4 && $has('iron') > 0 && $has('magnet') > 0 && $has('wire') > 0) {
-            return $c(['iron' => 1, 'magnet' => 1, 'wire' => 1], 'drive chain — combine a motor (iron + magnet + wire)');
+        // composite (aluminium + carbon) — the LIGHT frame + wing upgrade.
+        if ($has('composite') < 5) {
+            if ($has('aluminum') > 0 && $has('carbon') > 0) {
+                return $c(['aluminum' => 1, 'carbon' => 1], 'ship — combine composite (aluminium + carbon) for a light frame/wings');
+            }
+            if ($credits >= 60) {
+                return $buy($has('aluminum') <= 0 ? 'aluminum' : 'carbon', 6, 'ship — buy composite feedstock');
+            }
         }
-        // rocket_engine — an orbital-drive loose part (engine + motor / composite).
-        if ($has('rocket_engine') < 2 && $has('engine') > 0 && $has('motor') > 0) {
-            return $c(['engine' => 1, 'motor' => 1], 'drive chain — combine a rocket_engine (engine + motor)');
+        // chip (semiconductor + conductor) — the cockpit control upgrade.
+        if ($has('chip') < 2) {
+            if ($has('silicon') > 0 && ($has('wire') > 0 || $has('copper') > 0)) {
+                return $c(['silicon' => 1, ($has('wire') > 0 ? 'wire' : 'copper') => 1], 'ship — combine a chip (silicon + conductor) for the cockpit');
+            }
+            if ($credits >= 60 && $has('silicon') <= 0) {
+                return $buy('silicon', 6, 'ship — buy silicon for chips');
+            }
         }
-        // advanced_motor — a stronger drive loose part (engine + magnet + motor).
-        if ($has('advanced_motor') < 2 && $has('engine') > 0 && $has('magnet') > 0 && $has('motor') > 1) {
-            return $c(['engine' => 1, 'magnet' => 1, 'motor' => 1], 'drive chain — combine an advanced_motor (engine + magnet + motor)');
+        // bearing (metal + oil) — doubles a propeller's thrust.
+        if ($has('bearing') < 3) {
+            if ($has('metal') > 0 && $has('oil') > 0) {
+                return $c(['metal' => 1, 'oil' => 1], 'ship — combine a bearing (metal + oil) for the propellers');
+            }
+            if ($credits >= 60 && $has('oil') <= 0) {
+                return $buy('oil', 6, 'ship — buy oil for bearings');
+            }
         }
-
-        return null;
-    }
-
-    /**
-     * The best `with:` item on hand for `build{part:engine}`. The engine part's
-     * accepted upgrades are `engine` / `motor` / `steel` (per the engine's own
-     * reject text); `codex-inventor`'s flagship flyer is "steel-engine", so
-     * `steel` is preferred, then `motor`. `rocket_engine` / `advanced_motor`
-     * are NOT engine upgrades — they are fed as their own loose parts.
-     */
-    public static function bestDriveUpgrade(array $inv): ?string
-    {
-        foreach (['steel', 'motor'] as $item) {
-            if ((int) ($inv[$item] ?? 0) > 0) {
-                return $item;
+        // ion_thruster — the orbital drive (goes on the jet → orbital_engine).
+        // The depot stocks it; the craft is fusion fuel + motor + chip.
+        if ($has('ion_thruster') === 0) {
+            if ($credits >= 200) {
+                return $buy('ion_thruster', 1, 'ship — buy the depot ion_thruster (goes on the jet → orbital_engine)');
+            }
+            if (($has('helium3') > 0 || $has('iridium') > 0) && $has('motor') > 0 && $has('chip') > 0) {
+                return $c([($has('helium3') > 0 ? 'helium3' : 'iridium') => 1, 'motor' => 1, 'chip' => 1], 'ship — combine an ion_thruster (fusion fuel + motor + chip)');
             }
         }
 
@@ -628,61 +633,86 @@ final class Ladder
         return null;
     }
 
-    /** Valid `build` parts (probed live). Everything else → "unknown part". */
+    /** Valid `build` parts (from `engine/vehicles.py` BUILD_COST). */
     public const SHIP_PART_ARCHETYPES = [
-        'engine', 'jet', 'frame', 'wing', 'wheel', 'cockpit', 'landing_gear', 'fuel_tank', 'tail', 'propeller',
+        'frame', 'cockpit', 'jet', 'engine', 'propeller', 'wing', 'wheel', 'tail', 'fuel_tank', 'landing_gear', 'panel',
     ];
 
     /**
-     * The confirmed `drives=true` mega-airframe (a ~34-part bundle finalises
-     * `drives=true` and can be `deploy`ed as an auto-miner; anything under ~28
-     * parts finalises inert). `frame` first so a forced-early `finalize` still
-     * has a chassis. `flies=true` needs a bigger bundle still — unsolved.
+     * The FLYER recipe — a light, `depart`-capable ship, sized from the real
+     * closed-form physics (`finalize_stats` in `engine/vehicles.py`). ~14
+     * parts: 3 engines feed 2 bearing-propellers for ~4900 thrust at ~880
+     * mass → twr ~5.6 (launch gate is 4·mass) and v_air ~100 with ~54
+     * wing_area → `flies`. The `jet` carries the `ion_thruster` upgrade →
+     * `orbital_engine`, so this ship can `depart`. `frame`/`cockpit` FIRST so
+     * a forced-early `finalize` still has the mandatory control point.
      *
      * @var array<string,int>
      */
     public const SHIP_BUNDLE_TARGET = [
-        'frame' => 2, 'engine' => 12, 'jet' => 6, 'wheel' => 6, 'wing' => 6,
-        'fuel_tank' => 3, 'landing_gear' => 2, 'tail' => 2, 'cockpit' => 1,
+        'frame' => 1, 'cockpit' => 1, 'jet' => 1, 'engine' => 3, 'propeller' => 2,
+        'wing' => 3, 'tail' => 1, 'fuel_tank' => 2, 'landing_gear' => 1,
     ];
 
-    /** Minimum loose-part count before a `finalize` is worth the turn. */
-    public const SHIP_BUNDLE_MIN = 28;
+    /** `part => the upgrade item to fit` (from `PART_UPGRADES` in the engine — lightest / strongest). */
+    public const SHIP_PART_UPGRADE = [
+        'frame' => 'composite', 'cockpit' => 'chip', 'jet' => 'ion_thruster',
+        'engine' => 'engine', 'propeller' => 'bearing', 'wing' => 'composite',
+        'fuel_tank' => 'casing', 'wheel' => 'alloy', 'tail' => 'alloy',
+    ];
 
     /**
-     * Whether a loose-part bundle matches the confirmed `drives=true` shape:
-     * 30+ parts, 12+ engines, wings no more than engines, and both a `tail` and
-     * a `cockpit` (the failed 58-part bundle had neither). `$parts` is the flat
-     * list of part-name strings from {@see looseParts()}.
-     *
-     * @param list<string> $parts
-     */
-    public static function megaBundleReady(array $parts): bool
-    {
-        $n = static fn(string $p): int => count(array_filter($parts, static fn(string $q): bool => $q === $p));
-
-        return count($parts) >= 30
-            && $n('engine') >= 12
-            && $n('wing') <= $n('engine')
-            && $n('wheel') >= 4
-            && $n('tail') >= 1
-            && $n('cockpit') >= 1;
-    }
-
-    /**
-     * `part => [allowed with: upgrade items]`, as the engine reports them in its
-     * rejection text (e.g. `frame can't use ['ion_thruster'] (upgrade options:
-     * [...])`). Used so the gear-up rung fits a legal upgrade instead of drawing
-     * a rejection. Empty / absent → build the part bare.
-     *
-     * @var array<string, list<string>>
+     * `part => [every legal with: item]` — the keys of {@see GameData::PART_UPGRADES},
+     * kept in this list shape for the cycle-the-archetypes callers.
      */
     public const PART_UPGRADES = [
         'frame' => ['steel', 'alloy', 'composite', 'superalloy'],
-        'propeller' => ['bearing', 'alloy'],
-        'cockpit' => ['chip', 'glass', 'lens', 'casing'],
+        'wheel' => ['alloy', 'bearing', 'rubber'],
         'engine' => ['engine', 'motor', 'steel'],
+        'wing' => ['alloy', 'composite'],
+        'tail' => ['alloy'],
+        'propeller' => ['bearing', 'alloy'],
+        'jet' => ['steel', 'ion_thruster'],
+        'cockpit' => ['chip', 'glass', 'lens', 'casing'],
+        'fuel_tank' => ['steel', 'casing'],
+        'panel' => ['plastic', 'casing'],
     ];
+
+    /**
+     * Whether the loose-part bundle is a finished flyer — decided by the real
+     * physics, not a part count. Assumes each part carries its
+     * {@see SHIP_PART_UPGRADE} (which is exactly how the gear-up block builds
+     * them, and how `shipCraftStep` sequences the upgrade items), rolls the
+     * bundle through {@see GameData::assess()}, and requires `flies` +
+     * `controllable` + `orbital_engine` (the three `depart` preconditions we can
+     * read off the parts alone). A structural floor rejects a bundle so thin it
+     * only "flies" on the lift-margin — it must still carry the pieces that make
+     * it worth finalizing.
+     *
+     * @param list<string> $parts
+     */
+    public static function flyerReady(array $parts): bool
+    {
+        $n = static fn(string $p): int => count(array_filter($parts, static fn(string $q): bool => $q === $p));
+
+        // Structural floor: the cheap mandatory pieces + something for thrust and lift.
+        if ($n('cockpit') < 1 || $n('frame') < 1 || $n('jet') < 1 || $n('fuel_tank') < 1
+            || $n('engine') < 1 || $n('propeller') < 1 || $n('wing') < 1) {
+            return false;
+        }
+
+        $recipe = [];
+        foreach (array_count_values($parts) as $part => $count) {
+            if (! isset(GameData::PART[$part])) {
+                continue;
+            }
+            $recipe[$part] = [$count, self::SHIP_PART_UPGRADE[$part] ?? null];
+        }
+
+        $verdict = GameData::assess($recipe);
+
+        return $verdict['flies'] && $verdict['controllable'] && $verdict['orbital_engine'];
+    }
 
     /**
      * A shipless way down from space: `ride` a completed elevator back to the
@@ -1026,37 +1056,27 @@ final class Ladder
                 return ['verb' => 'dock', 'args' => [], 'why' => 'expansionist — dock the asteroid and mine iridium/nickel for ship parts'];
             }
 
-            // On the ground and NOT flight-ready → GEAR UP toward a WORKING ship.
-            // Agents that have flying vehicles (`codex-inventor`'s multi-engine
-            // ships) got there via a concrete craft chain, not a random search:
-            // motor → rocket_engine / advanced_motor, then an engine-heavy
-            // `build` + `finalize`. That chain is the priority here.
+            // On the ground and NOT flight-ready → GEAR UP toward a FLYER. The
+            // recipe is closed-form (from the engine source): ~14 parts on a
+            // LIGHT composite frame — 3 engines feeding 2 bearing-propellers
+            // for the thrust, 3 composite wings for the lift, a chip cockpit
+            // for control, an ion_thruster jet for the orbital drive.
             if ($onGround && ! $flightReady) {
                 $held = self::looseParts($raw);
                 $count = static fn(string $p): int => count(array_filter($held, static fn(string $q): bool => $q === $p));
-                $engineParts = $count('engine');
 
-                // A working vehicle needs SCALE. Probed live: bundles under ~28
-                // parts always finalise inert (drives=false) no matter the mix;
-                // a ~34-part engine-heavy bundle finalises **drives=true**, and
-                // that vehicle can be `deploy`ed as an auto-miner (passive
-                // income — far better than another inert hull). `flies=true`
-                // (for `depart`) needs an even bigger bundle (codex's flyer is
-                // ~mass 2000) — chase that once the deployed miners have paid
-                // for the materials. So: only `finalize` a near-complete mega.
-                if (self::megaBundleReady($held)) {
-                    return ['verb' => 'finalize', 'args' => ['name' => 'accord_runner'], 'why' => 'expansionist — finalize the mega-airframe (drives=true) and deploy it'];
+                // Finished flyer on hand → finalize it.
+                if (self::flyerReady($held)) {
+                    return ['verb' => 'finalize', 'args' => ['name' => 'accord_flyer'], 'why' => 'expansionist — finalize the flyer (flies + orbital drive)'];
                 }
 
-                // 1. DRIVE CHAIN — craft the propulsion items. The real blocker.
-                if ($drive = self::driveChainStep($inv)) {
-                    return $drive;
+                // 1. Craft the upgrade items the flyer parts need (composite,
+                //    chip, bearing, wire, ion_thruster). The real blocker.
+                if ($craft = self::shipCraftStep($inv)) {
+                    return $craft;
                 }
 
-                // 2. Cheap flight kit from credits.
-                if ($has('ion_thruster') === 0 && $credits >= 150) {
-                    return ['verb' => 'buy', 'args' => ['resource' => 'ion_thruster', 'n' => 1], 'why' => 'expansionist — buy the depot ion_thruster'];
-                }
+                // 2. Fuel + a heat_shield for the Mars/Venus legs.
                 if (! $fuelled) {
                     if ($credits >= 60) {
                         return ['verb' => 'buy', 'args' => ['resource' => 'cryo_fuel', 'n' => 3], 'why' => 'expansionist — buy cryo_fuel (a ship runs on it)'];
@@ -1066,7 +1086,7 @@ final class Ladder
                     }
                 }
                 if ($has('heat_shield') === 0) {
-                    if ($has('superalloy') > 0 && $has('composite') > 0) {
+                    if ($has('superalloy') > 0 && $has('composite') > 1) {
                         return ['verb' => 'combine', 'args' => ['ingredients' => ['superalloy' => 1, 'composite' => 1]], 'why' => 'expansionist — combine a heat_shield'];
                     }
                     if ($has('superalloy') === 0 && $credits >= 60) {
@@ -1074,50 +1094,45 @@ final class Ladder
                     }
                 }
 
-                // 3. BUILD the mega-airframe to the confirmed drives=true
-                //    composition (~34 parts): a `frame` chassis FIRST, then
-                //    engines to 12, then wheels / wings / tanks / gear. Buy the
-                //    metal the parts cost (each `engine` = metal 8 + crystal 1
-                //    + steel 1).
-                $upg = self::bestDriveUpgrade($inv);
-                $canBuild = $has('metal') >= 8 || ($has('metal') < 10 && $credits >= 60);
-                // Only start / continue an airframe once we can actually make
-                // engines (a steel/motor upgrade + `engine` items on hand) or a
-                // bundle is already underway — otherwise it is a dead hull.
-                $target = self::SHIP_BUNDLE_TARGET;
-                $airframeViable = ($upg !== null && $has('engine') > 0) || $held !== [];
-                foreach ($airframeViable ? $target : [] as $part => $want) {
+                // 3. BUILD the flyer to SHIP_BUNDLE_TARGET, each part fitted
+                //    with its best upgrade (composite frame/wings, chip cockpit,
+                //    ion_thruster jet, bearing propellers, engine engines). Only
+                //    once the ship is genuinely underway (some upgrade item on
+                //    hand or a bundle started) — else fall through to earn.
+                $canBuild = $has('metal') >= 5 || $credits >= 60;
+                $viable = $held !== [] || $has('composite') > 0 || $has('chip') > 0 || $has('ion_thruster') > 0 || $has('engine') > 0;
+                foreach (($viable && $canBuild) ? self::SHIP_BUNDLE_TARGET : [] as $part => $want) {
                     if ($count($part) >= $want) {
                         continue;
-                    }
-                    if ($part === 'engine' && ($upg === null || $has('engine') === 0)) {
-                        continue; // need a steel/motor upgrade + an engine item
                     }
                     if (! $canBuild) {
                         break;
                     }
-                    if ($has('metal') < 8 && $credits >= 60) {
-                        return ['verb' => 'buy', 'args' => ['resource' => 'metal', 'n' => 24], 'why' => "expansionist — stock metal for the {$part}"];
+                    $upg = self::SHIP_PART_UPGRADE[$part] ?? null;
+                    // Hold this part until its upgrade item is on hand — a bare
+                    // part is heavier / weaker and can waste the whole bundle.
+                    if ($upg !== null && $has($upg) === 0) {
+                        if ($craft = self::shipCraftStep($inv)) {
+                            return $craft;
+                        }
+                        // upgrade genuinely unreachable → build it bare rather than stall
+                        $upg = null;
                     }
-                    if ($part === 'engine' && $has('crystal') < 2 && $credits >= 60) {
-                        return ['verb' => 'buy', 'args' => ['resource' => 'crystal', 'n' => 6], 'why' => 'expansionist — stock crystal (each engine part needs 1)'];
+                    if ($has('metal') < 10 && $credits >= 60) {
+                        return ['verb' => 'buy', 'args' => ['resource' => 'metal', 'n' => 20], 'why' => "expansionist — stock metal for the {$part}"];
                     }
-                    if ($has('metal') < 8) {
-                        break; // can't afford — fall through to earn
+                    if (in_array($part, ['engine', 'jet', 'cockpit'], true) && $has('crystal') < 2 && $credits >= 60) {
+                        return ['verb' => 'buy', 'args' => ['resource' => 'crystal', 'n' => 6], 'why' => "expansionist — stock crystal (the {$part} needs it)"];
+                    }
+                    if ($has('metal') < 5) {
+                        break;
                     }
                     $args = ['part' => $part];
-                    if ($part === 'engine') {
+                    if ($upg !== null) {
                         $args['with'] = [$upg => 1];
-                    } else {
-                        foreach (self::PART_UPGRADES[$part] ?? [] as $u) {
-                            if ($has($u) > 0) {
-                                $args['with'] = [$u => 1];
-                                break;
-                            }
-                        }
                     }
 
-                    return ['verb' => 'build', 'args' => $args, 'why' => "expansionist — build {$part} (" . ($count($part) + 1) . "/{$want}) for the airframe"];
+                    return ['verb' => 'build', 'args' => $args, 'why' => "expansionist — build {$part} (" . ($count($part) + 1) . "/{$want})" . ($upg ? " +{$upg}" : '') . ' for the flyer'];
                 }
 
                 // 4. Drive chain + airframe done and it still won't fly → a

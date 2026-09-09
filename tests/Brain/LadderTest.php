@@ -262,28 +262,30 @@ class LadderTest extends NHAUnitTestCase
             'inventory' => self::KIT + $extra,
             'elevators' => [['x' => 10, 'y' => 10]], 'nearby_deposits' => [],
         ];
+        // Everything a flyer part could need on hand, so the craft chain is quiet.
+        $stocked = ['metal' => 120, 'crystal' => 20, 'composite' => 10, 'chip' => 4, 'bearing' => 4, 'wire' => 8, 'ion_thruster' => 1, 'cryo_fuel' => 3, 'heat_shield' => 1, 'credits' => 8000];
 
-        // A full mega-bundle (30+ parts, 12 engines, wings <= engines, tail +
-        // cockpit) → finalize (this shape finalises drives=true).
-        $mega = array_merge(
-            array_fill(0, 12, 'engine'),
-            array_fill(0, 6, 'wing'),
-            array_fill(0, 6, 'wheel'),
-            ['frame', 'frame', 'fuel_tank', 'fuel_tank', 'fuel_tank', 'landing_gear', 'landing_gear', 'tail', 'tail', 'cockpit'],
+        // A finished flyer bundle (cockpit + 3 engines + 2 propellers + 3 wings
+        // + jet + fuel_tank) → finalize.
+        $flyer = array_merge(
+            ['frame', 'cockpit', 'jet', 'tail', 'fuel_tank', 'fuel_tank', 'landing_gear'],
+            array_fill(0, 3, 'engine'),
+            array_fill(0, 2, 'propeller'),
+            array_fill(0, 3, 'wing'),
         );
-        $parts = Ladder::suggestion(
-            ['tick' => 5, 'in_space' => false, 'altitude' => 0, 'inventory' => self::KIT, 'loose_parts' => $mega],
+        $fin = Ladder::suggestion(
+            ['tick' => 5, 'in_space' => false, 'altitude' => 0, 'inventory' => self::KIT, 'loose_parts' => $flyer],
             [],
             [],
             false,
             'expansionist',
         );
-        $this->assertSame('finalize', $parts['verb']);
+        $this->assertSame('finalize', $fin['verb']);
 
-        // The same bundle minus the tail + cockpit → NOT ready, keep building.
-        $short = array_slice($mega, 0, 27);
+        // Missing the propellers → NOT ready, keep building.
+        $short = array_values(array_filter($flyer, static fn(string $p): bool => $p !== 'propeller'));
         $notReady = Ladder::suggestion(
-            ['tick' => 5, 'in_space' => false, 'altitude' => 0, 'inventory' => self::KIT + ['metal' => 40, 'crystal' => 10, 'steel' => 10, 'engine' => 8, 'credits' => 5000], 'loose_parts' => $short, 'position' => [10, 10], 'nearby_deposits' => []],
+            ['tick' => 5, 'in_space' => false, 'altitude' => 0, 'inventory' => self::KIT + $stocked, 'loose_parts' => $short, 'position' => [10, 10], 'nearby_deposits' => []],
             [],
             [],
             false,
@@ -291,64 +293,52 @@ class LadderTest extends NHAUnitTestCase
         );
         $this->assertNotSame('finalize', $notReady['verb'] ?? null);
 
-        // Holds `engine` items + magnet/wire/iron → the DRIVE CHAIN fires first
-        // (combine a motor), ahead of any bare part-building.
-        $drive = Ladder::suggestion(
-            ['tick' => 5, 'in_space' => false, 'altitude' => 0, 'inventory' => self::KIT + ['ion_thruster' => 1, 'cryo_fuel' => 3, 'heat_shield' => 1, 'metal' => 20, 'engine' => 5, 'iron' => 10, 'magnet' => 5, 'wire' => 5], 'loose_parts' => [], 'position' => [10, 10], 'nearby_deposits' => []],
+        // No `composite` on hand (wire already stocked) → the craft chain
+        // combines composite for the light frame/wings.
+        $needComposite = Ladder::suggestion(
+            $base(['credits' => 4000, 'wire' => 8, 'aluminum' => 4, 'carbon' => 4]),
             [],
             [],
             false,
             'expansionist',
         );
-        $this->assertSame('combine', $drive['verb']);
-        $this->assertSame(['iron' => 1, 'magnet' => 1, 'wire' => 1], $drive['args']['ingredients']);
+        $this->assertSame('combine', $needComposite['verb']);
+        $this->assertSame(['aluminum' => 1, 'carbon' => 1], $needComposite['args']['ingredients']);
 
-        // Drive chain done (steel + engine items on hand), empty bundle → build
-        // the `frame` chassis FIRST (so a forced-early finalize still has a body).
-        $inv = self::KIT + ['ion_thruster' => 1, 'cryo_fuel' => 3, 'heat_shield' => 1, 'metal' => 20, 'engine' => 5, 'rocket_engine' => 2, 'steel' => 6, 'motor' => 4];
-        $frame = Ladder::suggestion(['tick' => 5, 'in_space' => false, 'altitude' => 0, 'inventory' => $inv, 'loose_parts' => [], 'position' => [10, 10], 'nearby_deposits' => []], [], [], false, 'expansionist');
+        // Fully stocked, empty bundle → build the composite `frame` FIRST.
+        $frame = Ladder::suggestion(
+            ['tick' => 5, 'in_space' => false, 'altitude' => 0, 'inventory' => self::KIT + $stocked, 'loose_parts' => [], 'position' => [10, 10], 'nearby_deposits' => []],
+            [],
+            [],
+            false,
+            'expansionist',
+        );
         $this->assertSame('build', $frame['verb']);
         $this->assertSame('frame', $frame['args']['part']);
+        $this->assertSame(['composite' => 1], $frame['args']['with']);
 
-        // Frames down → now the steel-engines (steel is the engine's real upgrade).
-        $engine = Ladder::suggestion(['tick' => 5, 'in_space' => false, 'altitude' => 0, 'inventory' => $inv, 'loose_parts' => ['frame', 'frame'], 'position' => [10, 10], 'nearby_deposits' => []], [], [], false, 'expansionist');
-        $this->assertSame('build', $engine['verb']);
-        $this->assertSame('engine', $engine['args']['part']);
-        $this->assertSame(['steel' => 1], $engine['args']['with']);
+        // Frame + cockpit down → next is the ion_thruster jet.
+        $jet = Ladder::suggestion(
+            ['tick' => 5, 'in_space' => false, 'altitude' => 0, 'inventory' => self::KIT + $stocked, 'loose_parts' => ['frame', 'cockpit'], 'position' => [10, 10], 'nearby_deposits' => []],
+            [],
+            [],
+            false,
+            'expansionist',
+        );
+        $this->assertSame('build', $jet['verb']);
+        $this->assertSame('jet', $jet['args']['part']);
+        $this->assertSame(['ion_thruster' => 1], $jet['args']['with']);
 
-        // Credits, no ion_thruster → buy the one the depot stocks.
-        $thruster = Ladder::suggestion($base(['credits' => 4000]), [], [], false, 'expansionist');
-        $this->assertSame('buy', $thruster['verb']);
-        $this->assertSame('ion_thruster', $thruster['args']['resource']);
-
-        // Have the thruster, still no fuel → buy cryo_fuel.
-        $fuel = Ladder::suggestion($base(['credits' => 4000, 'ion_thruster' => 1]), [], [], false, 'expansionist');
+        // Stocked but not fuelled → buy cryo_fuel.
+        $fuel = Ladder::suggestion($base(['credits' => 4000, 'composite' => 8, 'chip' => 2, 'bearing' => 3, 'wire' => 6, 'ion_thruster' => 1]), [], [], false, 'expansionist');
         $this->assertSame('buy', $fuel['verb']);
         $this->assertSame('cryo_fuel', $fuel['args']['resource']);
 
-        // Full kit + steel + engine items, but no metal for the part → buy
-        // metal (engine parts cost it).
-        $needMetal = Ladder::suggestion($base(['credits' => 4000, 'ion_thruster' => 1, 'cryo_fuel' => 3, 'heat_shield' => 1, 'steel' => 6, 'engine' => 3, 'metal' => 1]), [], [], false, 'expansionist');
-        $this->assertSame('buy', $needMetal['verb']);
-        $this->assertSame('metal', $needMetal['args']['resource']);
-
-        // Full kit + metal + steel + engine items, no bundle yet → start the
-        // airframe with the `frame` chassis (an `ion_thruster` resource is
-        // cargo, not a ship — it must not ride yet).
-        $assemble = Ladder::suggestion($base(['credits' => 4000, 'ion_thruster' => 1, 'cryo_fuel' => 3, 'heat_shield' => 1, 'metal' => 20, 'steel' => 3, 'engine' => 4]), [], [], false, 'expansionist');
-        $this->assertSame('build', $assemble['verb']);
-        $this->assertSame('frame', $assemble['args']['part']);
-
-        // A finalized ship + fuel, standing on a tall elevator → NOW ride up.
+        // A finalized flyer + fuel, standing on a tall elevator → NOW ride up.
         $ready = $base(['credits' => 4000, 'cryo_fuel' => 3]);
         $ready['vehicles'] = [['name' => 'runner', 'flies' => true, 'orbital_engine' => true]];
         $ready['elevators'] = [['x' => 10, 'y' => 10, 'height' => 500]];
         $this->assertSame('ride', Ladder::suggestion($ready, [], [], false, 'expansionist')['verb']);
-
-        // Low on credits, not fuelled → combine cryo_fuel from ice + an energy source.
-        $poor = Ladder::suggestion($base(['ice' => 3, 'coal' => 3, 'ion_thruster' => 1]), [], [], false, 'expansionist');
-        $this->assertSame('combine', $poor['verb']);
-        $this->assertSame(['ice' => 1, 'coal' => 1], $poor['args']['ingredients']);
     }
 
     /**

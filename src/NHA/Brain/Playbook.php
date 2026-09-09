@@ -26,6 +26,11 @@ namespace NHA\Brain;
  * @link https://nha.recluse.lol/rules      Crafting physics (combine matches tag SETS)
  * @link https://nha.recluse.lol/depot      Depot prices (buy = it pays you; sell = you pay it)
  *
+ * The ship-mechanics prose here (the `build`/`finalize` hints, mission steps
+ * 1/3/5) is a plain-language render of {@see GameData} — the transcription of
+ * `github.com/Recluse/nha-mmo` `engine/vehicles.py`. If a number here disagrees
+ * with `GameData`, `GameData` is right; fix this to match.
+ *
  * @since 3.0.0
  */
 final class Playbook
@@ -45,8 +50,8 @@ final class Playbook
         'gather' => 'n:int — forage the nearest plant within 8 (herb/lichen/fungus/algae → medicine)',
         'plant' => 'no args — spend 1 wood to top up the most-drained tree on your cell (cap 22); rejected if all full',
         'combine' => 'ingredients:{res:qty}, name?:string, n?:int — craft; matches the SET of physics tags, 1 of each per copy',
-        'build' => 'part:string, with?:{res:qty} — craft ONE vehicle part into loose_parts. Each `engine` costs metal 8 + crystal 1 + steel 1 (combine iron+carbon→steel). A working vehicle needs SCALE: a ~34-part MEGA-bundle — frame x2, engine x12 (with:{steel:1}), wheel x6, wing x6 (wings <= engines), fuel_tank x3, landing_gear x2, tail x2, cockpit x1 — finalises drives=true and can be `deploy`ed as an auto-miner. Anything under ~28 parts, or missing the tail/cockpit, finalises INERT. flies=true (for depart) needs a bigger bundle still. CONFIRMED parts: engine, frame, wing, wheel, cockpit, landing_gear, fuel_tank, tail, propeller. REJECTED: chassis, hull, rotor, airframe, wheels, body, thruster, axle, drivetrain.',
-        'finalize' => 'name?:string — assemble ALL loose_parts into one vehicle (computes drive/fly/thrust/fuel_cap/gear). Needs ≥1 loose part first — build them',
+        'build' => 'part:string, with?:{res:qty} — craft ONE vehicle part into loose_parts. The mission needs a ship that FLIES, and flight is about power-to-mass, NOT part count. finalize_stats: flies = has a `cockpit` (control) AND wing_area·v_air² ≥ 10·mass; v_air = isqrt(90·thrust / drag); drag = mass/20; thrust = Σ jet.thrust + (Σ propeller.thrust_pp)·(Σ engine.power). Propellers MULTIPLY engine power into thrust, so a few engines + a few propellers on a LIGHT frame beat an engine stack (more parts = more mass = lower v_air = will not fly). Target a ~14-part flyer: frame (with:{composite:1}), cockpit (with:{chip:1} — MANDATORY, no cockpit = no control = cannot fly or drive), jet (with:{ion_thruster:1} — this is the orbital_engine `depart` requires), engine x3, propeller x2 (with:{bearing:1}), wing x3 (with:{composite:1}), tail, fuel_tank x2, landing_gear. That gives mass ~880, thrust ~4900, v_air ~100, wing_area ~54 → flies, and thrust ≥ 4·mass so `launch` works too. CONFIRMED parts: frame, cockpit, jet, engine, propeller, wing, wheel, tail, fuel_tank, landing_gear, panel. REJECTED: chassis, hull, rotor, airframe, wheels, body, thruster, axle, drivetrain, motor, turbine.',
+        'finalize' => 'name?:string — assemble ALL loose_parts into one vehicle (computes drive/fly/thrust/fuel_cap/gear). Only finalize when the flyer bundle is complete: cockpit + frame + jet + 3 engines + 2 propellers + 3 wings + fuel_tank. Finalizing early wastes the parts on an INERT hull.',
         'deploy' => 'no args — send a finalized vehicle off to mine autonomously',
         'construct' => 'shape:string (box/cylinder/sphere/cone/pyramid/monument/extractor/colony/terraform/ziggurat/station), size?, height?, body?, module?, kind?, stage?, name? — raise a structure OR fund a co-op board',
         'ride' => 'no args — ride a completed orbital elevator up/down for free (stand on its base cell)',
@@ -125,8 +130,9 @@ final class Playbook
             HOW YOU MOVE THE MISSION (once you are safe, armed and fed)
             1. REACH A BODY & BUILD THERE — the only thing that actually scores the Accord.
                • On Earth, PACK FIRST: craft `heat_shield` (superalloy+composite), and for Venus also
-                 `acid_skin` (acid/sulfur+rubber); craft `hydrogen` (water+motor) for fuel. Build ship parts with
-                 `build` and `finalize` a ship with an `ion_thruster`.
+                 `acid_skin` (acid/sulfur+rubber); `buy cryo_fuel` for the tanks. Build the ~14-part FLYER
+                 (§3) and `finalize` it — the `jet` must be built `with:{ion_thruster:1}` so it counts as the
+                 orbital_engine `depart` requires.
                • `ride` the elevator (free) or `launch` to Earth orbit (alt ≥ 300).
                • `depart{dest}` while that body's `expansion.windows[dest].open` is true — Δv gates: deimos 50,
                  phobos 55, mars 100, venus 130 (your ship's Δv must clear it). If every window is closed, keep
@@ -139,16 +145,20 @@ final class Playbook
             2. INVEST IN OPEN BOARDS — `invest{module, credits}` for a Station module, or fund a `colony` /
                `terraform` board straight from credits. A pure credit sink that moves the co-op bar. Do this
                whenever you hold spare credits and cannot progress your own flight this turn.
-            3. WHEN YOU CANNOT FLY THIS TURN — build the MEGA-VEHICLE.
-               • `combine iron+carbon → steel` (each engine needs 1). Then `build` the ~34-part bundle:
-                 frame x2, engine x12 with:{steel:1}, wheel x6, wing x6, fuel_tank x3, landing_gear x2,
-                 tail x2, cockpit x1 → `finalize` → drives=true → `deploy` it as an auto-miner (passive
-                 income). A bundle under ~28 parts, or missing tail/cockpit, finalises INERT — do not
-                 finalize early. Each bundle is ~5000 credits of metal/crystal, so earn first.
+            3. WHEN YOU CANNOT FLY THIS TURN — build the FLYER, one part per turn. Flight is power-to-mass,
+               not part count: finalize_stats says flies = has `cockpit` AND wing_area·v_air² ≥ 10·mass, with
+               v_air driven by thrust = Σ jet.thrust + (Σ propeller.thrust_pp)·(Σ engine.power) over drag =
+               mass/20. Propellers multiply engine power, so a LIGHT bundle wins; an engine stack just adds mass.
+               • Craft the upgrade items: `wire` (draw copper), `composite` (aluminium+carbon), `chip`
+                 (silicon+wire), `bearing` (metal+oil), `ion_thruster` (buy, or combine helium3+motor+chip).
+               • Build the bundle: frame `with:{composite:1}` · cockpit `with:{chip:1}` (MANDATORY) · jet
+                 `with:{ion_thruster:1}` · engine ×3 · propeller ×2 `with:{bearing:1}` · wing ×3
+                 `with:{composite:1}` · tail · fuel_tank ×2 · landing_gear → `finalize` once cockpit+frame+jet+
+                 3 engines+2 propellers+3 wings+fuel_tank are all held. Finalizing early wastes the parts INERT.
                • RESEARCH: a FRESH uninvented `combine` off a ~40+ raw surplus (inventor points). Never
                  resubmit a tried/invented set.
                • WEALTH to fund it: harvest what is under you, `sell` a glut (raw past ~80) or credits < ~300.
-               • Do NOT `construct` towers — not the goal.
+               • Do NOT `construct` towers, and do NOT `deploy` more auto-miners — the mission is the flyer.
 
             DECISION LADDER (check top to bottom, act on the FIRST that applies)
             The report ends with a "SUGGESTED next action" line computed from this ladder — follow it unless the
@@ -174,16 +184,21 @@ final class Playbook
                is true and your ship's Δv clears that gate → `depart{dest:b}` for the nearest such body (prefer a moon
                first — a Forward Base cheapens every later route). If flight-ready but still on the ground → `ride` the
                elevator base (free) or `launch` toward orbit.
-            5. GEAR FOR DEPARTURE — grounded, `vehicles` empty. The ships that FLY are ENGINE-HEAVY (agents with
-               flying craft built "triple/quad/penta-engine" hulls). One step per turn:
-               • DRIVE CHAIN first: `combine iron+magnet+wire → motor`; `combine engine+motor → rocket_engine`
-                 (or `engine+composite`); `combine engine+magnet+motor → advanced_motor`; `combine metal+salt+
-                 silicon → battery`. `combine iron+carbon → steel` for the cheap upgrade.
-               • Then BUILD 3-5 `engine` parts, each `build{part:engine, with:{rocket_engine|advanced_motor|
-                 motor|steel:1}}`, plus `frame`/`wing`/`fuel_tank`/`landing_gear`. `finalize` at ~7 parts with
-                 3+ engines. REJECTED parts (never retry): chassis, hull, rotor, airframe, wheels, body, thruster.
-               • `heat_shield` for Mars/Venus → `combine superalloy+composite`; thin fuel → `buy cryo_fuel`.
-            6. RESEARCH — only once the drive chain + engine build are underway and it still will not fly. Any two
+            5. GEAR FOR DEPARTURE — grounded, `vehicles` empty. Flight is power-to-mass, not part count: a LIGHT
+               ~14-part flyer beats an engine stack. One step per turn, in this order:
+               • CRAFT THE UPGRADE ITEMS the parts need: `wire` (draw `copper`, or buy copper), `composite`
+                 (`combine aluminium+carbon`, or buy the feedstock), `chip` (`combine silicon+wire`), `bearing`
+                 (`combine metal+oil`), `ion_thruster` (buy from depot if credits ≳ 200, else
+                 `combine helium3+motor+chip`).
+               • BUILD the bundle, one part per turn, each with its upgrade item:
+                 frame `with:{composite:1}` · cockpit `with:{chip:1}` (MANDATORY) · jet `with:{ion_thruster:1}`
+                 (→ orbital_engine) · engine ×3 · propeller ×2 `with:{bearing:1}` · wing ×3 `with:{composite:1}`
+                 · tail · fuel_tank ×2 · landing_gear. `finalize` once cockpit+frame+jet+3 engines+2 propellers+
+                 3 wings+fuel_tank are all in loose_parts. REJECTED parts (never retry): chassis, hull, rotor,
+                 airframe, wheels, body, thruster, motor, turbine.
+               • `heat_shield` for Mars/Venus → `combine superalloy+composite`; thin fuel → `buy cryo_fuel`;
+                 `acid_skin` for Venus.
+            6. RESEARCH — only once the flyer build is underway and stocked and it still will not fly. Any two
                raws ~40+ → `combine` a FRESH, uninvented tag set (a real shot at a missing item + inventor points).
                NEVER resubmit a set listed as tried/invented. Rejected `combine` = ingredient short: harvest/buy it.
             7. INVEST IN THE CO-OP. Spare credits (≳ 200) and an open board (`invest{module,credits}` for a Station

@@ -941,17 +941,24 @@ final class AutoPlayer
                     $decision = ['verb' => 'build', 'args' => ['part' => $part], 'reason' => "\"{$decision['args']['part']}\" is a rejected part — trying {$part} instead"];
                 }
 
-                // Cap runaway `build engine`: the model, told "engine-heavy",
-                // once stacked 82 engines into one bundle. If the bundle already
-                // has the target engine count, swap to the first under-target
-                // part so the mega-bundle actually completes.
-                if ($verb === 'build' && (string) ($decision['args']['part'] ?? '') === 'engine') {
+                // Cap runaway `build engine` / any over-target part: the model,
+                // told "engine-heavy", once stacked 82 engines into one bundle.
+                // The flyer recipe is small and specific — if a part is already
+                // at its SHIP_BUNDLE_TARGET count, swap to the first part still
+                // under target so the flyer actually completes.
+                if ($verb === 'build') {
+                    $bpart = (string) ($decision['args']['part'] ?? '');
                     $lp = Ladder::looseParts($rawObs);
-                    $ec = count(array_filter($lp, static fn(string $p): bool => $p === 'engine'));
-                    if ($ec >= (Ladder::SHIP_BUNDLE_TARGET['engine'] ?? 12) + 2) {
+                    $cnt = static fn(string $q): int => count(array_filter($lp, static fn(string $z): bool => $z === $q));
+                    if ($bpart !== '' && isset(Ladder::SHIP_BUNDLE_TARGET[$bpart]) && $cnt($bpart) >= Ladder::SHIP_BUNDLE_TARGET[$bpart]) {
                         foreach (Ladder::SHIP_BUNDLE_TARGET as $p => $want) {
-                            if ($p !== 'engine' && count(array_filter($lp, static fn(string $q): bool => $q === $p)) < $want) {
-                                $decision = ['verb' => 'build', 'args' => ['part' => $p], 'reason' => "{$ec} engines is enough — build a {$p} toward the rest of the bundle"];
+                            if ($cnt($p) < $want) {
+                                $up = Ladder::SHIP_PART_UPGRADE[$p] ?? null;
+                                $a = ['part' => $p];
+                                if ($up !== null && (int) (((array) $observation->getInventory())[$up] ?? 0) > 0) {
+                                    $a['with'] = [$up => 1];
+                                }
+                                $decision = ['verb' => 'build', 'args' => $a, 'reason' => "enough {$bpart} — build a {$p} toward the rest of the flyer"];
                                 break;
                             }
                         }
@@ -985,31 +992,32 @@ final class AutoPlayer
                     }
                 }
 
-                // Don't `finalize` a stub. The ships that fly are deeply
-                // engine-heavy (codex's quad/penta-engine hulls, mass ~2000),
-                // so hold `finalize` until the bundle has 8+ parts AND 5+
-                // `engine` parts; until then keep working the drive chain.
+                // Don't `finalize` a stub. Hold `finalize` until the bundle is a
+                // finished flyer (cockpit + engines + propellers + wings + jet);
+                // until then, work the ship craft chain / build the next part.
                 if ($verb === 'finalize' && ! Ladder::hasOrbitalShip($rawObs)) {
                     $held0 = Ladder::looseParts($rawObs);
-                    $engineParts = count(array_filter($held0, static fn(string $p): bool => $p === 'engine'));
-                    if (! Ladder::megaBundleReady($held0)) {
+                    if (! Ladder::flyerReady($held0)) {
                         $held = (array) $observation->getInventory();
-                        if ($drive = Ladder::driveChainStep($held)) {
-                            $decision = ['verb' => $drive['verb'], 'args' => $drive['args'], 'reason' => $drive['why']];
-                        } elseif ((int) ($held['metal'] ?? 0) < 12 && (int) ($held['credits'] ?? 0) >= 60) {
-                            $decision = ['verb' => 'buy', 'args' => ['resource' => 'metal', 'n' => 10], 'reason' => 'ship parts cost metal — stock it before finalizing a stub'];
-                        } elseif (($upg = Ladder::bestDriveUpgrade($held)) !== null && (int) ($held['engine'] ?? 0) > 0) {
-                            $decision = ['verb' => 'build', 'args' => ['part' => 'engine', 'with' => [$upg => 1]], 'reason' => "only {$engineParts} engine parts — build another with {$upg}"];
+                        $cnt = static fn(string $q): int => count(array_filter($held0, static fn(string $z): bool => $z === $q));
+                        if ($craft = Ladder::shipCraftStep($held)) {
+                            $decision = ['verb' => $craft['verb'], 'args' => $craft['args'], 'reason' => $craft['why']];
+                        } elseif ((int) ($held['metal'] ?? 0) < 10 && (int) ($held['credits'] ?? 0) >= 60) {
+                            $decision = ['verb' => 'buy', 'args' => ['resource' => 'metal', 'n' => 20], 'reason' => 'flyer parts cost metal — stock it before finalizing a stub'];
                         } else {
-                            $part = null;
-                            foreach (Ladder::SHIP_PART_ARCHETYPES as $cand) {
-                                if (! in_array($cand, $held0, true)) {
-                                    $part = $cand;
+                            $part = 'engine';
+                            foreach (Ladder::SHIP_BUNDLE_TARGET as $p => $want) {
+                                if ($cnt($p) < $want) {
+                                    $part = $p;
                                     break;
                                 }
                             }
-                            $part ??= 'engine';
-                            $decision = ['verb' => 'build', 'args' => ['part' => $part], 'reason' => 'building toward an engine-heavy bundle before finalizing'];
+                            $up = Ladder::SHIP_PART_UPGRADE[$part] ?? null;
+                            $a = ['part' => $part];
+                            if ($up !== null && (int) ($held[$up] ?? 0) > 0) {
+                                $a['with'] = [$up => 1];
+                            }
+                            $decision = ['verb' => 'build', 'args' => $a, 'reason' => "flyer incomplete — build the {$part} first"];
                         }
                         $verb = (string) $decision['verb'];
                     }
