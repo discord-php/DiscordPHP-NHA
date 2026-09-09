@@ -75,8 +75,9 @@ final class AutoPlayer
         'steel' => 4,
         'titanium' => 4,
         'superalloy' => 4,
-        // Flight kit — a loop-break / research `combine` must never eat the
-        // last one (a forced `combine algae+ion_thruster` cost a real thruster).
+        // Flight kit + drive-chain items — a loop-break / research `combine`
+        // must never eat these (a forced `combine advanced_motor+coal` /
+        // `algae+ion_thruster` throws away a hard-won propulsion part).
         'ion_thruster' => 1,
         'heat_shield' => 1,
         'acid_skin' => 1,
@@ -85,6 +86,11 @@ final class AutoPlayer
         'hydrogen' => 1,
         'landing_gear' => 1,
         'fuel_tank' => 1,
+        'motor' => 2,
+        'rocket_engine' => 1,
+        'advanced_motor' => 1,
+        'engine' => 2,
+        'steel' => 3,
     ];
 
     /**

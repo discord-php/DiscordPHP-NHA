@@ -12,6 +12,21 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.24] - 2026-09-09
+
+### Fixed
+- Reserve-protect the drive-chain items (`motor`, `rocket_engine`,
+  `advanced_motor`, `engine`, `steel`) in `BUILD_MATERIAL_RESERVE` — a
+  loop-break `combine` was throwing a hard-won `advanced_motor` into the Guild
+  as junk research.
+
+### Notes
+- 3.2.23 stopped the `deploy` loop; post-restart the agent builds the
+  mega-bundle correctly (`build engine/frame [+steel]`, 9/34 parts and
+  growing) with its 2 auto-miners feeding income. It is slow — a full
+  ~34-part bundle is ~5000 credits — but on the right track and no longer
+  looping.
+
 ## [3.2.23] - 2026-09-09
 
 ### Fixed
