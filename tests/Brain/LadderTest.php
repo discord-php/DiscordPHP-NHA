@@ -263,9 +263,9 @@ class LadderTest extends NHAUnitTestCase
             'elevators' => [['x' => 10, 'y' => 10]], 'nearby_deposits' => [],
         ];
 
-        // An engine-heavy spread (7+ parts, 3+ engines) → finalize and fly-test.
+        // A penta-engine spread (8+ parts, 5+ engines) → finalize and fly-test.
         $parts = Ladder::suggestion(
-            ['tick' => 5, 'in_space' => false, 'altitude' => 0, 'inventory' => self::KIT, 'loose_parts' => ['engine', 'engine', 'engine', 'frame', 'wing', 'fuel_tank', 'landing_gear']],
+            ['tick' => 5, 'in_space' => false, 'altitude' => 0, 'inventory' => self::KIT, 'loose_parts' => ['engine', 'engine', 'engine', 'engine', 'engine', 'frame', 'wing', 'fuel_tank']],
             [],
             [],
             false,
@@ -285,10 +285,10 @@ class LadderTest extends NHAUnitTestCase
         $this->assertSame('combine', $drive['verb']);
         $this->assertSame(['iron' => 1, 'magnet' => 1, 'wire' => 1], $drive['args']['ingredients']);
 
-        // Drive chain exhausted (rocket_engines in hand), no bundle yet →
-        // `build` an engine part fitted with the best propulsion item.
+        // Drive chain done (steel + rocket_engines stocked), no bundle yet →
+        // `build` a steel-engine part (steel is the engine's real upgrade).
         $engine = Ladder::suggestion(
-            ['tick' => 5, 'in_space' => false, 'altitude' => 0, 'inventory' => self::KIT + ['ion_thruster' => 1, 'cryo_fuel' => 3, 'heat_shield' => 1, 'metal' => 20, 'engine' => 5, 'rocket_engine' => 3, 'steel' => 3], 'loose_parts' => [], 'position' => [10, 10], 'nearby_deposits' => []],
+            ['tick' => 5, 'in_space' => false, 'altitude' => 0, 'inventory' => self::KIT + ['ion_thruster' => 1, 'cryo_fuel' => 3, 'heat_shield' => 1, 'metal' => 20, 'engine' => 5, 'rocket_engine' => 2, 'steel' => 6, 'motor' => 4], 'loose_parts' => [], 'position' => [10, 10], 'nearby_deposits' => []],
             [],
             [],
             false,
@@ -296,7 +296,7 @@ class LadderTest extends NHAUnitTestCase
         );
         $this->assertSame('build', $engine['verb']);
         $this->assertSame('engine', $engine['args']['part']);
-        $this->assertSame(['rocket_engine' => 1], $engine['args']['with']);
+        $this->assertSame(['steel' => 1], $engine['args']['with']);
 
         // Credits, no ion_thruster → buy the one the depot stocks.
         $thruster = Ladder::suggestion($base(['credits' => 4000]), [], [], false, 'expansionist');
@@ -308,9 +308,9 @@ class LadderTest extends NHAUnitTestCase
         $this->assertSame('buy', $fuel['verb']);
         $this->assertSame('cryo_fuel', $fuel['args']['resource']);
 
-        // Full kit + a propulsion item + engine items, but no metal for the
-        // part → buy metal (engine parts cost it).
-        $needMetal = Ladder::suggestion($base(['credits' => 4000, 'ion_thruster' => 1, 'cryo_fuel' => 3, 'heat_shield' => 1, 'rocket_engine' => 2, 'engine' => 3, 'metal' => 1]), [], [], false, 'expansionist');
+        // Full kit + steel + engine items, but no metal for the part → buy
+        // metal (engine parts cost it).
+        $needMetal = Ladder::suggestion($base(['credits' => 4000, 'ion_thruster' => 1, 'cryo_fuel' => 3, 'heat_shield' => 1, 'steel' => 6, 'engine' => 3, 'metal' => 1]), [], [], false, 'expansionist');
         $this->assertSame('buy', $needMetal['verb']);
         $this->assertSame('metal', $needMetal['args']['resource']);
 

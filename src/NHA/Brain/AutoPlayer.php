@@ -945,14 +945,14 @@ final class AutoPlayer
                     }
                 }
 
-                // Don't `finalize` a stub. The ships that fly are engine-heavy
-                // (codex's triple/quad/penta-engine hulls), so hold `finalize`
-                // until the bundle has 6+ parts AND at least 2 `engine` parts;
-                // until then keep working the drive chain / building engines.
+                // Don't `finalize` a stub. The ships that fly are deeply
+                // engine-heavy (codex's quad/penta-engine hulls, mass ~2000),
+                // so hold `finalize` until the bundle has 8+ parts AND 5+
+                // `engine` parts; until then keep working the drive chain.
                 if ($verb === 'finalize' && ! Ladder::hasOrbitalShip($rawObs)) {
                     $held0 = Ladder::looseParts($rawObs);
                     $engineParts = count(array_filter($held0, static fn(string $p): bool => $p === 'engine'));
-                    if (count($held0) < 6 || $engineParts < 2) {
+                    if (count($held0) < 8 || $engineParts < 5) {
                         $held = (array) $observation->getInventory();
                         if ($drive = Ladder::driveChainStep($held)) {
                             $decision = ['verb' => $drive['verb'], 'args' => $drive['args'], 'reason' => $drive['why']];

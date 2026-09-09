@@ -168,13 +168,15 @@ final class Ladder
             return $combat;
         }
 
-        // 1. Assemble crafted parts into a vehicle once the bundle is full
-        //    enough to be worth a try (5+ distinct parts). The drive recipe is
-        //    unsolved — most `finalize`s still come out inert — so this fires
-        //    on a fuller spread, not a 4-part stub, and the junk hulls it
-        //    leaves behind are cosmetic (there is no scrap verb).
-        if (count((array) ($raw['loose_parts'] ?? [])) >= 5 && ! self::hasOrbitalShip($raw)) {
-            return ['verb' => 'finalize', 'args' => [], 'why' => 'you have a full spread of loose parts — assemble them and see what flies'];
+        // 1. Assemble the airframe once it is deeply engine-heavy — the ships
+        //    that fly are quad/penta-engine (5+ `engine` parts, 8+ total).
+        //    A lighter bundle just mints another inert hull.
+        $lp1 = self::looseParts($raw);
+        if (count($lp1) >= 8
+            && count(array_filter($lp1, static fn(string $p): bool => $p === 'engine')) >= 5
+            && ! self::hasOrbitalShip($raw)
+        ) {
+            return ['verb' => 'finalize', 'args' => [], 'why' => 'engine-heavy airframe on hand — assemble it and see what flies'];
         }
 
         // 1b. Passive income: a finished vehicle that is not out working yet →
@@ -541,37 +543,37 @@ final class Ladder
         $has = static fn(string $k): int => (int) ($inv[$k] ?? 0);
         $c = static fn(array $ing, string $why): array => ['verb' => 'combine', 'args' => ['ingredients' => $ing], 'why' => $why];
 
-        // 1. steel — the cheap engine upgrade (iron + carbon).
-        if ($has('steel') < 3 && $has('iron') > 0 && $has('carbon') > 0) {
-            return $c(['iron' => 1, 'carbon' => 1], 'drive chain — smelt steel (iron + carbon) for engine upgrades');
+        // steel — the flagship engine upgrade ("steel-engine"). Need ~1 per
+        // engine part, so keep a deep stack (iron + carbon).
+        if ($has('steel') < 6 && $has('iron') > 0 && $has('carbon') > 0) {
+            return $c(['iron' => 1, 'carbon' => 1], 'drive chain — smelt steel (iron + carbon) for steel-engines');
         }
-        // 2. motor — the core kinetic part (iron + magnet + wire).
-        if ($has('motor') < 3 && $has('iron') > 0 && $has('magnet') > 0 && $has('wire') > 0) {
+        // motor — the fallback engine upgrade + a rocket_engine input.
+        if ($has('motor') < 4 && $has('iron') > 0 && $has('magnet') > 0 && $has('wire') > 0) {
             return $c(['iron' => 1, 'magnet' => 1, 'wire' => 1], 'drive chain — combine a motor (iron + magnet + wire)');
         }
-        // 3. battery — opens the advanced_motor / richer lines (metal + salt + silicon).
-        if ($has('battery') < 2 && $has('metal') > 0 && $has('salt') > 0 && $has('silicon') > 0) {
-            return $c(['metal' => 1, 'salt' => 1, 'silicon' => 1], 'drive chain — combine a battery (metal + salt + silicon)');
-        }
-        // 4. rocket_engine — the orbital drive (engine + motor, or engine + composite).
-        if ($has('rocket_engine') < 3 && $has('engine') > 0 && $has('motor') > 0) {
+        // rocket_engine — an orbital-drive loose part (engine + motor / composite).
+        if ($has('rocket_engine') < 2 && $has('engine') > 0 && $has('motor') > 0) {
             return $c(['engine' => 1, 'motor' => 1], 'drive chain — combine a rocket_engine (engine + motor)');
         }
-        if ($has('rocket_engine') < 3 && $has('engine') > 0 && $has('composite') > 0) {
-            return $c(['engine' => 1, 'composite' => 1], 'drive chain — combine a rocket_engine (engine + composite)');
-        }
-        // 5. advanced_motor — a stronger drive (engine + magnet + motor).
-        if ($has('advanced_motor') < 2 && $has('engine') > 0 && $has('magnet') > 0 && $has('motor') > 0) {
+        // advanced_motor — a stronger drive loose part (engine + magnet + motor).
+        if ($has('advanced_motor') < 2 && $has('engine') > 0 && $has('magnet') > 0 && $has('motor') > 1) {
             return $c(['engine' => 1, 'magnet' => 1, 'motor' => 1], 'drive chain — combine an advanced_motor (engine + magnet + motor)');
         }
 
         return null;
     }
 
-    /** The best propulsion `with:` item on hand for `build{part:engine}`, or `null`. */
+    /**
+     * The best `with:` item on hand for `build{part:engine}`. The engine part's
+     * accepted upgrades are `engine` / `motor` / `steel` (per the engine's own
+     * reject text); `codex-inventor`'s flagship flyer is "steel-engine", so
+     * `steel` is preferred, then `motor`. `rocket_engine` / `advanced_motor`
+     * are NOT engine upgrades — they are fed as their own loose parts.
+     */
     public static function bestDriveUpgrade(array $inv): ?string
     {
-        foreach (['rocket_engine', 'advanced_motor', 'motor', 'steel'] as $item) {
+        foreach (['steel', 'motor'] as $item) {
             if ((int) ($inv[$item] ?? 0) > 0) {
                 return $item;
             }
@@ -996,9 +998,10 @@ final class Ladder
                 $held = self::looseParts($raw);
                 $engineParts = count(array_filter($held, static fn(string $p): bool => $p === 'engine'));
 
-                // An engine-heavy spread on hand → assemble and fly-test it.
-                if (count($held) >= 7 && $engineParts >= 3) {
-                    return ['verb' => 'finalize', 'args' => ['name' => 'accord_runner'], 'why' => 'expansionist — finalize the engine-heavy airframe'];
+                // A deeply engine-heavy spread on hand (codex's flyers are
+                // quad/penta-engine) → assemble and fly-test it.
+                if (count($held) >= 8 && $engineParts >= 5) {
+                    return ['verb' => 'finalize', 'args' => ['name' => 'accord_runner'], 'why' => 'expansionist — finalize the penta-engine airframe'];
                 }
 
                 // 1. DRIVE CHAIN — craft the propulsion items (motor,
@@ -1037,30 +1040,30 @@ final class Ladder
                 //    harvest / buy it.
                 $upg = self::bestDriveUpgrade($inv);
                 $canBuild = $has('metal') >= 5 || ($has('metal') < 10 && $credits >= 60);
-                if ($upg !== null && $engineParts < 4 && $has('engine') > 0 && $canBuild) {
+                if ($upg !== null && $engineParts < 5 && $has('engine') > 0 && $canBuild) {
                     if ($has('metal') < 5) {
                         return ['verb' => 'buy', 'args' => ['resource' => 'metal', 'n' => 12], 'why' => 'expansionist — stock metal for engine parts'];
                     }
 
                     return ['verb' => 'build', 'args' => ['part' => 'engine', 'with' => [$upg => 1]], 'why' => "expansionist — build engine #" . ($engineParts + 1) . " with {$upg}"];
                 }
-                if ($engineParts >= 1 && $canBuild) {
-                    foreach (['frame', 'wing', 'fuel_tank', 'landing_gear', 'cockpit'] as $p) {
+                // Once the engines are down, add the orbital-drive loose parts
+                // and the structural pieces.
+                if ($engineParts >= 3 && $canBuild) {
+                    foreach (['rocket_engine', 'advanced_motor', 'frame', 'wing', 'fuel_tank', 'landing_gear', 'wheel', 'cockpit'] as $p) {
                         if (in_array($p, $held, true)) {
+                            continue;
+                        }
+                        // rocket_engine / advanced_motor are loose parts only if
+                        // we crafted the item to consume.
+                        if (in_array($p, ['rocket_engine', 'advanced_motor'], true) && $has($p) === 0) {
                             continue;
                         }
                         if ($has('metal') < 5) {
                             return ['verb' => 'buy', 'args' => ['resource' => 'metal', 'n' => 12], 'why' => 'expansionist — stock metal for airframe parts'];
                         }
-                        $args = ['part' => $p];
-                        foreach (self::PART_UPGRADES[$p] ?? [] as $up) {
-                            if ($has($up) > 0) {
-                                $args['with'] = [$up => 1];
-                                break;
-                            }
-                        }
 
-                        return ['verb' => 'build', 'args' => $args, 'why' => "expansionist — build the {$p} for the airframe"];
+                        return ['verb' => 'build', 'args' => ['part' => $p], 'why' => "expansionist — build the {$p} for the airframe"];
                     }
                 }
 

@@ -12,6 +12,23 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.18] - 2026-09-09
+
+### Fixed
+- Follow-up to 3.2.17's live run: the drive chain now executes (agent crafts
+  `motor`, `rocket_engine`, `battery`, `steel`), but every `finalize` was still
+  inert — bundles had only 1-2 `engine` parts and the engine build was passing
+  `with:{rocket_engine}`, which the `engine` part does not accept (its upgrades
+  are `engine`/`motor`/`steel`).
+  - `bestDriveUpgrade()` now returns **`steel`** (then `motor`) — codex's
+    flagship flyer is literally named "steel-engine".
+  - Build up to **5** `engine` parts (was 4); `finalize` gate raised to **8+
+    parts with 5+ engines** (codex's flyers are quad/penta-engine, mass ~2000),
+    in rung 1, the expansionist gear-up, and the `AutoPlayer` finalize guard.
+  - `rocket_engine` / `advanced_motor` added as their own loose parts once the
+    engines are down (they are not engine `with:` upgrades); `wheel` added to
+    the structural spread.
+
 ## [3.2.17] - 2026-09-09
 
 ### Changed
