@@ -285,15 +285,15 @@ class LadderTest extends NHAUnitTestCase
         $this->assertSame('combine', $drive['verb']);
         $this->assertSame(['iron' => 1, 'magnet' => 1, 'wire' => 1], $drive['args']['ingredients']);
 
-        // Drive chain done (steel + rocket_engines stocked), no bundle yet →
-        // `build` a steel-engine part (steel is the engine's real upgrade).
-        $engine = Ladder::suggestion(
-            ['tick' => 5, 'in_space' => false, 'altitude' => 0, 'inventory' => self::KIT + ['ion_thruster' => 1, 'cryo_fuel' => 3, 'heat_shield' => 1, 'metal' => 20, 'engine' => 5, 'rocket_engine' => 2, 'steel' => 6, 'motor' => 4], 'loose_parts' => [], 'position' => [10, 10], 'nearby_deposits' => []],
-            [],
-            [],
-            false,
-            'expansionist',
-        );
+        // Drive chain done (steel + engine items on hand), empty bundle → build
+        // the `frame` chassis FIRST (so a forced-early finalize still has a body).
+        $inv = self::KIT + ['ion_thruster' => 1, 'cryo_fuel' => 3, 'heat_shield' => 1, 'metal' => 20, 'engine' => 5, 'rocket_engine' => 2, 'steel' => 6, 'motor' => 4];
+        $frame = Ladder::suggestion(['tick' => 5, 'in_space' => false, 'altitude' => 0, 'inventory' => $inv, 'loose_parts' => [], 'position' => [10, 10], 'nearby_deposits' => []], [], [], false, 'expansionist');
+        $this->assertSame('build', $frame['verb']);
+        $this->assertSame('frame', $frame['args']['part']);
+
+        // Frame down → now the steel-engines (steel is the engine's real upgrade).
+        $engine = Ladder::suggestion(['tick' => 5, 'in_space' => false, 'altitude' => 0, 'inventory' => $inv, 'loose_parts' => ['frame'], 'position' => [10, 10], 'nearby_deposits' => []], [], [], false, 'expansionist');
         $this->assertSame('build', $engine['verb']);
         $this->assertSame('engine', $engine['args']['part']);
         $this->assertSame(['steel' => 1], $engine['args']['with']);
@@ -314,12 +314,12 @@ class LadderTest extends NHAUnitTestCase
         $this->assertSame('buy', $needMetal['verb']);
         $this->assertSame('metal', $needMetal['args']['resource']);
 
-        // Full kit + metal + a propulsion item + engine items, no bundle yet →
-        // `build` an engine part (an `ion_thruster` resource is cargo, not a
-        // ship — it must not ride yet).
+        // Full kit + metal + steel + engine items, no bundle yet → start the
+        // airframe with the `frame` chassis (an `ion_thruster` resource is
+        // cargo, not a ship — it must not ride yet).
         $assemble = Ladder::suggestion($base(['credits' => 4000, 'ion_thruster' => 1, 'cryo_fuel' => 3, 'heat_shield' => 1, 'metal' => 20, 'steel' => 3, 'engine' => 4]), [], [], false, 'expansionist');
         $this->assertSame('build', $assemble['verb']);
-        $this->assertSame('engine', $assemble['args']['part']);
+        $this->assertSame('frame', $assemble['args']['part']);
 
         // A finalized ship + fuel, standing on a tall elevator → NOW ride up.
         $ready = $base(['credits' => 4000, 'cryo_fuel' => 3]);

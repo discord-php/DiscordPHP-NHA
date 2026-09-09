@@ -12,6 +12,23 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.19] - 2026-09-09
+
+### Fixed
+- 3.2.18 built 5 steel-engines and `finalize`d a PURE-engine bundle → `v=0`
+  (worse than the mixed bundles that hit v≈28). A ship needs STRUCTURE:
+  - The gear-up now builds to a **balanced target composition**
+    (`frame` ×1 first as the chassis, `engine` ×5, then `wing`/`wheel`/
+    `fuel_tank`/`landing_gear`) instead of engines-then-maybe-structure.
+  - `finalize` gate = **3+ engines AND a `frame` AND a `wing` or `wheel` AND
+    7+ parts AND fuel loaded** (a pure-engine or fuel-less bundle finalises
+    inert).
+  - The drive chain buys `carbon` when the steel smelt stalls on it (the live
+    run ran `carbon` to 0 and the engine builds started rejecting).
+  - The airframe is only started once engines are actually makeable (a
+    steel/motor upgrade + `engine` items on hand) — no more bare `frame` on a
+    lone metal pile.
+
 ## [3.2.18] - 2026-09-09
 
 ### Fixed

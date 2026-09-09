@@ -544,9 +544,15 @@ final class Ladder
         $c = static fn(array $ing, string $why): array => ['verb' => 'combine', 'args' => ['ingredients' => $ing], 'why' => $why];
 
         // steel — the flagship engine upgrade ("steel-engine"). Need ~1 per
-        // engine part, so keep a deep stack (iron + carbon).
-        if ($has('steel') < 6 && $has('iron') > 0 && $has('carbon') > 0) {
-            return $c(['iron' => 1, 'carbon' => 1], 'drive chain — smelt steel (iron + carbon) for steel-engines');
+        // engine part, so keep a deep stack (iron + carbon). Buy carbon if the
+        // smelt is stalled on it and there are credits.
+        if ($has('steel') < 6 && $has('iron') > 0) {
+            if ($has('carbon') > 0) {
+                return $c(['iron' => 1, 'carbon' => 1], 'drive chain — smelt steel (iron + carbon) for steel-engines');
+            }
+            if ((int) ($inv['credits'] ?? 0) >= 60) {
+                return ['verb' => 'buy', 'args' => ['resource' => 'carbon', 'n' => 6], 'why' => 'drive chain — buy carbon to smelt steel for engines'];
+            }
         }
         // motor — the fallback engine upgrade + a rocket_engine input.
         if ($has('motor') < 4 && $has('iron') > 0 && $has('magnet') > 0 && $has('wire') > 0) {
@@ -996,29 +1002,30 @@ final class Ladder
             // `build` + `finalize`. That chain is the priority here.
             if ($onGround && ! $flightReady) {
                 $held = self::looseParts($raw);
-                $engineParts = count(array_filter($held, static fn(string $p): bool => $p === 'engine'));
+                $count = static fn(string $p): int => count(array_filter($held, static fn(string $q): bool => $q === $p));
+                $engineParts = $count('engine');
 
-                // A deeply engine-heavy spread on hand (codex's flyers are
-                // quad/penta-engine) → assemble and fly-test it.
-                if (count($held) >= 8 && $engineParts >= 5) {
-                    return ['verb' => 'finalize', 'args' => ['name' => 'accord_runner'], 'why' => 'expansionist — finalize the penta-engine airframe'];
+                // A BALANCED, engine-heavy airframe → assemble and fly-test it:
+                // a chassis (`frame`), 3+ `engine`s for power, and a lift/drive
+                // surface (`wing`/`wheel`). A pure-engine bundle finalises to
+                // v=0 — it needs the structure.
+                $hasStructure = $count('frame') >= 1 && ($count('wing') >= 1 || $count('wheel') >= 1);
+                if ($engineParts >= 3 && $hasStructure && count($held) >= 7 && $fuelled) {
+                    return ['verb' => 'finalize', 'args' => ['name' => 'accord_runner'], 'why' => 'expansionist — finalize the balanced engine-heavy airframe'];
                 }
 
-                // 1. DRIVE CHAIN — craft the propulsion items (motor,
-                //    rocket_engine, advanced_motor, battery). The real blocker.
+                // 1. DRIVE CHAIN — craft the propulsion items. The real blocker.
                 if ($drive = self::driveChainStep($inv)) {
                     return $drive;
                 }
 
-                // 2. Cheap flight kit from credits, so launch is instant once
-                //    the ship exists. (`ion_thruster` is the depot's orbital
-                //    upgrade; fuel + a heat_shield for the Mars/Venus legs.)
+                // 2. Cheap flight kit from credits.
                 if ($has('ion_thruster') === 0 && $credits >= 150) {
                     return ['verb' => 'buy', 'args' => ['resource' => 'ion_thruster', 'n' => 1], 'why' => 'expansionist — buy the depot ion_thruster'];
                 }
                 if (! $fuelled) {
                     if ($credits >= 60) {
-                        return ['verb' => 'buy', 'args' => ['resource' => 'cryo_fuel', 'n' => 3], 'why' => 'expansionist — buy cryo_fuel'];
+                        return ['verb' => 'buy', 'args' => ['resource' => 'cryo_fuel', 'n' => 3], 'why' => 'expansionist — buy cryo_fuel (a ship runs on it)'];
                     }
                     if ($has('ice') > 0 && ($has('coal') > 0 || $has('oil') > 0)) {
                         return ['verb' => 'combine', 'args' => ['ingredients' => ['ice' => 1, ($has('coal') > 0 ? 'coal' : 'oil') => 1]], 'why' => 'expansionist — combine cryo_fuel'];
@@ -1033,38 +1040,43 @@ final class Ladder
                     }
                 }
 
-                // 3. BUILD the airframe ENGINE-HEAVY: `engine` parts first, each
-                //    fitted with the best propulsion item held, then structural
-                //    pieces once at least one engine is on the bundle. Only when
-                //    metal is available (parts cost 2-5) — else fall through to
-                //    harvest / buy it.
+                // 3. BUILD a BALANCED airframe to a target composition. `frame`
+                //    (chassis) FIRST so any forced-early `finalize` still has a
+                //    body, then engines to 5, then the lift / drive / tank
+                //    surfaces. Buy the metal the parts cost.
                 $upg = self::bestDriveUpgrade($inv);
-                $canBuild = $has('metal') >= 5 || ($has('metal') < 10 && $credits >= 60);
-                if ($upg !== null && $engineParts < 5 && $has('engine') > 0 && $canBuild) {
-                    if ($has('metal') < 5) {
-                        return ['verb' => 'buy', 'args' => ['resource' => 'metal', 'n' => 12], 'why' => 'expansionist — stock metal for engine parts'];
+                $canBuild = $has('metal') >= 8 || ($has('metal') < 10 && $credits >= 60);
+                // Only start / continue an airframe once we can actually make
+                // engines (a steel/motor upgrade + `engine` items on hand) or a
+                // bundle is already underway — otherwise it is a dead hull.
+                $target = ['frame' => 1, 'engine' => 5, 'wing' => 1, 'wheel' => 1, 'fuel_tank' => 1, 'landing_gear' => 1];
+                $airframeViable = ($upg !== null && $has('engine') > 0) || $held !== [];
+                foreach ($airframeViable ? $target : [] as $part => $want) {
+                    if ($count($part) >= $want) {
+                        continue;
+                    }
+                    if ($part === 'engine' && ($upg === null || $has('engine') === 0)) {
+                        continue; // need a steel/motor upgrade + an engine item
+                    }
+                    if (! $canBuild) {
+                        break;
+                    }
+                    if ($has('metal') < 8) {
+                        return ['verb' => 'buy', 'args' => ['resource' => 'metal', 'n' => 16], 'why' => "expansionist — stock metal for the {$part}"];
+                    }
+                    $args = ['part' => $part];
+                    if ($part === 'engine') {
+                        $args['with'] = [$upg => 1];
+                    } else {
+                        foreach (self::PART_UPGRADES[$part] ?? [] as $u) {
+                            if ($has($u) > 0) {
+                                $args['with'] = [$u => 1];
+                                break;
+                            }
+                        }
                     }
 
-                    return ['verb' => 'build', 'args' => ['part' => 'engine', 'with' => [$upg => 1]], 'why' => "expansionist — build engine #" . ($engineParts + 1) . " with {$upg}"];
-                }
-                // Once the engines are down, add the orbital-drive loose parts
-                // and the structural pieces.
-                if ($engineParts >= 3 && $canBuild) {
-                    foreach (['rocket_engine', 'advanced_motor', 'frame', 'wing', 'fuel_tank', 'landing_gear', 'wheel', 'cockpit'] as $p) {
-                        if (in_array($p, $held, true)) {
-                            continue;
-                        }
-                        // rocket_engine / advanced_motor are loose parts only if
-                        // we crafted the item to consume.
-                        if (in_array($p, ['rocket_engine', 'advanced_motor'], true) && $has($p) === 0) {
-                            continue;
-                        }
-                        if ($has('metal') < 5) {
-                            return ['verb' => 'buy', 'args' => ['resource' => 'metal', 'n' => 12], 'why' => 'expansionist — stock metal for airframe parts'];
-                        }
-
-                        return ['verb' => 'build', 'args' => ['part' => $p], 'why' => "expansionist — build the {$p} for the airframe"];
-                    }
+                    return ['verb' => 'build', 'args' => $args, 'why' => "expansionist — build {$part} (" . ($count($part) + 1) . "/{$want}) for the airframe"];
                 }
 
                 // 4. Drive chain + airframe done and it still won't fly → a
