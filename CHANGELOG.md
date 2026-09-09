@@ -12,6 +12,16 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.33] - 2026-09-09
+
+### Fixed
+- **Hold covers the whole space tier, not just the orbit band.** A held ship
+  loses ~2 altitude/tick to orbital decay; the ~130-tick sink from 300 to the
+  ground fell through `isHoldingForWindow` (which required alt 2265 300) into
+  loop-break churn. The hold + suppression now run for alt 2265 100, idling
+  through the sink; once it lands, the grounded-with-ship path rides it back
+  up. `dock` in the hold is gated to the real orbit band (3002013599).
+
 ## [3.2.32] - 2026-09-09
 
 ### Fixed

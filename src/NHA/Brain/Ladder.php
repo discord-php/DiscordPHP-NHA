@@ -508,7 +508,10 @@ final class Ladder
         if ($stance !== Stance::Expansionist->value) {
             return false;
         }
-        if (! ($raw['in_space'] ?? false) || (int) ($raw['altitude'] ?? 0) < 300) {
+        // The whole space tier (≥ 100), not just the orbit band — a held ship
+        // decays ~2 alt/tick, and the ~130-tick sink from 300 to the ground
+        // would otherwise fall through to loop-break and thrash.
+        if (! ($raw['in_space'] ?? false) || (int) ($raw['altitude'] ?? 0) < 100) {
             return false;
         }
         if (($raw['expansion']['at_body'] ?? null) !== null || ! self::hasOrbitalShip($raw)) {
@@ -1243,12 +1246,14 @@ final class Ladder
                 return ['verb' => 'depart', 'args' => ['dest' => $dest], 'why' => "expansionist — {$dest} window is open and you are fuelled and shielded"];
             }
 
-            // In Earth orbit with a depart-capable ship but NO open window (or
-            // still short on fuel) → HOLD PRODUCTIVELY. Top up the transfer
-            // fuel first (a ship in orbit on fumes is the whole failure mode),
-            // then a heat_shield for the Mars/Venus legs, then dock+mine an
-            // asteroid if one is here, else idle and wait the window out.
-            if ($inSpace && $alt >= 300 && $atBody === null && $hasShip) {
+            // In space with a depart-capable ship but NO serviceable window →
+            // HOLD PRODUCTIVELY. Top up the transfer fuel first (a ship in
+            // orbit on fumes is the whole failure mode), then a heat_shield for
+            // the Mars/Venus legs, then dock+mine an asteroid if one is in
+            // range, else idle. Covers the whole space tier so the slow
+            // orbital-decay sink to the ground does not fall through to churn;
+            // once it lands, the grounded-with-ship path rides it back up.
+            if ($inSpace && $alt >= 100 && $atBody === null && $hasShip) {
                 if (! $fuelReady && $credits >= 60) {
                     return ['verb' => 'buy', 'args' => ['resource' => 'cryo_fuel', 'n' => 30], 'why' => "expansionist — stock cryo_fuel ({$fuelUnits}/" . self::DEPART_FUEL_MIN . ') so the ship clears the transfer Δv'];
                 }
@@ -1270,7 +1275,7 @@ final class Ladder
                 foreach ((array) ($raw['asteroids'] ?? []) as $a) {
                     $near = min($near, (int) (((array) $a)['dist'] ?? 99));
                 }
-                if ($near <= 2) {
+                if ($near <= 2 && $alt >= 300 && $alt < 600) {
                     return ['verb' => 'dock', 'args' => [], 'why' => 'expansionist — dock the adjacent asteroid and mine while holding for a window'];
                 }
 

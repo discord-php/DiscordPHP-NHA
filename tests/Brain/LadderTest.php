@@ -492,6 +492,16 @@ class LadderTest extends NHAUnitTestCase
         $venusOnly['inventory']['cryo_fuel'] = 120;
         $this->assertTrue(Ladder::isHoldingForWindow($venusOnly, 'expansionist'));
 
+        // Still holding while decaying through the space tier (alt 100–299) —
+        // the ~2/tick sink to the ground must not fall through to churn.
+        $sinking = $held;
+        $sinking['altitude'] = 180;
+        $this->assertTrue(Ladder::isHoldingForWindow($sinking, 'expansionist'));
+        $this->assertContains(Ladder::suggestion($sinking, [], [], false, 'expansionist')['verb'], ['deposit', 'move', 'buy']);
+        // Below the space tier → on its way to the ground, no longer "holding".
+        $sinking['altitude'] = 60;
+        $this->assertFalse(Ladder::isHoldingForWindow($sinking, 'expansionist'));
+
         // Under-fuelled + credits → stock cryo_fuel toward the transfer reserve.
         $buyFuel = Ladder::suggestion($held, [], [], false, 'expansionist');
         $this->assertSame('buy', $buyFuel['verb']);
