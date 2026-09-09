@@ -12,6 +12,29 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.20] - 2026-09-09
+
+### Added
+- **`drives=true` recipe cracked by live token-probing** (`ship_probe*.py`).
+  It is SCALE, not composition: bundles of 4-19 parts always `finalize` inert
+  regardless of mix (even 8 steel-engines, even v_air 46). A **~34-part
+  mega-bundle** finalises `drives=true`: `frame x2, engine x12 (with steel),
+  wheel x6, wing x6, fuel_tank x3, landing_gear x2, tail x2, cockpit x1`.
+  A 58-part bundle with `wings > engines` and no tail/cockpit → inert, so:
+  wings <= engines, tail + cockpit required. A `drives=true` vehicle `deploy`s
+  as an **auto-miner** (passive resource income).
+- `Ladder::megaBundleReady()`, `SHIP_BUNDLE_TARGET`, `SHIP_BUNDLE_MIN`. The
+  expansionist gear-up + rung 1 + the `AutoPlayer` finalize guard now build to
+  and finalize only the full mega-bundle; the engine build stocks `crystal`
+  (each engine costs metal 8 + crystal 1 + steel 1). `SHIP_PART_ARCHETYPES`
+  trimmed to the 9 confirmed-valid parts.
+
+### Notes
+- Each mega-bundle costs ~5000 credits of materials, so the agent earns /
+  deploys miners first. **`flies=true` is still unsolved** — 44 parts / 16
+  wings stayed `flies=false` (v_air ~15-46 vs codex's 121); it needs a bigger
+  bundle still. `flies` + `orbital_engine` gates `depart` to the inner system.
+
 ## [3.2.19] - 2026-09-09
 
 ### Fixed

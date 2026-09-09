@@ -168,15 +168,12 @@ final class Ladder
             return $combat;
         }
 
-        // 1. Assemble the airframe once it is deeply engine-heavy — the ships
-        //    that fly are quad/penta-engine (5+ `engine` parts, 8+ total).
-        //    A lighter bundle just mints another inert hull.
-        $lp1 = self::looseParts($raw);
-        if (count($lp1) >= 8
-            && count(array_filter($lp1, static fn(string $p): bool => $p === 'engine')) >= 5
-            && ! self::hasOrbitalShip($raw)
-        ) {
-            return ['verb' => 'finalize', 'args' => [], 'why' => 'engine-heavy airframe on hand — assemble it and see what flies'];
+        // 1. Assemble the airframe once the full mega-bundle is on hand. Probed
+        //    live: a ~34-part spread with 12 engines, wheels, wings ≤ engines,
+        //    a tail and a cockpit finalises `drives=true`; a lighter one, or one
+        //    missing the tail/cockpit, is an inert hull.
+        if (self::megaBundleReady(self::looseParts($raw)) && ! self::hasOrbitalShip($raw)) {
+            return ['verb' => 'finalize', 'args' => [], 'why' => 'full mega-airframe on hand — finalise it (drives=true) and deploy'];
         }
 
         // 1b. Passive income: a finished vehicle that is not out working yet →
@@ -621,22 +618,46 @@ final class Ladder
         return null;
     }
 
-    /**
-     * The vehicle-part archetypes to feed `build`, minus the ones the engine
-     * has already rejected as "unknown part". `build{part:landing_gear}` is a
-     * confirmed hit; the rest are the documented hints (fuel_tank from the
-     * expansion notes) and standard airframe pieces. Rotated by tick so the
-     * deterministic path searches the (undocumented) vocabulary instead of
-     * hammering one name.
-     *
-     * @var list<string>
-     */
+    /** Valid `build` parts (probed live). Everything else → "unknown part". */
     public const SHIP_PART_ARCHETYPES = [
-        // Confirmed valid by the live engine.
-        'propeller', 'engine', 'frame', 'wing', 'cockpit', 'landing_gear', 'fuel_tank', 'tail',
-        // Still untested — worth a shot as the missing drive/lift piece.
-        'wheel', 'axle',
+        'engine', 'frame', 'wing', 'wheel', 'cockpit', 'landing_gear', 'fuel_tank', 'tail', 'propeller',
     ];
+
+    /**
+     * The confirmed `drives=true` mega-airframe (a ~34-part bundle finalises
+     * `drives=true` and can be `deploy`ed as an auto-miner; anything under ~28
+     * parts finalises inert). `frame` first so a forced-early `finalize` still
+     * has a chassis. `flies=true` needs a bigger bundle still — unsolved.
+     *
+     * @var array<string,int>
+     */
+    public const SHIP_BUNDLE_TARGET = [
+        'frame' => 2, 'engine' => 12, 'wheel' => 6, 'wing' => 6,
+        'fuel_tank' => 3, 'landing_gear' => 2, 'tail' => 2, 'cockpit' => 1,
+    ];
+
+    /** Minimum loose-part count before a `finalize` is worth the turn. */
+    public const SHIP_BUNDLE_MIN = 28;
+
+    /**
+     * Whether a loose-part bundle matches the confirmed `drives=true` shape:
+     * 30+ parts, 12+ engines, wings no more than engines, and both a `tail` and
+     * a `cockpit` (the failed 58-part bundle had neither). `$parts` is the flat
+     * list of part-name strings from {@see looseParts()}.
+     *
+     * @param list<string> $parts
+     */
+    public static function megaBundleReady(array $parts): bool
+    {
+        $n = static fn(string $p): int => count(array_filter($parts, static fn(string $q): bool => $q === $p));
+
+        return count($parts) >= 30
+            && $n('engine') >= 12
+            && $n('wing') <= $n('engine')
+            && $n('wheel') >= 4
+            && $n('tail') >= 1
+            && $n('cockpit') >= 1;
+    }
 
     /**
      * `part => [allowed with: upgrade items]`, as the engine reports them in its
@@ -1005,13 +1026,16 @@ final class Ladder
                 $count = static fn(string $p): int => count(array_filter($held, static fn(string $q): bool => $q === $p));
                 $engineParts = $count('engine');
 
-                // A BALANCED, engine-heavy airframe → assemble and fly-test it:
-                // a chassis (`frame`), 3+ `engine`s for power, and a lift/drive
-                // surface (`wing`/`wheel`). A pure-engine bundle finalises to
-                // v=0 — it needs the structure.
-                $hasStructure = $count('frame') >= 1 && ($count('wing') >= 1 || $count('wheel') >= 1);
-                if ($engineParts >= 3 && $hasStructure && count($held) >= 7 && $fuelled) {
-                    return ['verb' => 'finalize', 'args' => ['name' => 'accord_runner'], 'why' => 'expansionist — finalize the balanced engine-heavy airframe'];
+                // A working vehicle needs SCALE. Probed live: bundles under ~28
+                // parts always finalise inert (drives=false) no matter the mix;
+                // a ~34-part engine-heavy bundle finalises **drives=true**, and
+                // that vehicle can be `deploy`ed as an auto-miner (passive
+                // income — far better than another inert hull). `flies=true`
+                // (for `depart`) needs an even bigger bundle (codex's flyer is
+                // ~mass 2000) — chase that once the deployed miners have paid
+                // for the materials. So: only `finalize` a near-complete mega.
+                if (self::megaBundleReady($held)) {
+                    return ['verb' => 'finalize', 'args' => ['name' => 'accord_runner'], 'why' => 'expansionist — finalize the mega-airframe (drives=true) and deploy it'];
                 }
 
                 // 1. DRIVE CHAIN — craft the propulsion items. The real blocker.
@@ -1040,16 +1064,17 @@ final class Ladder
                     }
                 }
 
-                // 3. BUILD a BALANCED airframe to a target composition. `frame`
-                //    (chassis) FIRST so any forced-early `finalize` still has a
-                //    body, then engines to 5, then the lift / drive / tank
-                //    surfaces. Buy the metal the parts cost.
+                // 3. BUILD the mega-airframe to the confirmed drives=true
+                //    composition (~34 parts): a `frame` chassis FIRST, then
+                //    engines to 12, then wheels / wings / tanks / gear. Buy the
+                //    metal the parts cost (each `engine` = metal 8 + crystal 1
+                //    + steel 1).
                 $upg = self::bestDriveUpgrade($inv);
                 $canBuild = $has('metal') >= 8 || ($has('metal') < 10 && $credits >= 60);
                 // Only start / continue an airframe once we can actually make
                 // engines (a steel/motor upgrade + `engine` items on hand) or a
                 // bundle is already underway — otherwise it is a dead hull.
-                $target = ['frame' => 1, 'engine' => 5, 'wing' => 1, 'wheel' => 1, 'fuel_tank' => 1, 'landing_gear' => 1];
+                $target = self::SHIP_BUNDLE_TARGET;
                 $airframeViable = ($upg !== null && $has('engine') > 0) || $held !== [];
                 foreach ($airframeViable ? $target : [] as $part => $want) {
                     if ($count($part) >= $want) {
@@ -1061,8 +1086,14 @@ final class Ladder
                     if (! $canBuild) {
                         break;
                     }
+                    if ($has('metal') < 8 && $credits >= 60) {
+                        return ['verb' => 'buy', 'args' => ['resource' => 'metal', 'n' => 24], 'why' => "expansionist — stock metal for the {$part}"];
+                    }
+                    if ($part === 'engine' && $has('crystal') < 2 && $credits >= 60) {
+                        return ['verb' => 'buy', 'args' => ['resource' => 'crystal', 'n' => 6], 'why' => 'expansionist — stock crystal (each engine part needs 1)'];
+                    }
                     if ($has('metal') < 8) {
-                        return ['verb' => 'buy', 'args' => ['resource' => 'metal', 'n' => 16], 'why' => "expansionist — stock metal for the {$part}"];
+                        break; // can't afford — fall through to earn
                     }
                     $args = ['part' => $part];
                     if ($part === 'engine') {

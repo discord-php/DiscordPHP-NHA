@@ -263,15 +263,33 @@ class LadderTest extends NHAUnitTestCase
             'elevators' => [['x' => 10, 'y' => 10]], 'nearby_deposits' => [],
         ];
 
-        // A penta-engine spread (8+ parts, 5+ engines) → finalize and fly-test.
+        // A full mega-bundle (30+ parts, 12 engines, wings <= engines, tail +
+        // cockpit) → finalize (this shape finalises drives=true).
+        $mega = array_merge(
+            array_fill(0, 12, 'engine'),
+            array_fill(0, 6, 'wing'),
+            array_fill(0, 6, 'wheel'),
+            ['frame', 'frame', 'fuel_tank', 'fuel_tank', 'fuel_tank', 'landing_gear', 'landing_gear', 'tail', 'tail', 'cockpit'],
+        );
         $parts = Ladder::suggestion(
-            ['tick' => 5, 'in_space' => false, 'altitude' => 0, 'inventory' => self::KIT, 'loose_parts' => ['engine', 'engine', 'engine', 'engine', 'engine', 'frame', 'wing', 'fuel_tank']],
+            ['tick' => 5, 'in_space' => false, 'altitude' => 0, 'inventory' => self::KIT, 'loose_parts' => $mega],
             [],
             [],
             false,
             'expansionist',
         );
         $this->assertSame('finalize', $parts['verb']);
+
+        // The same bundle minus the tail + cockpit → NOT ready, keep building.
+        $short = array_slice($mega, 0, 27);
+        $notReady = Ladder::suggestion(
+            ['tick' => 5, 'in_space' => false, 'altitude' => 0, 'inventory' => self::KIT + ['metal' => 40, 'crystal' => 10, 'steel' => 10, 'engine' => 8, 'credits' => 5000], 'loose_parts' => $short, 'position' => [10, 10], 'nearby_deposits' => []],
+            [],
+            [],
+            false,
+            'expansionist',
+        );
+        $this->assertNotSame('finalize', $notReady['verb'] ?? null);
 
         // Holds `engine` items + magnet/wire/iron → the DRIVE CHAIN fires first
         // (combine a motor), ahead of any bare part-building.
@@ -292,8 +310,8 @@ class LadderTest extends NHAUnitTestCase
         $this->assertSame('build', $frame['verb']);
         $this->assertSame('frame', $frame['args']['part']);
 
-        // Frame down → now the steel-engines (steel is the engine's real upgrade).
-        $engine = Ladder::suggestion(['tick' => 5, 'in_space' => false, 'altitude' => 0, 'inventory' => $inv, 'loose_parts' => ['frame'], 'position' => [10, 10], 'nearby_deposits' => []], [], [], false, 'expansionist');
+        // Frames down → now the steel-engines (steel is the engine's real upgrade).
+        $engine = Ladder::suggestion(['tick' => 5, 'in_space' => false, 'altitude' => 0, 'inventory' => $inv, 'loose_parts' => ['frame', 'frame'], 'position' => [10, 10], 'nearby_deposits' => []], [], [], false, 'expansionist');
         $this->assertSame('build', $engine['verb']);
         $this->assertSame('engine', $engine['args']['part']);
         $this->assertSame(['steel' => 1], $engine['args']['with']);

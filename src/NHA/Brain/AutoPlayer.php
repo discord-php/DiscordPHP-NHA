@@ -952,7 +952,7 @@ final class AutoPlayer
                 if ($verb === 'finalize' && ! Ladder::hasOrbitalShip($rawObs)) {
                     $held0 = Ladder::looseParts($rawObs);
                     $engineParts = count(array_filter($held0, static fn(string $p): bool => $p === 'engine'));
-                    if (count($held0) < 8 || $engineParts < 5) {
+                    if (! Ladder::megaBundleReady($held0)) {
                         $held = (array) $observation->getInventory();
                         if ($drive = Ladder::driveChainStep($held)) {
                             $decision = ['verb' => $drive['verb'], 'args' => $drive['args'], 'reason' => $drive['why']];

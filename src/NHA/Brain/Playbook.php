@@ -45,7 +45,7 @@ final class Playbook
         'gather' => 'n:int — forage the nearest plant within 8 (herb/lichen/fungus/algae → medicine)',
         'plant' => 'no args — spend 1 wood to top up the most-drained tree on your cell (cap 22); rejected if all full',
         'combine' => 'ingredients:{res:qty}, name?:string, n?:int — craft; matches the SET of physics tags, 1 of each per copy',
-        'build' => 'part:string, with?:{res:qty} — craft ONE vehicle part into loose_parts (costs metal). The ships that FLY are ENGINE-HEAVY: build `engine` parts, each with:{rocket_engine|advanced_motor|motor|steel:1}, 3-5 of them, plus frame/wing/fuel_tank/landing_gear, THEN finalize. First craft the propulsion items: combine iron+magnet+wire→motor, engine+motor→rocket_engine, engine+magnet+motor→advanced_motor. CONFIRMED parts: engine, frame, wing, cockpit, landing_gear, fuel_tank, propeller, tail. REJECTED (never retry): chassis, hull, rotor, airframe, wheels, body, thruster.',
+        'build' => 'part:string, with?:{res:qty} — craft ONE vehicle part into loose_parts. Each `engine` costs metal 8 + crystal 1 + steel 1 (combine iron+carbon→steel). A working vehicle needs SCALE: a ~34-part MEGA-bundle — frame x2, engine x12 (with:{steel:1}), wheel x6, wing x6 (wings <= engines), fuel_tank x3, landing_gear x2, tail x2, cockpit x1 — finalises drives=true and can be `deploy`ed as an auto-miner. Anything under ~28 parts, or missing the tail/cockpit, finalises INERT. flies=true (for depart) needs a bigger bundle still. CONFIRMED parts: engine, frame, wing, wheel, cockpit, landing_gear, fuel_tank, tail, propeller. REJECTED: chassis, hull, rotor, airframe, wheels, body, thruster, axle, drivetrain.',
         'finalize' => 'name?:string — assemble ALL loose_parts into one vehicle (computes drive/fly/thrust/fuel_cap/gear). Needs ≥1 loose part first — build them',
         'deploy' => 'no args — send a finalized vehicle off to mine autonomously',
         'construct' => 'shape:string (box/cylinder/sphere/cone/pyramid/monument/extractor/colony/terraform/ziggurat/station), size?, height?, body?, module?, kind?, stage?, name? — raise a structure OR fund a co-op board',
@@ -139,14 +139,15 @@ final class Playbook
             2. INVEST IN OPEN BOARDS — `invest{module, credits}` for a Station module, or fund a `colony` /
                `terraform` board straight from credits. A pure credit sink that moves the co-op bar. Do this
                whenever you hold spare credits and cannot progress your own flight this turn.
-            3. WHEN YOU CANNOT FLY THIS TURN — work the SHIP.
-               • DRIVE CHAIN: `combine iron+magnet+wire → motor`, then `engine+motor → rocket_engine` /
-                 `engine+magnet+motor → advanced_motor`; `iron+carbon → steel`. Then `build{part:engine,
-                 with:{that item}}` x3-5 and `finalize` an engine-heavy bundle. The ships that fly are
-                 engine-heavy — this is the blocker, not a gamble.
-               • RESEARCH only after: a FRESH uninvented `combine` off a ~40+ raw surplus (a real shot + inventor
-                 points). Never resubmit a tried/invented set.
-               • WEALTH only to fund it: harvest what is under you, `sell` a glut (raw past ~80) or credits < ~300.
+            3. WHEN YOU CANNOT FLY THIS TURN — build the MEGA-VEHICLE.
+               • `combine iron+carbon → steel` (each engine needs 1). Then `build` the ~34-part bundle:
+                 frame x2, engine x12 with:{steel:1}, wheel x6, wing x6, fuel_tank x3, landing_gear x2,
+                 tail x2, cockpit x1 → `finalize` → drives=true → `deploy` it as an auto-miner (passive
+                 income). A bundle under ~28 parts, or missing tail/cockpit, finalises INERT — do not
+                 finalize early. Each bundle is ~5000 credits of metal/crystal, so earn first.
+               • RESEARCH: a FRESH uninvented `combine` off a ~40+ raw surplus (inventor points). Never
+                 resubmit a tried/invented set.
+               • WEALTH to fund it: harvest what is under you, `sell` a glut (raw past ~80) or credits < ~300.
                • Do NOT `construct` towers — not the goal.
 
             DECISION LADDER (check top to bottom, act on the FIRST that applies)
