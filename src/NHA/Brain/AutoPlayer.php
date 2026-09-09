@@ -703,9 +703,13 @@ final class AutoPlayer
         $lastCombineSig = ($last !== null && ($last['verb'] ?? '') === 'combine')
             ? self::combineSignature((array) ($last['args'] ?? []))
             : '';
+        $lastDepartDest = ($last !== null && ($last['verb'] ?? '') === 'depart')
+            ? (string) (($last['args'] ?? [])['dest'] ?? '')
+            : '';
+        $lastDepartTick = (int) ($last['tick'] ?? 0);
         $outcome = $lastQueued !== null
             ? $this->nha->intents->getIntentStatus($lastQueued)->then(
-                function ($s) use ($agent_id, $lastQueued, $lastCombineSig): array {
+                function ($s) use ($agent_id, $lastQueued, $lastCombineSig, $lastDepartDest, $lastDepartTick): array {
                     $status = (string) ($s->status ?? '?');
 
                     // Settled or aged out: forget the id so the next turn does
@@ -736,6 +740,18 @@ final class AutoPlayer
                         ) {
                             $this->state->recordDeadCombine($agent_id, $lastCombineSig);
                         }
+                    }
+
+                    // A rejected `depart` arms a retry cooldown (so an
+                    // observe/intent window race does not spam it); a
+                    // thrust-to-weight / capability rejection also parks that
+                    // destination as unreachable for the run.
+                    if ($lastDepartDest !== '' && $status === 'rejected') {
+                        $why = strtolower((string) ($s->result ?? ''));
+                        $permanent = str_contains($why, 'thrust/(mass')
+                            || str_contains($why, 'thrust-to-weight')
+                            || str_contains($why, 'ion_thruster (orbital drive)');
+                        $this->state->recordDepartRejection($agent_id, $lastDepartDest, $lastDepartTick, $permanent);
                     }
 
                     return ['status' => $status, 'result' => (string) ($s->result ?? '')];
@@ -810,7 +826,15 @@ final class AutoPlayer
             // NOT a loop to break: objective rotation here just burns the combat
             // kit and the stockpile. Suppress loop-break and let the forced-hold
             // override below drive the deterministic hold.
-            $holdingForWindow = Ladder::isHoldingForWindow($rawObs, $stance);
+            // Depart gating: skip destinations a prior `depart` was permanently
+            // (TWR) rejected for, and after any rejection hold off for a short
+            // cooldown so an observe/intent window race is not spammed.
+            $departUnreachable = $this->state->departUnreachable($agent_id);
+            $departCooldown = $this->state->departRetryCooldownActive($agent_id, $tick);
+            $departServiceable = Ladder::departTarget($rawObs, $departUnreachable); // null unless a window we can take is open
+            $departNow = $departServiceable !== null && ! $departCooldown;
+            $holdingForWindow = Ladder::isHoldingForWindow($rawObs, $stance, $departUnreachable)
+                || ($departCooldown && ($rawObs['in_space'] ?? false) && Ladder::hasOrbitalShip($rawObs));
             $loopRaw = self::detectLoop($recent);
             $loop = ($loopRaw !== null && ! $holdingForWindow
                 && (str_starts_with($loopRaw, 'stuck ') || ! $this->state->loopBreakCooldownActive($agent_id, $tick)))
@@ -836,7 +860,7 @@ final class AutoPlayer
 
             $altNow = (int) ($observation->get('altitude') ?? 0);
 
-            return $this->brain->decide($observation, $context ?: null, $stance)->then(function (?array $decision) use ($agent_id, $token, $tick, $altNow, $observation, $rawObs, $known, $tried, $dead, $researchPaying, $recent, $loop, $loopObjective, $stance, $holdingForWindow) {
+            return $this->brain->decide($observation, $context ?: null, $stance)->then(function (?array $decision) use ($agent_id, $token, $tick, $altNow, $observation, $rawObs, $known, $tried, $dead, $researchPaying, $recent, $loop, $loopObjective, $stance, $holdingForWindow, $departNow, $departServiceable, $departCooldown) {
                 if ($decision === null && $loopObjective === null && ! $holdingForWindow) {
                     // Record the pass so a wait-streak is visible to detectLoop.
                     $this->state->recordDecision($agent_id, ['verb' => 'wait', 'args' => [], 'reason' => '', 'queued_intent' => null, 'tick' => $tick, 'alt' => $altNow]);
@@ -964,15 +988,43 @@ final class AutoPlayer
                     $verb = 'move';
                 }
 
-                // Parked in orbit with a depart-capable ship and every window
-                // shut: there is one right move (stock fuel / shield, dock, or
-                // idle and wait). Force the deterministic hold for ANY model
-                // pick except a real `depart` — `mine`/`move`/`ride`/`land` all
-                // just burn turns up here. `$loopObjective` is null because
+                // Sanity-check any `depart` (model or ladder) before it goes
+                // out: it is only worth submitting when it is serviceable RIGHT
+                // NOW — the right destination, a window open, the 300-600
+                // altitude band, the arrival items on hand, not on a
+                // post-rejection cooldown, and not a body the ship has already
+                // proven it cannot reach (Venus TWR). Otherwise it is just
+                // rejected and the agent spams it every tick.
+                if ($verb === 'depart' && $stance === Stance::Expansionist->value) {
+                    $picked = (string) ($decision['args']['dest'] ?? '');
+                    if (! $departNow || $picked !== $departServiceable) {
+                        if ($departNow) {
+                            $decision = ['verb' => 'depart', 'args' => ['dest' => $departServiceable], 'reason' => "{$departServiceable} is the serviceable window — go there instead"];
+                        } else {
+                            $hold = Ladder::suggestion($rawObs, $tried, $known, false, $stance);
+                            $decision = ($hold !== null && ! in_array((string) ($hold['verb'] ?? ''), ['land', 'depart'], true))
+                                ? ['verb' => (string) $hold['verb'], 'args' => (array) ($hold['args'] ?? []), 'reason' => (string) ($hold['why'] ?? '')]
+                                : self::idle($rawObs, $departCooldown ? 'backing off after a rejected depart' : 'no serviceable transfer window — hold');
+                        }
+                        $verb = (string) $decision['verb'];
+                    }
+                }
+
+                // Parked in orbit with a depart-capable ship and no window it
+                // can service: the one right move is stock fuel / shield, dock,
+                // or idle and wait ({@see Ladder::isHoldingForWindow()}). Force
+                // the deterministic hold for ANY model pick except a real,
+                // sanctioned `depart` — `mine`/`move`/`ride`/`land` all just
+                // burn turns up here. `$loopObjective` is null because
                 // loop-break is suppressed while holding.
                 if ($holdingForWindow && $verb !== 'depart') {
+                    // `$holdingForWindow` is only set when the deterministic
+                    // check says NOT to depart (no serviceable window, or a
+                    // post-rejection cooldown), so a `depart` coming back from
+                    // `Ladder::suggestion()` here is stale — drop it with `land`
+                    // and fall through to the idle hold.
                     $hold = Ladder::suggestion($rawObs, $tried, $known, false, $stance);
-                    if ($hold !== null && ($hold['verb'] ?? '') !== 'land') {
+                    if ($hold !== null && ! in_array((string) ($hold['verb'] ?? ''), ['land', 'depart'], true)) {
                         $decision = ['verb' => (string) $hold['verb'], 'args' => (array) ($hold['args'] ?? []), 'reason' => (string) ($hold['why'] ?? '')];
                         $verb = (string) $decision['verb'];
                     } elseif (! in_array($verb, ['dock', 'buy', 'deposit', 'wait'], true)) {
@@ -981,15 +1033,13 @@ final class AutoPlayer
                     }
                 }
 
-                // An open transfer window is a ~30-tick chance and the model
+                // An open transfer window is a ~120-tick chance and the model
                 // tends to fritter it away mining / selling. If the agent is in
                 // orbit, fuelled and shielded for a destination whose window is
-                // open, DEPART — nothing else on Earth matters more.
-                if ($stance === Stance::Expansionist->value
-                    && $verb !== 'depart'
-                    && ($dest = Ladder::departTarget($rawObs)) !== null
-                ) {
-                    $decision = ['verb' => 'depart', 'args' => ['dest' => $dest], 'reason' => "{$dest} window is open and the ship is fuelled + shielded — go"];
+                // open (and not on a post-rejection cooldown), DEPART — nothing
+                // else on Earth matters more.
+                if ($stance === Stance::Expansionist->value && $verb !== 'depart' && $departNow) {
+                    $decision = ['verb' => 'depart', 'args' => ['dest' => $departServiceable], 'reason' => "{$departServiceable} window is open and the ship is fuelled + shielded — go"];
                     $verb = 'depart';
                 }
 

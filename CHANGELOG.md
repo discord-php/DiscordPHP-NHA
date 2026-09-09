@@ -12,6 +12,29 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.34] - 2026-09-09
+
+### Fixed
+- **The agent no longer burns turns on a `depart` the engine will reject.**
+  Two failure modes were spamming the intent queue every tick: a `depart` to a
+  window that had briefly closed between observe and intent (an observe/intent
+  race), and `depart venus` with a flyer whose thrust-to-weight can never make
+  the hop.
+  - `Ladder::departTarget()` takes an `$unreachable` list and enforces the
+    engine's alt 300–600 `depart` band (the upper bound was missing, so a ship
+    decaying from 601 still offered a depart).
+  - A rejected `depart` arms a 12-tick retry cooldown
+    (`LoopStrategyStateTrait::recordDepartRejection()` /
+    `departRetryCooldownActive()`); a thrust-to-weight / capability rejection
+    ("thrust/(mass", "thrust-to-weight", "ion_thruster (orbital drive)") also
+    parks that destination as unreachable for the run — the engine only reports
+    the TWR shortfall on rejection, so this is the only way to learn it.
+  - `AutoPlayer::step()` sanity-checks every `depart` (model *or* ladder) before
+    it goes out: unless `departTarget()` confirms that exact destination is
+    serviceable right now and no cooldown is active, it is rewritten to the
+    deterministic hold. The forced-hold block no longer lets a stale `depart`
+    from `Ladder::suggestion()` slip past.
+
 ## [3.2.33] - 2026-09-09
 
 ### Fixed

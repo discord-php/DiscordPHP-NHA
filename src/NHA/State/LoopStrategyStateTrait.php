@@ -137,6 +137,55 @@ trait LoopStrategyStateTrait
         ];
     }
 
+    /** A rejected `depart` is not retried for this many world ticks. */
+    private const DEPART_RETRY_COOLDOWN_TICKS = 12;
+
+    /**
+     * Records a rejected `depart`. Always arms a short retry cooldown so an
+     * observe/intent window race does not spam the same failing `depart` every
+     * tick. When `$permanent` (a thrust-to-weight / capability rejection rather
+     * than a closed window), the destination is also parked in the unreachable
+     * set for the rest of the run — the engine only reports a TWR shortfall on
+     * rejection, so this is the only way to learn the ship cannot make that hop.
+     *
+     * @since 3.2.34
+     */
+    public function recordDepartRejection(int $agent_id, string $dest, int $tick, bool $permanent): void
+    {
+        $key = (string) $agent_id;
+        $this->data['agent_depart_block'][$key] = ['dest' => $dest, 'tick' => $tick];
+        if ($permanent && $dest !== '') {
+            $u = array_values(array_filter((array) ($this->data['agent_depart_unreachable'][$key] ?? []), 'is_string'));
+            if (! in_array($dest, $u, true)) {
+                $u[] = $dest;
+            }
+            $this->data['agent_depart_unreachable'][$key] = array_slice($u, -8);
+        }
+        $this->save();
+    }
+
+    /** True while the last rejected `depart` is still on its retry cooldown. */
+    public function departRetryCooldownActive(int $agent_id, int $tick): bool
+    {
+        $e = $this->data['agent_depart_block'][(string) $agent_id] ?? null;
+        if (! is_array($e) || $tick <= 0) {
+            return false;
+        }
+
+        return ($tick - (int) ($e['tick'] ?? 0)) < self::DEPART_RETRY_COOLDOWN_TICKS;
+    }
+
+    /**
+     * Destinations a `depart` was permanently (TWR / capability) rejected for
+     * this run — {@see \NHA\Brain\Ladder::departTarget()} skips them.
+     *
+     * @return list<string>
+     */
+    public function departUnreachable(int $agent_id): array
+    {
+        return array_values(array_filter((array) ($this->data['agent_depart_unreachable'][(string) $agent_id] ?? []), 'is_string'));
+    }
+
     /**
      * Records the agent's stance. `$tick` is only stamped when the stance
      * actually changes, so it marks the last *switch* for the dwell timer.

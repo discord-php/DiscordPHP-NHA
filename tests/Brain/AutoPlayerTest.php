@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use NHA\Brain\AgentBrain;
 use NHA\Brain\AutoPlayer;
+use NHA\Brain\Ladder;
 use NHA\Brain\OllamaClient;
 use NHA\Http\Http;
 use NHA\NHA;
@@ -1061,6 +1062,100 @@ class AutoPlayerTest extends NHAUnitTestCase
         $player->step(142287, 'tok');
 
         $this->assertNotSame('combine', $this->posts[0][1]['verb'], 'the transfer fuel is protected from a combine');
+    }
+
+    /**
+     * A model `depart` to a body whose window is NOT open right now is not
+     * serviceable — it would just be rejected. The sanity guard swaps it for the
+     * deterministic hold instead of letting the agent spam it.
+     *
+     * @covers \NHA\Brain\AutoPlayer::step
+     */
+    public function testAModelDepartToAClosedWindowIsSwappedForTheHold(): void
+    {
+        $nha = $this->nhaWith([
+            'tick' => 500, 'downed_until' => 0, 'position' => [30, 110],
+            'in_space' => true, 'altitude' => 480,
+            'inventory' => ['credits' => 3000, 'cryo_fuel' => 95, 'heat_shield' => 1,
+                'stimpack' => 1, 'kinetic_gun' => 1, 'slug' => 5],
+            'vehicles' => [['name' => 'skiff', 'flies' => true, 'orbital_engine' => true]],
+            'expansion' => ['at_body' => null, 'windows' => ['deimos' => ['open' => false], 'mars' => ['open' => false]]],
+            'asteroids' => [],
+        ]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"depart","args":{"dest":"deimos"}}'), new StateStore($this->statePath));
+
+        $player->step(142287, 'tok');
+
+        $this->assertNotSame('depart', $this->posts[0][1]['verb'], 'no depart is submitted while every window is closed');
+    }
+
+    /**
+     * A `depart` that came back rejected arms a short retry cooldown: even if the
+     * window flickers back open the next tick (an observe/intent race), the agent
+     * backs off instead of re-sending the same failing intent every tick.
+     *
+     * @covers \NHA\Brain\AutoPlayer::step
+     */
+    public function testARejectedDepartArmsARetryCooldown(): void
+    {
+        $state = new StateStore($this->statePath);
+        $state->recordDecision(142287, ['verb' => 'depart', 'args' => ['dest' => 'deimos'], 'reason' => '', 'queued_intent' => 999, 'tick' => 498]);
+
+        // Last turn's depart comes back rejected (closed window); the window is
+        // open again this tick and the model immediately re-picks it.
+        $nha = $this->nhaWith([
+            'tick' => 500, 'downed_until' => 0, 'position' => [30, 110],
+            'in_space' => true, 'altitude' => 480,
+            'status' => 'rejected', 'result' => 'the Deimos launch window is CLOSED',
+            'inventory' => ['credits' => 3000, 'cryo_fuel' => 95, 'heat_shield' => 1,
+                'stimpack' => 1, 'kinetic_gun' => 1, 'slug' => 5],
+            'vehicles' => [['name' => 'skiff', 'flies' => true, 'orbital_engine' => true]],
+            'expansion' => ['at_body' => null, 'windows' => ['deimos' => ['open' => true], 'mars' => ['open' => false]]],
+            'asteroids' => [],
+        ]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"depart","args":{"dest":"deimos"}}'), $state);
+
+        $player->step(142287, 'tok');
+
+        $this->assertTrue($state->departRetryCooldownActive(142287, 500), 'the rejection armed a retry cooldown');
+        $this->assertNotSame('depart', $this->posts[0][1]['verb'], 'the depart is held back while the cooldown is active');
+    }
+
+    /**
+     * A `depart` rejected for a thrust-to-weight / capability reason is not a
+     * timing problem — the ship simply cannot make that hop. The destination is
+     * parked as unreachable for the run so {@see \NHA\Brain\Ladder::departTarget()}
+     * stops offering it even with the window wide open.
+     *
+     * @covers \NHA\Brain\AutoPlayer::step
+     */
+    public function testATwrRejectedDepartMarksTheDestinationUnreachable(): void
+    {
+        $state = new StateStore($this->statePath);
+        $state->recordDecision(142287, ['verb' => 'depart', 'args' => ['dest' => 'venus'], 'reason' => '', 'queued_intent' => 999, 'tick' => 498]);
+
+        $nha = $this->nhaWith([
+            'tick' => 500, 'downed_until' => 0, 'position' => [30, 110],
+            'in_space' => true, 'altitude' => 480,
+            'status' => 'rejected',
+            'result' => 'need a controllable, flying ship with an ion_thruster (orbital drive) and thrust/(mass*4) >= 0.9',
+            'inventory' => ['credits' => 3000, 'cryo_fuel' => 95, 'heat_shield' => 1,
+                'stimpack' => 1, 'kinetic_gun' => 1, 'slug' => 5],
+            'vehicles' => [['name' => 'skiff', 'flies' => true, 'orbital_engine' => true]],
+            'expansion' => ['at_body' => null, 'windows' => ['venus' => ['open' => true]]],
+            'asteroids' => [],
+        ]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"depart","args":{"dest":"venus"}}'), $state);
+
+        $player->step(142287, 'tok');
+
+        $this->assertContains('venus', $state->departUnreachable(142287), 'the TWR rejection parked venus as unreachable');
+        $this->assertNull(Ladder::departTarget([
+            'in_space' => true, 'altitude' => 480,
+            'inventory' => ['cryo_fuel' => 95, 'heat_shield' => 1, 'acid_skin' => 1],
+            'expansion' => ['at_body' => null, 'windows' => ['venus' => ['open' => true]]],
+            'vehicles' => [['name' => 'skiff', 'flies' => true, 'orbital_engine' => true]],
+        ], $state->departUnreachable(142287)), 'departTarget no longer offers venus even fully equipped');
     }
 
     /**

@@ -502,8 +502,9 @@ final class Ladder
      * `acid_skin`) still counts as holding — {@see departTarget()} is null.
      *
      * @param array<string,mixed> $raw
+     * @param list<string>        $unreachable dests a prior `depart` was rejected for
      */
-    public static function isHoldingForWindow(array $raw, string $stance): bool
+    public static function isHoldingForWindow(array $raw, string $stance, array $unreachable = []): bool
     {
         if ($stance !== Stance::Expansionist->value) {
             return false;
@@ -518,7 +519,7 @@ final class Ladder
             return false;
         }
 
-        return self::departTarget($raw) === null;
+        return self::departTarget($raw, $unreachable) === null;
     }
 
     /** Destinations ordered cheapest-Δv first, with the protective items each arrival consumes. */
@@ -527,18 +528,24 @@ final class Ladder
     ];
 
     /**
-     * The body to `depart` for RIGHT NOW, or `null`. The agent must be in Earth
-     * orbit (alt ≥ 300, `at_body` unset) with a `depart`-capable ship and some
-     * fuel; the cheapest destination whose window is open and whose arrival
-     * items are all on hand wins. {@see AutoPlayer} forces this over any model
-     * pick — an open window is a ~30-tick chance and the model tends to fritter
-     * it away mining.
+     * The body to `depart` for RIGHT NOW, or `null`. The agent must be in the
+     * Earth-orbit band the engine's `depart` accepts (alt 300–600, `at_body`
+     * unset) with a `depart`-capable ship and some fuel; the cheapest
+     * destination whose window is open, whose arrival items are all on hand,
+     * and that is NOT in `$unreachable` wins. {@see AutoPlayer} forces this
+     * over any model pick and refuses a `depart` it does not sanction — an
+     * open window is a ~120-tick chance and the model tends to fritter it away
+     * mining, or fixate on a body the ship cannot actually reach (Venus needs
+     * TWR 0.9; the engine only reports that on rejection, so a failed dest is
+     * fed back in via `$unreachable`).
      *
      * @param array<string,mixed> $raw
+     * @param list<string>        $unreachable dests a prior `depart` was rejected for (TWR / no window)
      */
-    public static function departTarget(array $raw): ?string
+    public static function departTarget(array $raw, array $unreachable = []): ?string
     {
-        if (! ($raw['in_space'] ?? false) || (int) ($raw['altitude'] ?? 0) < 300) {
+        $alt = (int) ($raw['altitude'] ?? 0);
+        if (! ($raw['in_space'] ?? false) || $alt < 300 || $alt > 600) {
             return null;
         }
         if (($raw['expansion']['at_body'] ?? null) !== null || ! self::hasOrbitalShip($raw)) {
@@ -551,6 +558,9 @@ final class Ladder
         }
         $windows = (array) ($raw['expansion']['windows'] ?? []);
         foreach (self::DEPART_ORDER as $dest => $items) {
+            if (in_array($dest, $unreachable, true)) {
+                continue;
+            }
             if (empty(((array) ($windows[$dest] ?? []))['open'])) {
                 continue;
             }

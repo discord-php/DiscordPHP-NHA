@@ -579,6 +579,16 @@ class LadderTest extends NHAUnitTestCase
         $ground['in_space'] = false;
         $ground['altitude'] = 0;
         $this->assertNull(Ladder::departTarget($ground));
+
+        // above the 300-600 depart band (moon altitude edge) → null.
+        $high = $orbit(['deimos' => ['open' => true]], ['cryo_fuel' => 80]);
+        $high['altitude'] = 601;
+        $this->assertNull(Ladder::departTarget($high));
+
+        // a destination in the unreachable list is skipped → next cheapest wins.
+        $twoOpen = $orbit(['deimos' => ['open' => true], 'phobos' => ['open' => true]], ['cryo_fuel' => 80]);
+        $this->assertSame('phobos', Ladder::departTarget($twoOpen, ['deimos']));
+        $this->assertNull(Ladder::departTarget($twoOpen, ['deimos', 'phobos']));
     }
 
     /**

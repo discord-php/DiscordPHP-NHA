@@ -26,10 +26,12 @@ flowchart TD
     poll --> pollC{status}
     pollC -- "applied &amp; was combine" --> mergeK[knownCombines&#91;sig&#93; = true]
     pollC -- "rejected &amp; was combine" --> dead[state.recordDeadCombine sig]
+    pollC -- "rejected &amp; was depart" --> deprej["state.recordDepartRejection<br/>&#8594; 12-tick retry cooldown;<br/>TWR / capability reason<br/>&#8594; park the dest unreachable for the run"]
     pollC -- applied / rejected / gone --> clr[state.clearQueuedIntent]
     pollC -- pending / none --> rules
     mergeK --> rules
     dead --> rules
+    deprej --> rules
     clr --> rules
     rules[knownCombines&#40;&#41;<br/>re-pull GET /rules &#8804; every 90s] --> obs[NHA::observe]
     obs --> downed{downed?}
@@ -61,9 +63,11 @@ flowchart TD
     g2 -- yes --> fb2["fallbackDecision<br/>&quot;work this spot before<br/>riding the elevator again&quot;"]
     fb2 --> stay{ladder pick != the<br/>same transit verb?}
     stay -- yes --> useStay[take the local action]
-    stay -- no --> rec
-    useStay --> rec
-    g2 -- no --> rec
+    stay -- no --> exp
+    useStay --> exp
+    g2 -- no --> exp
+    exp{"&#40;expansionist flight guardrails&#41;<br/>on the ground w/ a finished ship &#8594; force toward orbit;<br/>in orbit &amp; a window we can service is open &amp; no retry cooldown &#8594; force depart;<br/>a depart to any other dest &#40;model or ladder&#41; &#8594; force the deterministic hold<br/>&#40;stock fuel/shield &#8594; dock &#8594; idle&#41;"}
+    exp --> rec
     rec[if final verb == combine:<br/>state.recordCombineSignature] --> submit[NHA::intentWithToken<br/>state.recordDecision &#40;with altitude&#41;]
     submit --> done([&#129302; &#91;stance&#93; / &#128737;&#65039; / &#9851;&#65039; / &#128260; status line])
 ```
