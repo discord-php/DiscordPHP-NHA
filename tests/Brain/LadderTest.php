@@ -263,9 +263,9 @@ class LadderTest extends NHAUnitTestCase
             'elevators' => [['x' => 10, 'y' => 10]], 'nearby_deposits' => [],
         ];
 
-        // 4+ loose parts INCLUDING a drive → assemble the ship.
+        // A full spread of loose parts (5+) → assemble the ship and see what flies.
         $parts = Ladder::suggestion(
-            ['tick' => 5, 'in_space' => false, 'altitude' => 0, 'inventory' => self::KIT, 'loose_parts' => ['propeller', 'wing', 'cockpit', 'landing_gear']],
+            ['tick' => 5, 'in_space' => false, 'altitude' => 0, 'inventory' => self::KIT, 'loose_parts' => ['propeller', 'wing', 'cockpit', 'landing_gear', 'frame']],
             [],
             [],
             false,
@@ -273,15 +273,15 @@ class LadderTest extends NHAUnitTestCase
         );
         $this->assertSame('finalize', $parts['verb']);
 
-        // 4 parts but NO drive part → keep building, don't finalize a stub.
-        $noDrive = Ladder::suggestion(
+        // Fewer than 5 parts → keep building the airframe spread, don't finalize a stub.
+        $stub = Ladder::suggestion(
             ['tick' => 5, 'in_space' => false, 'altitude' => 0, 'inventory' => self::KIT + ['ion_thruster' => 1, 'cryo_fuel' => 3, 'heat_shield' => 1, 'metal' => 20], 'loose_parts' => ['wing', 'cockpit', 'landing_gear', 'tail'], 'position' => [10, 10], 'nearby_deposits' => []],
             [],
             [],
             false,
             'expansionist',
         );
-        $this->assertSame('build', $noDrive['verb']);
+        $this->assertSame('build', $stub['verb']);
 
         // Credits, no ion_thruster → buy the one the depot stocks.
         $thruster = Ladder::suggestion($base(['credits' => 4000]), [], [], false, 'expansionist');
@@ -333,14 +333,15 @@ class LadderTest extends NHAUnitTestCase
         $pick = Ladder::suggestion($raw, [], [], false, 'expansionist');
         $this->assertNotSame('construct', $pick['verb'] ?? null);
 
-        // Homestead in the same spot still towers.
-        $this->assertSame('construct', Ladder::suggestion($raw, [], [], false, 'homestead')['verb']);
+        // A shipless expansionist NEVER builds towers — not even when ship
+        // assembly has stalled (17 inert hulls and counting). The mission is
+        // research + the flight, not a field of spires.
+        $stalled = $raw;
+        $stalled['vehicles'] = array_fill(0, 6, ['name' => 'hull', 'drives' => false, 'flies' => false, 'fuel_cap' => 0]);
+        $this->assertNotSame('construct', Ladder::suggestion($stalled, [], [], false, 'expansionist')['verb'] ?? null);
 
-        // BUT once ship assembly is a proven dead end (3+ inert hulls), towers
-        // are the only thing left to score — the gate lifts.
-        $stuck = $raw;
-        $stuck['vehicles'] = array_fill(0, 3, ['name' => 'hull', 'drives' => false, 'flies' => false, 'fuel_cap' => 0]);
-        $this->assertSame('construct', Ladder::suggestion($stuck, [], [], false, 'expansionist')['verb']);
+        // Homestead in the same spot still towers (it is not the mission stance).
+        $this->assertSame('construct', Ladder::suggestion($raw, [], [], false, 'homestead')['verb']);
     }
 
     /**

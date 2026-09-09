@@ -12,6 +12,33 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.16] - 2026-09-09
+
+### Changed
+- **No more tower grind, and research is the priority.** Per user direction:
+  - The `shipBuildStuck` → build-towers fallback is gone. A shipless
+    expansionist never `construct`s a spire — the tower rung and rung 3b
+    (buy toward `composite`) are gated off for it, and the Playbook's
+    `RESEARCH` / `WEALTH` steps + anti-patterns say "not the goal, skip it".
+  - `RESEARCH_SURPLUS` dropped 60 → `RESOURCE_TARGET + 10` (40): a speculative
+    `combine` now fires "as resources allow", never digging the reserve.
+  - New `Ladder::speculativeCombine()` helper, called from **inside the
+    expansionist gear-up** (right after the cheap flight kit, *before* any
+    part-building) as well as generic rung 2. The mission is blocked on an
+    undocumented mechanic, so inventing the missing item via `combine` — and
+    the inventor points it pays — is the way forward.
+  - A shipless expansionist gets a dedicated harvest rung that tops two raws
+    past the research bar, so `speculativeCombine` keeps finding a fresh pair.
+  - Deterministic airframe experiment kept but demoted: build one part of each
+    valid archetype only while `metal` is stocked and `loose_parts < 5`, then
+    `finalize` the spread. `finalize` gate raised to **5** parts (a 4-part stub
+    still came out inert); dropped the `looseHasDrivePart` / inert-hull
+    circuit-breaker — the junk hulls are cosmetic (no scrap verb) and stopping
+    assembly to grind towers was wrong.
+  - `SHIP_PART_ARCHETYPES` trimmed to the 8 confirmed-valid + `wheel`/`axle`.
+  - Playbook / Expansionist briefing / PLAYBOOK.md rewritten around
+    research-first, no towers.
+
 ## [3.2.15] - 2026-09-09
 
 ### Changed

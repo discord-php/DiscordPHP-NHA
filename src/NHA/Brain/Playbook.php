@@ -139,14 +139,15 @@ final class Playbook
             2. INVEST IN OPEN BOARDS — `invest{module, credits}` for a Station module, or fund a `colony` /
                `terraform` board straight from credits. A pure credit sink that moves the co-op bar. Do this
                whenever you hold spare credits and cannot progress your own flight this turn.
-            3. FUND THE MISSION — everything below only exists to pay for the two above.
-               • BUILDER POINTS: `construct shape=box/cylinder/sphere/cone/pyramid` scores footprint x height every
-                 time — build TALL (h ≥ 30 = x1.5, ≥ 45 = x2) and VARIED. A quick credit + points faucet when you
-                 are grounded and blocked. Claim an unclaimed `monument kind=...` TITLE in passing, don't detour for it.
-               • INVENTOR POINTS: a GAMBLE. One or two speculative `combine`s of raws you already hold; if
-                 `inventor_points` has not moved after two, stop and get back to gearing up.
-               • WEALTH: mine/chop/gather what is under you, `sell` the surplus, `fulfill` contracts you cover.
+            3. WHEN YOU CANNOT FLY THIS TURN — RESEARCH toward the flight recipe.
+               • `combine` a FRESH, uninvented tag set from any two raws sitting a little above their stockpile
+                 (~40+). The drive part that makes a `finalize`d ship actually fly is undocumented — inventing
+                 it is the way through, and every first-ever invention pays `inventor_points` toward the goal.
+                 Never resubmit a set listed as tried/invented.
+               • WEALTH only to fund the above: mine/chop/gather what is under you toward that ~40+ surplus,
+                 `sell` a genuine glut (a raw past ~80) or when credits < ~300, `fulfill` contracts you cover.
                  Depot "buy" = credits it pays YOU on `sell`; "sell" = what YOU pay to `buy`.
+               • Do NOT `construct` towers for builder points — that is not the goal.
 
             DECISION LADDER (check top to bottom, act on the FIRST that applies)
             The report ends with a "SUGGESTED next action" line computed from this ladder — follow it unless the
@@ -175,20 +176,21 @@ final class Playbook
             5. GEAR FOR DEPARTURE. Grounded and NOT flight-ready → close the gap, one step per turn:
                • No `heat_shield` → `combine` superalloy+composite; no `acid_skin` (Venus) → acid/sulfur+rubber;
                  thin fuel → `buy cryo_fuel` or `combine` water+motor for `hydrogen`.
-               • Have an `ion_thruster` + fuel + shield but `vehicles` is still empty → `build` the airframe:
-                 one part per turn into loose_parts, then `finalize`. `part` is an undocumented enum — try
-                 fuel_tank, landing_gear, chassis, frame, hull, wing, wheel, cockpit; "unknown part X" just
-                 means try the next name, do NOT repeat a rejected one. Fit the drive with with:{ion_thruster:1}.
-               A rejected `combine` means you lack the inputs — harvest or `buy` them, don't repeat.
-            6. INVEST IN THE CO-OP. Spare credits (≳ 200) and an open board (`invest{module,credits}` for a Station
-               module, or fund a `colony`/`terraform` board) → put credits in. Moves the shared bar toward the Accord
-               and is never wasted.
-            7. FUND THE MISSION (grounded, blocked on 3-6). Turn effort into credits/points to spend later:
-               • Hold `composite` + `metal` → `construct` a TALL varied tower for builder points.
-               • Genuine surplus (2+ raws at 60+) → ONE speculative `combine` for inventor points; never resubmit.
-               • Credits < ~300, or a raw piled past ~80 → `sell` the excess (keep 30 of each).
-            8. STOCKPILE toward the next ship part / shield / tower — standing on a deposit of a raw you hold < 30 →
-               `mine`/`chop`/`gather` `n` = min(amount, 30 − held, 15).
+               • Have an `ion_thruster` + fuel + shield but `vehicles` is still empty → `build` a SPREAD of
+                 airframe parts (one/turn into loose_parts), then `finalize` and see what comes out. `part` is
+                 an undocumented enum — CONFIRMED: propeller, engine, frame, wing, cockpit, landing_gear,
+                 fuel_tank, tail; REJECTED (never retry): chassis, hull, rotor, airframe, wheels, body,
+                 thruster. Every `finalize` so far is inert (drives=false) — the drive recipe is still unknown.
+            6. RESEARCH toward that recipe — the PRIORITY while you cannot fly. Any two raws a little above their
+               stockpile (~40+) → `combine` a fresh, uninvented tag set. This is how the missing part gets
+               discovered, and each first-ever invention pays `inventor_points` toward the goal. Vary the set;
+               NEVER resubmit one listed as tried/invented. A rejected `combine` = you were an ingredient short:
+               harvest or `buy` it, don't repeat the same set.
+            7. INVEST IN THE CO-OP. Spare credits (≳ 200) and an open board (`invest{module,credits}` for a Station
+               module, or fund a `colony`/`terraform` board) → put credits in. Never wasted.
+            8. STOCKPILE to feed research — standing on a deposit of a raw you hold < ~45 → `mine`/`chop`/`gather`
+               `n` = min(amount, 45 − held, 15). Sell only a genuine glut (a raw past ~80) or when credits < ~300.
+               Do NOT `construct` towers — builder points are not the goal.
             9. POSITION. `move` toward the nearest useful thing: an `elevator` base (to reach orbit free), a deposit
                of the raw you are furthest below 30 on, an artifact (`attune`), loot (`collect`). `x,y` = destination,
                `dx,dy` = one ~3-cell step.
@@ -197,8 +199,8 @@ final class Playbook
             PHASE PLAYBOOK
             - EARLY (on the ground, thin inventory): harvest → `combine` for a `motor` (powered mining yields more)
               and a `chip`/`radar`. `plant` a tree when you have spare wood so wood keeps renewing. Bank credits.
-            - MID (stocked): build TALL for builder points; claim a monument TITLE before rivals do; craft parts
-              with `build`, then `finalize` a vehicle and `deploy` it for passive mining.
+            - MID (stocked): harvest a surplus and RESEARCH it — `combine` fresh tag sets toward the flight
+              recipe and inventor points; `build` + `finalize` airframe experiments alongside.
             - SPACE: you spawn near a finished elevator — `move` to its base cell and `ride` (free, no fuel). In
               orbit (alt 300-599) `dock` an asteroid then `mine` iridium/nickel. `construct shape=station module=...`
               needs you `in_space` and ≥ 3 funders; one agent funds ≤ 40% of any resource.
@@ -214,12 +216,12 @@ final class Playbook
             - `say`/`tell` sparingly and with purpose (recruit an ally, warn, negotiate a trade). One message per tick.
 
             ANTI-PATTERNS — never do these
-            - HOARDING: harvesting a resource you already hold 15+ of. Raw stockpiles do not score — `construct`
-              with them instead.
-            - COMBINE GRIND: submitting `combine` set after set while `inventor_points` stays 0. Two tries, then build.
-            - RESUBMIT: any `combine` set listed in "combine sets already submitted" or "already-invented" — it mints
-              nothing the 2nd time. The loop now auto-drops such a combine and sells a surplus instead, so a wasted
-              pick just costs you the turn — choose a fresh set or a different verb.
+            - RESUBMIT: any `combine` set listed in "combine sets already submitted" or "already-invented" — it
+              mints nothing the 2nd time. Choose a FRESH pair every research turn. (Research itself is good and
+              wanted — it is repeating a spent set that is the mistake.)
+            - HOARDING: harvesting a raw you already hold ~45+ of when others sit low — spread the surplus so
+              research has more pairs to try.
+            - TOWER GRIND: `construct box/cylinder/sphere/cone/pyramid` for builder points. Not the goal; skip it.
             - LOOPING: the same verb as recent turns when nothing forced it. If the last turn was
               `chop`/`mine`/`gather`, this turn must not be — build, sell, or move on.
             - AIMLESS TRANSIT: `launch`/`ride`/`land` with no plan wastes fuel and turns. Reaching Earth orbit to

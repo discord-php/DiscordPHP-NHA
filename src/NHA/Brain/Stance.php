@@ -121,8 +121,11 @@ enum Stance: string
                 . 'Moon base). On a body: `land_body`/`land_moon`, then `construct{shape:colony|extractor|terraform}` '
                 . 'and fund the board — this is the win. In Earth orbit with a fuelled ion-thruster ship and an open '
                 . 'window: `depart` (a moon first — a Forward Base cheapens every later route). On the ground: gear a '
-                . 'ship (`build` parts → `finalize`), craft `heat_shield` / `acid_skin` / `hydrogen`, then `ride`/`launch` '
-                . 'up. `invest` spare credits in any open Station/colony/terraform board. Grind on Earth ONLY to pay for all this.',
+                . 'ship (`build` a spread of parts → `finalize`), craft `heat_shield` / `acid_skin` / `hydrogen`, then '
+                . '`ride`/`launch` up. When you CANNOT progress the flight this turn, RESEARCH: `combine` fresh '
+                . 'uninvented tag sets from a raw surplus — the drive recipe is undocumented and inventing it is the '
+                . 'way through (and it pays inventor points). `invest` spare credits in any open board. Do NOT grind '
+                . 'towers — harvest and research instead.',
         };
     }
 }

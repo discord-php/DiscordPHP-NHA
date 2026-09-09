@@ -47,8 +47,14 @@ final class Ladder
     public const RESOURCE_TARGET = 30;
     public const HOARD_CAP = 80;
 
-    /** Research only fires when at least two raws sit this deep — a genuine surplus, not the stockpile. */
-    public const RESEARCH_SURPLUS = 60;
+    /**
+     * Research fires when at least two raws sit this deep — the stockpile
+     * target plus a small margin, so a `combine` never digs into the reserve
+     * ("as resources allow"). The mission is blocked on an undocumented
+     * mechanic, so inventing new items via `combine` — and the inventor points
+     * it pays — is a real way forward, not a luxury.
+     */
+    public const RESEARCH_SURPLUS = self::RESOURCE_TARGET + 10;
 
     /**
      * Raw materials the Earth depot actually trades (probed from `GET /depot`).
@@ -162,14 +168,13 @@ final class Ladder
             return $combat;
         }
 
-        // 1. Assemble crafted parts into a vehicle — once there are 4+ AND a
-        //    DRIVE part is among them. `finalize` without a drive part just
-        //    mints another hull that neither drives nor flies; and once 3 such
-        //    hulls exist the recipe is clearly unsolved — stop feeding it.
-        if (count((array) ($raw['loose_parts'] ?? [])) >= 4 && self::looseHasDrivePart($raw)
-            && self::inertVehicleCount($raw) < 3
-        ) {
-            return ['verb' => 'finalize', 'args' => [], 'why' => 'you have enough loose parts incl. a drive — assemble them into a vehicle'];
+        // 1. Assemble crafted parts into a vehicle once the bundle is full
+        //    enough to be worth a try (5+ distinct parts). The drive recipe is
+        //    unsolved — most `finalize`s still come out inert — so this fires
+        //    on a fuller spread, not a 4-part stub, and the junk hulls it
+        //    leaves behind are cosmetic (there is no scrap verb).
+        if (count((array) ($raw['loose_parts'] ?? [])) >= 5 && ! self::hasOrbitalShip($raw)) {
+            return ['verb' => 'finalize', 'args' => [], 'why' => 'you have a full spread of loose parts — assemble them and see what flies'];
         }
 
         // 1b. Passive income: a finished vehicle that is not out working yet →
@@ -194,30 +199,15 @@ final class Ladder
 
         // 1d. STANCE steer. A few deterministic nudges toward the current stance
         //     before the generic ladder. The prompt carries the rest.
-        if ($stanced = self::stanceMove($stance, $raw, $inv, $raws, $credits, $x, $y)) {
+        if ($stanced = self::stanceMove($stance, $raw, $inv, $raws, $credits, $x, $y, $tried, $worldKnown, $allowSpeculation)) {
             return $stanced;
         }
 
-        // 2. One speculative combine — but ONLY on a genuine material surplus
-        //    (research is a luxury, not a grind): at least two raws sitting at
-        //    least RESEARCH_SURPLUS deep, on top of the normal stockpile.
-        $surplusRaws = array_filter($raws, static fn(int $q): bool => $q >= self::RESEARCH_SURPLUS);
-        if ($allowSpeculation && count($surplusRaws) >= 2) {
-            $names = array_keys($surplusRaws);
-            for ($i = 0; $i < count($names); $i++) {
-                for ($j = $i + 1; $j < count($names); $j++) {
-                    $pair = [$names[$i], $names[$j]];
-                    sort($pair);
-                    $sig = implode('+', $pair);
-                    if (! isset($tried[$sig]) && ! isset($worldKnown[$sig])) {
-                        return [
-                            'verb' => 'combine',
-                            'args' => ['ingredients' => [$pair[0] => 1, $pair[1] => 1]],
-                            'why' => "{$pair[0]}+{$pair[1]} is an untried, uninvented tag set — one shot at inventor points",
-                        ];
-                    }
-                }
-            }
+        // 2. One speculative combine on a material surplus — research toward the
+        //    goal, not a grind: it only spends raws that sit a margin above the
+        //    stockpile target, and never a set already tried or invented.
+        if ($allowSpeculation && ($research = self::speculativeCombine($raws, $tried, $worldKnown))) {
+            return $research;
         }
 
         // 2b. Off the ground with no orbital work to do (no asteroid to dock and
@@ -252,11 +242,12 @@ final class Ladder
         // is the Accord, not a field of vanity spires. Only once a real ship
         // (not a loose `ion_thruster` resource) is in hold does a tower to fund
         // the trip become fair game again.
-        // …unless ship assembly is a proven dead end (3+ inert hulls), in which
-        // case towers are the only thing left to score and the gate lifts.
+        // An expansionist with no ship is still gearing — the mission is the
+        // Accord, not a field of vanity spires. (A grounded expansionist that
+        // cannot yet build a working ship keeps *experimenting* with parts;
+        // grinding builder points is not a substitute for the goal.)
         $gearingShip = $stance === Stance::Expansionist->value && $onGround
-            && ! self::hasOrbitalShip($raw)
-            && ! self::shipBuildStuck($raw);
+            && ! self::hasOrbitalShip($raw);
         if ($onGround && ! $gearingShip && $has('composite') >= 2 && $has('metal') >= 8) {
             if (self::cellOccupied($raw)) {
                 return self::stepToClearGround($raw);
@@ -270,6 +261,43 @@ final class Ladder
                 'args' => ['shape' => $shape, 'size' => $size, 'height' => $height, 'name' => 'spire-' . ($tick % 1000)],
                 'why' => "you hold the composite + metal a tall {$shape} needs — builder points score every time",
             ];
+        }
+
+        // 3a-mission. A shipless expansionist HARVESTS to feed research: raise a
+        //   couple of raws past the research bar so `speculativeCombine` keeps
+        //   finding a fresh pair to gamble. Mine in place, else walk to the
+        //   nearest deposit of the raw furthest below the bar.
+        if ($gearingShip) {
+            $bar = self::RESEARCH_SURPLUS + 5;
+            $onIt = null;
+            $walkTo = null;
+            $walkHeld = $bar;
+            foreach ((array) ($raw['nearby_deposits'] ?? []) as $d) {
+                $d = (array) $d;
+                $res = (string) ($d['resource'] ?? '');
+                if ($res === '' || ! in_array($res, self::DEPOT_TRADEABLE, true) && ! in_array($res, ['wood', 'herb', 'lichen', 'fungus', 'algae'], true)) {
+                    continue;
+                }
+                $held = $raws[$res] ?? 0;
+                if ($held >= $bar) {
+                    continue;
+                }
+                if ((int) ($d['dist'] ?? 9) === 0) {
+                    $onIt ??= [$res, $held, (int) ($d['amount'] ?? 10)];
+                } elseif ($held < $walkHeld && isset($d['x'], $d['y'])) {
+                    $walkTo = [(int) $d['x'], (int) $d['y'], $res];
+                    $walkHeld = $held;
+                }
+            }
+            if ($onIt !== null) {
+                [$res, $held, $amt] = $onIt;
+                $verb = $res === 'wood' ? 'chop' : (in_array($res, ['herb', 'lichen', 'fungus', 'algae'], true) ? 'gather' : 'mine');
+
+                return ['verb' => $verb, 'args' => ['n' => min($amt, $bar - $held, 15)], 'why' => "harvesting {$res} ({$held}/{$bar}) to feed the next research combine"];
+            }
+            if ($walkTo !== null) {
+                return ['verb' => 'move', 'args' => ['x' => $walkTo[0], 'y' => $walkTo[1]], 'why' => "walking to a {$walkTo[2]} deposit — stocking raws for research"];
+            }
         }
 
         // 3a. STOCKPILE what is under your feet before spending credits: standing
@@ -291,10 +319,10 @@ final class Ladder
         }
 
         // 3b. Spend the credit pile toward a tower: buy the metal, then buy
-        //     aluminium + carbon and combine them into `composite`. Credits are
-        //     only a means — turning them into builder points is the reliable
-        //     scorer a stuck ground agent can always reach.
-        if ($onGround && $credits >= self::CREDIT_FLOOR) {
+        //     aluminium + carbon and combine them into `composite`. Skipped for
+        //     a shipless expansionist — its credits and raws go to the mission
+        //     (research / the flight kit), not a field of spires.
+        if ($onGround && $credits >= self::CREDIT_FLOOR && ! $gearingShip) {
             if ($has('metal') < 8 && $credits >= 60) {
                 return ['verb' => 'buy', 'args' => ['resource' => 'metal', 'n' => 8], 'why' => 'banking metal for a tower — credits are only useful spent'];
             }
@@ -472,39 +500,53 @@ final class Ladder
     }
 
     /**
-     * Whether ship assembly is a proven dead end for this agent: 3+ `finalize`d
-     * hulls all came out driveless and there is no scrap verb to clear them.
-     * The `build`/`finalize` drive recipe is undocumented and unsolved. When
-     * this holds, the gear-up chain is abandoned and the expansionist falls
-     * back to the generic ladder (towers for builder points) so it keeps
-     * scoring instead of spinning on `deposit`/`move`.
+     * The `build` part archetypes already sitting in the loose-part bundle, so
+     * the gear-up rung builds VARIETY (a `finalize` scores on distinct parts +
+     * materials) instead of five of the same.
      *
      * @param array<string,mixed> $raw
+     *
+     * @return list<string>
      */
-    public static function shipBuildStuck(array $raw): bool
+    public static function looseParts(array $raw): array
     {
-        return self::inertVehicleCount($raw) >= 3 && ! self::hasOrbitalShip($raw);
+        return array_values(array_filter(array_map(
+            static fn($p): string => is_array($p) ? (string) ($p['part'] ?? $p['name'] ?? '') : (string) $p,
+            (array) ($raw['loose_parts'] ?? []),
+        )));
     }
 
-    /** Drive-part `build` archetypes — a `finalize` bundle needs one or the ship comes out inert. */
-    public const DRIVE_PARTS = ['engine', 'propeller', 'wheel', 'axle', 'nacelle', 'drive'];
-
     /**
-     * Whether the loose-part bundle already holds a drive part. `finalize`
-     * without one produces a hull that neither `drives` nor `flies`.
+     * The first novel `combine` the agent can afford from its surplus: two raws
+     * that each sit at least {@see RESEARCH_SURPLUS} deep, whose sorted `a+b`
+     * signature is neither in `$tried` (this run) nor `$worldKnown` (already
+     * invented). Returns `null` when there is no surplus pair left to gamble.
      *
-     * @param array<string,mixed> $raw
+     * @param array<string,int>  $raws       Raw resources on hand, sorted desc.
+     * @param array<string,bool> $tried      `a+b => true` for sets submitted this run.
+     * @param array<string,bool> $worldKnown `a+b => true` for sets already invented.
+     *
+     * @return array{verb: string, args: array<string,mixed>, why: string}|null
      */
-    public static function looseHasDrivePart(array $raw): bool
+    public static function speculativeCombine(array $raws, array $tried, array $worldKnown): ?array
     {
-        foreach ((array) ($raw['loose_parts'] ?? []) as $p) {
-            $name = is_array($p) ? (string) ($p['part'] ?? $p['name'] ?? '') : (string) $p;
-            if (in_array($name, self::DRIVE_PARTS, true)) {
-                return true;
+        $surplus = array_keys(array_filter($raws, static fn(int $q): bool => $q >= self::RESEARCH_SURPLUS));
+        for ($i = 0; $i < count($surplus); $i++) {
+            for ($j = $i + 1; $j < count($surplus); $j++) {
+                $pair = [$surplus[$i], $surplus[$j]];
+                sort($pair);
+                $sig = implode('+', $pair);
+                if (! isset($tried[$sig]) && ! isset($worldKnown[$sig])) {
+                    return [
+                        'verb' => 'combine',
+                        'args' => ['ingredients' => [$pair[0] => 1, $pair[1] => 1]],
+                        'why' => "{$pair[0]}+{$pair[1]} is an untried, uninvented tag set — research toward the goal",
+                    ];
+                }
             }
         }
 
-        return false;
+        return null;
     }
 
     /**
@@ -520,8 +562,8 @@ final class Ladder
     public const SHIP_PART_ARCHETYPES = [
         // Confirmed valid by the live engine.
         'propeller', 'engine', 'frame', 'wing', 'cockpit', 'landing_gear', 'fuel_tank', 'tail',
-        // Still untested.
-        'wheel', 'axle', 'nacelle', 'drive',
+        // Still untested — worth a shot as the missing drive/lift piece.
+        'wheel', 'axle',
     ];
 
     /**
@@ -758,10 +800,13 @@ final class Ladder
      * @param array<string,mixed> $raw
      * @param array<string,mixed> $inv
      * @param array<string,int>   $raws
+     * @param array<string,bool>  $tried            Combine sets submitted this run.
+     * @param array<string,bool>  $worldKnown       Combine sets already invented.
+     * @param bool                $allowSpeculation When false, the research nudge is skipped.
      *
      * @return array{verb: string, args: array<string,mixed>, why: string}|null
      */
-    private static function stanceMove(string $stance, array $raw, array $inv, array $raws, int $credits, int $x, int $y): ?array
+    private static function stanceMove(string $stance, array $raw, array $inv, array $raws, int $credits, int $x, int $y, array $tried = [], array $worldKnown = [], bool $allowSpeculation = true): ?array
     {
         $has = static fn(string $k): int => (int) ($inv[$k] ?? 0);
 
@@ -812,15 +857,6 @@ final class Ladder
             $alt = (int) ($raw['altitude'] ?? 0);
             $inSpace = (bool) ($raw['in_space'] ?? false);
             $onGround = ! $inSpace && $alt === 0;
-
-            // Ship assembly is a dead end for this agent: 3+ `finalize`d hulls
-            // all came out driveless (the `build`/`finalize` drive recipe is
-            // undocumented and unsolved), and there is no scrap verb to clear
-            // them. Stop pouring metal and turns into more junk — drop to the
-            // generic ladder (towers / co-op invest / stockpile) so the agent
-            // at least scores while the recipe stays unknown. Flight/at-body
-            // rungs below still fire if a real ship ever appears.
-            $shipBuildStuck = $onGround && self::shipBuildStuck($raw);
 
             // Arrived at a body but still in its orbit → put down.
             if ($atBody !== null && $alt > 0) {
@@ -887,16 +923,14 @@ final class Ladder
                 return ['verb' => 'dock', 'args' => [], 'why' => 'expansionist — dock the asteroid and mine iridium/nickel for ship parts'];
             }
 
-            // On the ground and NOT flight-ready → GEAR UP, do not ride/launch.
-            // The depot sells `ion_thruster`, `cryo_fuel` and `superalloy`
-            // outright, so the fast path is just to BUY them with the credits
-            // the agent has been banking; `combine` is the low-credit fallback.
-            // This runs ahead of the generic ladder's tower rung.
-            if ($onGround && ! $flightReady && ! $shipBuildStuck) {
-                // 4+ loose parts including a DRIVE → bundle them into a ship.
-                // Without a drive part `finalize` just adds another inert hull.
-                if (count((array) ($raw['loose_parts'] ?? [])) >= 4 && self::looseHasDrivePart($raw)) {
-                    return ['verb' => 'finalize', 'args' => ['name' => 'accord_runner'], 'why' => 'expansionist — finalize the loose parts (incl. a drive) into a ship'];
+            // On the ground and NOT flight-ready → GEAR UP toward a ship. The
+            // drive recipe is unsolved, so this keeps *experimenting* — build a
+            // varied spread of parts, `finalize`, see what comes out — rather
+            // than grinding towers. It runs ahead of the generic ladder.
+            if ($onGround && ! $flightReady) {
+                // A full spread of loose parts → assemble and see what flies.
+                if (count((array) ($raw['loose_parts'] ?? [])) >= 5) {
+                    return ['verb' => 'finalize', 'args' => ['name' => 'accord_runner'], 'why' => 'expansionist — finalize the full spread of loose parts'];
                 }
                 // The orbital engine.
                 if ($has('ion_thruster') === 0) {
@@ -928,39 +962,41 @@ final class Ladder
                         return ['verb' => 'buy', 'args' => ['resource' => 'superalloy', 'n' => 1], 'why' => 'expansionist — buy superalloy toward a heat_shield'];
                     }
                 }
-                // Every ship part costs metal (landing_gear 3, cockpit
-                // 4+crystal, frame 5+composite, fuel_tank 3, tail 2) — stock it
-                // before the build rotation starves.
-                if ($has('ion_thruster') > 0 && $has('metal') < 15 && $credits >= 60) {
-                    return ['verb' => 'buy', 'args' => ['resource' => 'metal', 'n' => 12], 'why' => 'expansionist — stock metal; every ship part costs it'];
+                // RESEARCH is the priority now. The flight recipe is undocumented,
+                // so once the cheap kit is in hand a novel `combine` is the real
+                // way forward — a shot at the missing item, plus inventor points
+                // toward the goal. It fires whenever two raws sit a margin above
+                // the stockpile target, so it never digs into the reserve.
+                if ($allowSpeculation && ($research = self::speculativeCombine($raws, $tried, $worldKnown))) {
+                    return $research;
                 }
-                // Kit in hand (ion_thruster + fuel + shield) but still no
-                // vehicle → `build` the airframe parts, then `finalize` bundles
-                // every loose part into one ship. The `part` vocabulary is not
-                // documented anywhere and the engine answers a wrong guess with
-                // "unknown part X", so rotate through the plausible archetypes
-                // (from the expansion-era notes) rather than repeating one bad
-                // name; a hit lands in `loose_parts` and the rung above it
-                // finalizes. The live model explores the same space in parallel.
-                if ($has('ion_thruster') > 0) {
-                    $part = self::SHIP_PART_ARCHETYPES[(int) ($raw['tick'] ?? 0) % count(self::SHIP_PART_ARCHETYPES)];
-                    $args = ['part' => $part];
-                    // Fit a legal upgrade if this part takes one and we hold it.
-                    // No known part accepts `ion_thruster` as a `with:` item —
-                    // where the orbital drive seats is still unsolved.
-                    foreach (self::PART_UPGRADES[$part] ?? [] as $up) {
-                        if ($has($up) > 0) {
-                            $args['with'] = [$up => 1];
-                            break;
-                        }
+                // A light airframe experiment on the side: keep ~one part of
+                // every valid archetype on hand so the LLM (or rung 1) has a
+                // full spread to `finalize` and test. Only while metal is
+                // stocked — parts must not compete with research for raws.
+                $held = self::looseParts($raw);
+                $missing = array_values(array_diff(self::SHIP_PART_ARCHETYPES, $held));
+                if ($has('ion_thruster') > 0 && $missing !== [] && count($held) < 5) {
+                    if ($has('metal') < 15 && $credits >= 60) {
+                        return ['verb' => 'buy', 'args' => ['resource' => 'metal', 'n' => 12], 'why' => 'expansionist — stock metal for a spread of ship parts'];
                     }
+                    if ($has('metal') >= 5) {
+                        $offset = self::inertVehicleCount($raw) % count($missing);
+                        $part = $missing[$offset];
+                        $args = ['part' => $part];
+                        foreach (self::PART_UPGRADES[$part] ?? [] as $up) {
+                            if ($has($up) > 0) {
+                                $args['with'] = [$up => 1];
+                                break;
+                            }
+                        }
 
-                    return ['verb' => 'build', 'args' => $args, 'why' => "expansionist — build a {$part} toward the ship (rotating archetypes; \"unknown part\" just means try the next), then finalize"];
+                        return ['verb' => 'build', 'args' => $args, 'why' => "expansionist — build a {$part} toward a full airframe spread to finalize"];
+                    }
                 }
-                // Low on credits and can't craft yet → let the generic ladder
-                // earn (harvest / sell). It will NOT tower-spam: the tower rung
-                // is gated for a gearing expansionist and the loop guard catches
-                // a construct/move cycle.
+                // Nothing pressing — let the generic ladder HARVEST, building the
+                // raw surplus that feeds the next research combine. No towers
+                // (the tower rung is gated for a shipless expansionist).
                 return null;
             }
 

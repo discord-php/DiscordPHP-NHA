@@ -117,9 +117,13 @@ flowchart TD
 
 Economy targets ([`Ladder`](../src/NHA/Brain/Ladder.php) constants):
 `CREDIT_FLOOR` 300 · `RESOURCE_TARGET` 30 · `HOARD_CAP` 80 · `RESEARCH_SURPLUS`
-60. `sell` fires only below the floor or above the cap; harvesting and
-repositioning fill each raw toward the target; research (rung 2) fires only when
-two raws each sit `RESEARCH_SURPLUS` deep.
+`RESOURCE_TARGET + 10` (40). `sell` fires only below the floor or above the cap.
+The mission is blocked on an undocumented mechanic, so **research is the
+priority**, not a luxury: a speculative `combine` fires whenever two raws sit a
+margin above the stockpile (rung 2, and again inside the expansionist gear-up
+before any part-building). A shipless expansionist has its own harvest rung that
+tops raws toward the research bar, and **never builds towers** (the tower rung is
+gated off for it, and `RESEARCH`/`WEALTH` in its prompt say so).
 
 ---
 
@@ -145,7 +149,7 @@ flowchart TD
 
 | stance | prompt steer + rung 1d |
 |---|---|
-| `expansionist`| the mission stance for every non-combat turn — gear a ship, fly, `construct shape=colony/extractor/terraform` on a body, `dock` an asteroid, `invest` spare credits, else stockpile/earn toward the flight. Falls back to towers only once ship assembly is a proven dead end (`shipBuildStuck`: 3+ inert hulls). |
+| `expansionist`| the mission stance for every non-combat turn — gear a ship, fly, `construct shape=colony/extractor/terraform` on a body, `dock` an asteroid, `invest` spare credits. When it cannot progress the flight this turn it **researches** (`combine` a fresh pair off a raw surplus) and harvests to feed that. Never builds towers. |
 | `aggressive`  | defensive only — keep the magazine deep (`buy slug`), stay at weapon range and `attack` the agent who hit you, `heal` below ~35% HP; do **not** hunt passers-by or bounties. Hands back to `expansionist` once the threat is stale. |
 | `homestead` / `capitalist` | not ranked. If a stale value is read mid-dwell the briefing points back at the mission (bootstrap the kit / fund the boards). |
 

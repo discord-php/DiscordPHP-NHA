@@ -176,13 +176,13 @@ class AutoPlayerTest extends NHAUnitTestCase
      */
     public function testStepDropsACombineTheWorldAlreadyInventedAndFallsToInfrastructure(): void
     {
-        // GET /rules (same mock as observe) reports glass+wood as a known recipe;
-        // the agent holds the composite + metal a tower needs, and ship assembly
-        // is a proven dead end (3 inert hulls) so towers are the fallback.
+        // GET /rules (same mock as observe) reports glass+wood as a known recipe.
+        // Broke, no ship, no research surplus — the spent combine is dropped and
+        // the agent does real work toward the mission (sell to bank credits),
+        // not a re-submit and not `wait`.
         $nha = $this->nhaWith([
             'tick' => 42, 'downed_until' => 0, 'position' => [1, 1],
             'inventory' => ['composite' => 3, 'metal' => 12],
-            'vehicles' => array_fill(0, 3, ['name' => 'hull', 'drives' => false, 'flies' => false, 'fuel_cap' => 0]),
             'dynamic' => [['sig' => 'glass,wood']],
         ]);
         $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"combine","args":{"ingredients":{"glass":1,"wood":1}}}'), new StateStore($this->statePath));
@@ -190,7 +190,8 @@ class AutoPlayerTest extends NHAUnitTestCase
         $player->step(142287, 'tok');
 
         $this->assertCount(1, $this->posts, 'one intent went out');
-        $this->assertSame('construct', $this->posts[0][1]['verb'], 'the spent research combine became infrastructure work');
+        $this->assertNotSame('combine', $this->posts[0][1]['verb'], 'a world-known set is not re-submitted');
+        $this->assertContains($this->posts[0][1]['verb'], ['sell', 'buy', 'mine', 'chop', 'gather', 'build'], 'it does real work instead');
     }
 
     /**

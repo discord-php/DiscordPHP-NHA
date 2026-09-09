@@ -945,39 +945,30 @@ final class AutoPlayer
                     }
                 }
 
-                // Stop the inert-hull pileup. The model keeps `finalize`-ing
-                // wing/cockpit/landing_gear sets that come out with no drive
-                // (drives=false, flies=false) — 10 dead vehicles and counting.
-                // A ship only moves if a DRIVE part is in the bundle, so hold
-                // `finalize` until loose_parts has 4+ entries including one of
-                // the drive archetypes. Junk already in `vehicles` is ignored
-                // (there is no scrap verb — gating on it would brick assembly
-                // forever). Buy the metal the parts cost, then keep building.
-                if ($verb === 'finalize') {
-                    $loose = array_map(
-                        static fn($p): string => is_array($p) ? (string) ($p['part'] ?? $p['name'] ?? '') : (string) $p,
-                        (array) ($rawObs['loose_parts'] ?? []),
-                    );
-                    $hasDrivePart = array_intersect($loose, Ladder::DRIVE_PARTS) !== [];
-                    $stuck = Ladder::inertVehicleCount($rawObs) >= 3;
-                    if ($stuck) {
-                        // 3+ driveless hulls already — the recipe is unsolved and
-                        // there is no scrap verb. Stop finalizing; let the ladder
-                        // score with towers / co-op invest instead.
-                        $alt = $this->fallbackDecision($observation, 'ship assembly is a dead end (3+ inert hulls) — score elsewhere until the drive recipe is known', $tried, $known, $researchPaying, $stance);
-                        $decision = $alt ?? self::idle($rawObs, 'ship assembly stuck — nothing else to do this turn');
-                        $verb = (string) ($decision['verb'] ?? '');
-                    } elseif (count($loose) < 4 || ! $hasDrivePart) {
-                        $held = (array) $observation->getInventory();
-                        $tickNow = (int) ($observation->get('tick') ?? 0);
-                        if ((int) ($held['metal'] ?? 0) < 12 && (int) ($held['credits'] ?? 0) >= 60) {
-                            $decision = ['verb' => 'buy', 'args' => ['resource' => 'metal', 'n' => 10], 'reason' => 'ship parts cost metal (landing_gear 3, cockpit 4, frame 5…) — stock it first'];
-                        } else {
-                            $part = Ladder::SHIP_PART_ARCHETYPES[$tickNow % count(Ladder::SHIP_PART_ARCHETYPES)];
-                            $decision = ['verb' => 'build', 'args' => ['part' => $part], 'reason' => "no drive part in the bundle yet — build a {$part}, don't finalize a stub"];
+                // Don't `finalize` a stub. Every ship so far has come out inert,
+                // so a `finalize` is only worth a turn on a full spread — hold it
+                // until loose_parts has 5+ entries, and until then keep building
+                // parts (buying the metal they cost). The junk hulls this leaves
+                // are cosmetic — there is no scrap verb, and abandoning assembly
+                // to grind towers is not the goal.
+                if ($verb === 'finalize' && count(Ladder::looseParts($rawObs)) < 5 && ! Ladder::hasOrbitalShip($rawObs)) {
+                    $held = (array) $observation->getInventory();
+                    $tickNow = (int) ($observation->get('tick') ?? 0);
+                    if ((int) ($held['metal'] ?? 0) < 12 && (int) ($held['credits'] ?? 0) >= 60) {
+                        $decision = ['verb' => 'buy', 'args' => ['resource' => 'metal', 'n' => 10], 'reason' => 'ship parts cost metal — stock it before finalizing a stub'];
+                    } else {
+                        $held0 = Ladder::looseParts($rawObs);
+                        $part = null;
+                        foreach (Ladder::SHIP_PART_ARCHETYPES as $cand) {
+                            if (! in_array($cand, $held0, true)) {
+                                $part = $cand;
+                                break;
+                            }
                         }
-                        $verb = (string) $decision['verb'];
+                        $part ??= Ladder::SHIP_PART_ARCHETYPES[$tickNow % count(Ladder::SHIP_PART_ARCHETYPES)];
+                        $decision = ['verb' => 'build', 'args' => ['part' => $part], 'reason' => "only " . count($held0) . " loose parts — build a {$part} toward a fuller bundle first"];
                     }
+                    $verb = (string) $decision['verb'];
                 }
 
                 // `build` is a forward verb the loop guard will not flag, so
