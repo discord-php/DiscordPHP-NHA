@@ -176,19 +176,28 @@ final class Ladder
             return ['verb' => 'finalize', 'args' => [], 'why' => 'full mega-airframe on hand — finalise it (drives=true) and deploy'];
         }
 
-        // 1b. Passive income: a finished vehicle that is not out working yet →
-        //     `deploy` it to roam and mine autonomously. An expansionist keeps
-        //     an orbital-engine ship to FLY, not to deploy for mining. Skip an
-        //     inert hull — `deploy` rejects "no vehicle that drives or flies".
+        // 1b. Passive income: a freshly finalized `drives`/`flies` vehicle →
+        //     `deploy` it to auto-mine. The observe feed does NOT reliably flag
+        //     a deployed vehicle as out, so this only fires while the agent has
+        //     0–1 working vehicles total — past that, assume the earlier ones
+        //     are already roaming and leave any further `deploy` to the model.
+        //     An expansionist keeps an orbital-engine ship to FLY, not deploy.
+        $workingVehicles = 0;
+        $undeployedNonOrbital = false;
         foreach ((array) ($raw['vehicles'] ?? []) as $vehicle) {
             $vehicle = (array) $vehicle;
-            $isOrbital = ! empty($vehicle['orbital_engine']) || ! empty($vehicle['ion_thruster']);
-            $canWork = ! empty($vehicle['drives']) || ! empty($vehicle['flies']);
-            $out = ! empty($vehicle['deployed']) || ! empty($vehicle['roaming']) || ! empty($vehicle['out'])
-                || ! empty($vehicle['autonomous']);
-            if ($canWork && ! $out && ! ($stance === Stance::Expansionist->value && $isOrbital)) {
-                return ['verb' => 'deploy', 'args' => [], 'why' => 'you have a finished vehicle — deploy it for passive mining income'];
+            if (empty($vehicle['drives']) && empty($vehicle['flies'])) {
+                continue;
             }
+            $workingVehicles++;
+            $isOrbital = ! empty($vehicle['orbital_engine']) || ! empty($vehicle['ion_thruster']);
+            $out = ! empty($vehicle['deployed']) || ! empty($vehicle['roaming']) || ! empty($vehicle['out']) || ! empty($vehicle['autonomous']);
+            if (! $out && ! $isOrbital) {
+                $undeployedNonOrbital = true;
+            }
+        }
+        if ($undeployedNonOrbital && $workingVehicles <= 1) {
+            return ['verb' => 'deploy', 'args' => [], 'why' => 'a finished vehicle is idle — deploy it for passive mining income'];
         }
 
         // 1c. ARM. Out of combat but with no way to survive the next ambush —

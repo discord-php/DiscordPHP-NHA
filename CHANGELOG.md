@@ -12,6 +12,16 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.23] - 2026-09-09
+
+### Fixed
+- The `deploy` churn's root cause: rung 1b kept re-emitting `deploy` because
+  the observe feed never flags a deployed vehicle as out. Rung 1b now fires
+  ONLY while the agent has 0-1 working (`drives`/`flies`) vehicles total — past
+  that it assumes the earlier ones are roaming and leaves any further `deploy`
+  to the model (with the `AutoPlayer` repeat-suppressor as backstop). The agent
+  already has 2 deployed auto-miners, so `deploy` stops firing.
+
 ## [3.2.22] - 2026-09-09
 
 ### Fixed
