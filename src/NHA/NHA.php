@@ -66,7 +66,7 @@ use NHA\Repository\WorldRepository;
  * @property SocialRepository         $social
  * @property WorldRepository          $world
  *
- * @version 3.2.25
+ * @version 3.2.26
  */
 class NHA extends MessageCommandClient
 {

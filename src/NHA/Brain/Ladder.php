@@ -630,7 +630,7 @@ final class Ladder
 
     /** Valid `build` parts (probed live). Everything else → "unknown part". */
     public const SHIP_PART_ARCHETYPES = [
-        'engine', 'frame', 'wing', 'wheel', 'cockpit', 'landing_gear', 'fuel_tank', 'tail', 'propeller',
+        'engine', 'jet', 'frame', 'wing', 'wheel', 'cockpit', 'landing_gear', 'fuel_tank', 'tail', 'propeller',
     ];
 
     /**
@@ -642,7 +642,7 @@ final class Ladder
      * @var array<string,int>
      */
     public const SHIP_BUNDLE_TARGET = [
-        'frame' => 2, 'engine' => 12, 'wheel' => 6, 'wing' => 6,
+        'frame' => 2, 'engine' => 12, 'jet' => 6, 'wheel' => 6, 'wing' => 6,
         'fuel_tank' => 3, 'landing_gear' => 2, 'tail' => 2, 'cockpit' => 1,
     ];
 

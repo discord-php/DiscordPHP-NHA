@@ -12,6 +12,29 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.26] - 2026-09-09
+
+### Added
+- **`jet` is a valid `build` part** (probed: `build{part:jet}` → "insufficient
+  for jet (need {metal:10, crystal:2})", not "unknown part"). It's the likely
+  lift component for `flies=true` — added to `SHIP_PART_ARCHETYPES` and
+  `SHIP_BUNDLE_TARGET` (jet x6), so the live agent tries it on its next
+  mega-bundle. `rocket_engine` / `advanced_motor` are NOT build parts (only
+  combine outputs); `turbine`/`nacelle`/`prop` all "unknown part".
+
+### Fixed
+- Cap runaway `build engine`: told "engine-heavy", the model once stacked **82
+  engines** into one un-finalisable bundle (`megaBundleReady` needs a tail +
+  cockpit it never built). `AutoPlayer` now swaps a `build engine` for the next
+  under-target part once the bundle has target + 2 engines.
+
+### Notes
+- `flies=true` still unconfirmed but narrowed: it is NOT scale (a 105-part /
+  82-engine bundle finalised `drives=true v=9 flies=false` — more parts = lower
+  v). It needs high v_air, which our bundles never produce (v_air stays 0);
+  `jet` parts are the untested lead. The agent is credit-drained from the
+  probe run (~50 credits) — its 4 deployed auto-miners rebuild the reserve.
+
 ## [3.2.25] - 2026-09-09
 
 ### Fixed

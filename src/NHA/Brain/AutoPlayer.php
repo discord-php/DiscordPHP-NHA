@@ -941,6 +941,23 @@ final class AutoPlayer
                     $decision = ['verb' => 'build', 'args' => ['part' => $part], 'reason' => "\"{$decision['args']['part']}\" is a rejected part — trying {$part} instead"];
                 }
 
+                // Cap runaway `build engine`: the model, told "engine-heavy",
+                // once stacked 82 engines into one bundle. If the bundle already
+                // has the target engine count, swap to the first under-target
+                // part so the mega-bundle actually completes.
+                if ($verb === 'build' && (string) ($decision['args']['part'] ?? '') === 'engine') {
+                    $lp = Ladder::looseParts($rawObs);
+                    $ec = count(array_filter($lp, static fn(string $p): bool => $p === 'engine'));
+                    if ($ec >= (Ladder::SHIP_BUNDLE_TARGET['engine'] ?? 12) + 2) {
+                        foreach (Ladder::SHIP_BUNDLE_TARGET as $p => $want) {
+                            if ($p !== 'engine' && count(array_filter($lp, static fn(string $q): bool => $q === $p)) < $want) {
+                                $decision = ['verb' => 'build', 'args' => ['part' => $p], 'reason' => "{$ec} engines is enough — build a {$p} toward the rest of the bundle"];
+                                break;
+                            }
+                        }
+                    }
+                }
+
                 // `deploy` when there is nothing to deploy — an inert hull, or
                 // the drives=true vehicles are already out roaming (the observe
                 // feed does not always flag `deployed`). Either way a repeated
