@@ -101,6 +101,18 @@ final class AutoPlayer
     private const DEAD_BUILD_PARTS = ['thruster', 'ion_thruster', 'chassis', 'hull', 'rotor', 'airframe', 'wheels', 'body', 'motor', 'turbine'];
 
     /**
+     * Survival gear a research / loop-break `combine` must never eat — a forced
+     * `combine slug+stimpack` throws away the weapon ammo and the medicine that
+     * keep the agent alive through the next ambush. The ladder's own
+     * {@see Ladder::speculativeCombine()} already filters these; this list
+     * guards {@see self::loopBreakDecision()}'s research pass, which does not.
+     */
+    private const COMBAT_KIT = [
+        'slug', 'stimpack', 'kinetic_gun', 'energy_cell', 'energy_weapon',
+        'bomb', 'medkit', 'salve', 'antidote', 'tincture',
+    ];
+
+    /**
      * `a+b => true` for every combine set the world has already invented, from
      * `GET /rules`, plus any set this loop has since seen a `combine` APPLY for.
      * Refreshed every {@see self::RULES_TTL}s — the codex only grows, so a stale
@@ -577,6 +589,10 @@ final class AutoPlayer
                 if (in_array($res, ['credits', 'engine', 'motor', 'chip', 'frame', 'fuel'], true) || ! is_numeric($qty) || $qty <= 0) {
                     continue;
                 }
+                // Never gamble away survival gear (slug / stimpack / weapon).
+                if (in_array((string) $res, self::COMBAT_KIT, true)) {
+                    continue;
+                }
                 // Skip a build material that is only at (or below) its reserve —
                 // spending it on research would just be blocked by the guardrail.
                 // The reserve rises to cover whatever the live ship bill needs.
@@ -780,8 +796,16 @@ final class AutoPlayer
             // after each break stops it thrashing every turn on its own moves.
             // A "stuck land/launch" always breaks (a hard wedged state);
             // everything else respects the post-break cooldown.
+            // A depart-capable ship parked in orbit with every window shut has
+            // exactly one right move — stock fuel / shield, dock, or idle and
+            // wait (see {@see Ladder::isHoldingForWindow()}). Repeating that is
+            // NOT a loop to break: objective rotation here just burns the combat
+            // kit and the stockpile. Suppress loop-break and let the forced-hold
+            // override below drive the deterministic hold.
+            $holdingForWindow = Ladder::isHoldingForWindow($rawObs, $stance);
             $loopRaw = self::detectLoop($recent);
-            $loop = ($loopRaw !== null && (str_starts_with($loopRaw, 'stuck ') || ! $this->state->loopBreakCooldownActive($agent_id, $tick)))
+            $loop = ($loopRaw !== null && ! $holdingForWindow
+                && (str_starts_with($loopRaw, 'stuck ') || ! $this->state->loopBreakCooldownActive($agent_id, $tick)))
                 ? $loopRaw
                 : null;
             // Only PEEK the objective for the prompt; the cursor is advanced (and
@@ -804,12 +828,18 @@ final class AutoPlayer
 
             $altNow = (int) ($observation->get('altitude') ?? 0);
 
-            return $this->brain->decide($observation, $context ?: null, $stance)->then(function (?array $decision) use ($agent_id, $token, $tick, $altNow, $observation, $rawObs, $known, $tried, $dead, $researchPaying, $recent, $loop, $loopObjective, $stance) {
-                if ($decision === null && $loopObjective === null) {
+            return $this->brain->decide($observation, $context ?: null, $stance)->then(function (?array $decision) use ($agent_id, $token, $tick, $altNow, $observation, $rawObs, $known, $tried, $dead, $researchPaying, $recent, $loop, $loopObjective, $stance, $holdingForWindow) {
+                if ($decision === null && $loopObjective === null && ! $holdingForWindow) {
                     // Record the pass so a wait-streak is visible to detectLoop.
                     $this->state->recordDecision($agent_id, ['verb' => 'wait', 'args' => [], 'reason' => '', 'queued_intent' => null, 'tick' => $tick, 'alt' => $altNow]);
 
                     return "💤 Agent #{$agent_id}: brain chose to wait (tick {$tick}).";
+                }
+                // Holding for a window and the model passed → still run the
+                // deterministic hold (stock fuel / shield / dock / idle); the
+                // forced-hold override just below rewrites this.
+                if ($decision === null) {
+                    $decision = self::idle($rawObs, 'holding for a transfer window');
                 }
 
                 // Stuck in a loop — commit the objective rotation now (we know
@@ -918,24 +948,34 @@ final class AutoPlayer
                     $verb = 'move';
                 }
 
-                // In orbit with a fuelled ship and no window open, the model
-                // often picks `land` — dropping to Earth just to climb back.
-                // Hold: substitute the expansionist ladder's pick (depart if a
-                // window opened, dock an asteroid, else wait in orbit).
-                if ($verb === 'land'
-                    && $loopObjective === null
-                    && $stance === Stance::Expansionist->value
-                    && (int) ($observation->get('altitude') ?? 0) >= 300
-                    && ($rawObs['expansion']['at_body'] ?? null) === null
-                    && Ladder::hasOrbitalShip($rawObs)
-                ) {
+                // Parked in orbit with a depart-capable ship and every window
+                // shut: there is one right move (stock fuel / shield, dock, or
+                // idle and wait). Force the deterministic hold for ANY model
+                // pick except a real `depart` — `mine`/`move`/`ride`/`land` all
+                // just burn turns up here. `$loopObjective` is null because
+                // loop-break is suppressed while holding.
+                if ($holdingForWindow && $verb !== 'depart') {
                     $hold = Ladder::suggestion($rawObs, $tried, $known, false, $stance);
                     if ($hold !== null && ($hold['verb'] ?? '') !== 'land') {
-                        $decision = $hold;
-                        $verb = (string) ($decision['verb'] ?? '');
-                    } else {
-                        $decision = self::idle($rawObs, 'in orbit with a ship — holding for a transfer window');
+                        $decision = ['verb' => (string) $hold['verb'], 'args' => (array) ($hold['args'] ?? []), 'reason' => (string) ($hold['why'] ?? '')];
                         $verb = (string) $decision['verb'];
+                    } elseif (! in_array($verb, ['dock', 'buy', 'deposit', 'wait'], true)) {
+                        $decision = self::idle($rawObs, 'flight-ready ship in orbit — holding for a transfer window');
+                        $verb = (string) $decision['verb'];
+                    }
+                }
+
+                // A `build` of ship parts once a depart-capable ship already
+                // exists is a wasted turn on a second hull. Swap it for the
+                // fallback (finalize a ready flyer / earn / hold).
+                if ($verb === 'build'
+                    && $stance === Stance::Expansionist->value
+                    && Ladder::hasOrbitalShip($rawObs)
+                ) {
+                    $alt = $this->fallbackDecision($observation, 'you already have a flying ship — do not build a second', $tried, $known, $researchPaying, $stance);
+                    if ($alt !== null && ($alt['verb'] ?? '') !== 'build') {
+                        $decision = $alt;
+                        $verb = (string) ($decision['verb'] ?? '');
                     }
                 }
 

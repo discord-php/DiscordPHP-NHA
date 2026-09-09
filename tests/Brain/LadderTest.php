@@ -395,8 +395,9 @@ class LadderTest extends NHAUnitTestCase
         $this->assertSame('buy', $fuel['verb']);
         $this->assertSame('cryo_fuel', $fuel['args']['resource']);
 
-        // A finalized flyer + fuel, standing on a tall elevator → NOW ride up.
-        $ready = $base(['credits' => 4000, 'cryo_fuel' => 3]);
+        // A finalized flyer + a transfer-sized fuel reserve, standing on a tall
+        // elevator → NOW ride up.
+        $ready = $base(['credits' => 4000, 'cryo_fuel' => 95]);
         $ready['vehicles'] = [['name' => 'runner', 'flies' => true, 'orbital_engine' => true]];
         $ready['elevators'] = [['x' => 10, 'y' => 10, 'height' => 500]];
         $this->assertSame('ride', Ladder::suggestion($ready, [], [], false, 'expansionist')['verb']);
@@ -459,13 +460,69 @@ class LadderTest extends NHAUnitTestCase
     }
 
     /**
+     * The "wait for a launch window" hold: a depart-capable ship parked in
+     * Earth orbit with every window shut stocks the transfer fuel first, then a
+     * shield, then idles — it never thrashes mine/move/land up there.
+     *
+     * @covers \NHA\Brain\Ladder::isHoldingForWindow
+     * @covers \NHA\Brain\Ladder::suggestion
+     */
+    public function testFlightReadyShipInOrbitHoldsProductivelyForAWindow(): void
+    {
+        $orbit = static fn(array $inv): array => [
+            'tick' => 5, 'in_space' => true, 'altitude' => 420,
+            'inventory' => self::KIT + $inv,
+            'vehicles' => [['name' => 'skiff', 'flies' => true, 'orbital_engine' => true]],
+            'expansion' => ['at_body' => null, 'windows' => ['deimos' => ['open' => false], 'mars' => ['open' => false]]],
+            'asteroids' => [],
+        ];
+
+        // isHoldingForWindow: true here, false the moment a window opens.
+        $held = $orbit(['credits' => 4000, 'cryo_fuel' => 2, 'heat_shield' => 1]);
+        $this->assertTrue(Ladder::isHoldingForWindow($held, 'expansionist'));
+        $open = $held;
+        $open['expansion']['windows']['deimos'] = ['open' => true];
+        $this->assertFalse(Ladder::isHoldingForWindow($open, 'expansionist'));
+        $this->assertFalse(Ladder::isHoldingForWindow($held, 'homestead'));
+
+        // Under-fuelled + credits → stock cryo_fuel toward the transfer reserve.
+        $buyFuel = Ladder::suggestion($held, [], [], false, 'expansionist');
+        $this->assertSame('buy', $buyFuel['verb']);
+        $this->assertSame('cryo_fuel', $buyFuel['args']['resource']);
+
+        // Fuelled + shielded + no asteroid → a real idle (deposit), never land / mine.
+        $idle = Ladder::suggestion($orbit(['credits' => 4000, 'cryo_fuel' => 120, 'heat_shield' => 1]), [], [], false, 'expansionist');
+        $this->assertContains($idle['verb'], ['deposit', 'move']);
+    }
+
+    /**
+     * A ship on the ground that is under-fuelled tops the tank up before it
+     * rides the elevator — reaching orbit on fumes just parks it.
+     *
+     * @covers \NHA\Brain\Ladder::suggestion
+     */
+    public function testGroundedShipStocksFuelBeforeRidingUp(): void
+    {
+        $onGround = [
+            'tick' => 5, 'in_space' => false, 'altitude' => 0, 'position' => [10, 10],
+            'inventory' => self::KIT + ['credits' => 4000, 'cryo_fuel' => 5],
+            'vehicles' => [['name' => 'runner', 'flies' => true, 'orbital_engine' => true]],
+            'elevators' => [['x' => 10, 'y' => 10, 'height' => 500]],
+            'nearby_deposits' => [],
+        ];
+        $pick = Ladder::suggestion($onGround, [], [], false, 'expansionist');
+        $this->assertSame('buy', $pick['verb']);
+        $this->assertSame('cryo_fuel', $pick['args']['resource']);
+    }
+
+    /**
      * @covers \NHA\Brain\Ladder::suggestion
      */
     public function testExpansionistHeadsForTheElevatorWhenFlightReadyOnTheGround(): void
     {
         $onGround = [
             'tick' => 5, 'in_space' => false, 'altitude' => 0, 'position' => [10, 10],
-            'inventory' => self::KIT + ['hydrogen' => 4],
+            'inventory' => self::KIT + ['hydrogen' => 95],
             'vehicles' => [['name' => 'runner', 'flies' => true, 'orbital_engine' => true]],
             // A 120 m spire does NOT reach orbit — only the tall one counts.
             'elevators' => [['x' => 12, 'y' => 12, 'height' => 120], ['x' => 80, 'y' => 90, 'height' => 620]],
@@ -490,7 +547,7 @@ class LadderTest extends NHAUnitTestCase
     {
         $onGround = [
             'tick' => 5, 'in_space' => false, 'altitude' => 0, 'position' => [10, 10],
-            'inventory' => self::KIT + ['hydrogen' => 4],
+            'inventory' => self::KIT + ['hydrogen' => 95],
             'vehicles' => [['name' => 'runner', 'flies' => true, 'orbital_engine' => true]],
             'elevators' => [['x' => 12, 'y' => 12, 'height' => 120]],
             'nearby_deposits' => [],

@@ -54,6 +54,16 @@ final class Ladder
     public const HOARD_CAP = 80;
 
     /**
+     * Fuel units (cryo_fuel / hydrogen / helium3, counted 1:1) to have on hand
+     * before a transfer is worth attempting. `dv_capacity` in the engine is
+     * `dv = 900·L / (mass + 5·L)` for an ion ship (~880 mass); clearing the
+     * cheapest moon gate (Δv 50–55) needs ~70–80 units, so this leaves a
+     * margin. A ship that reaches Earth orbit under-fuelled just parks there
+     * burning turns — stock this FIRST, on the ground or while holding.
+     */
+    public const DEPART_FUEL_MIN = 90;
+
+    /**
      * Ceiling on a craft-plan-raised stockpile floor. A large bill (the full
      * flyer wants ~78 metal) must not wedge the agent into mining one resource
      * forever — it stockpiles to here, then buys / builds the rest.
@@ -479,6 +489,36 @@ final class Ladder
         }
 
         return false;
+    }
+
+    /**
+     * The agent is parked in Earth orbit with a `depart`-capable ship and no
+     * transfer window is open — the "wait for the launch window" state. There
+     * is exactly one productive move here (top up fuel / shield, dock+mine an
+     * asteroid, else idle); {@see AutoPlayer} suppresses loop-break while this
+     * holds and forces the {@see stanceMove()} hold action so the model cannot
+     * thrash `mine`/`move`/`ride`/`land` in a place none of them help.
+     *
+     * @param array<string,mixed> $raw
+     */
+    public static function isHoldingForWindow(array $raw, string $stance): bool
+    {
+        if ($stance !== Stance::Expansionist->value) {
+            return false;
+        }
+        if (! ($raw['in_space'] ?? false) || (int) ($raw['altitude'] ?? 0) < 300) {
+            return false;
+        }
+        if (($raw['expansion']['at_body'] ?? null) !== null || ! self::hasOrbitalShip($raw)) {
+            return false;
+        }
+        foreach ((array) ($raw['expansion']['windows'] ?? []) as $w) {
+            if (! empty(((array) $w)['open'])) {
+                return false; // a window IS open — let the depart logic run
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -1138,8 +1178,12 @@ final class Ladder
             // `ion_thruster` *resource* is just cargo — it cannot `land`,
             // `depart`, or hold an altitude; only a `finalize`d vehicle can.
             $hasShip = self::hasOrbitalShip($raw);
-            $fuelled = $has('hydrogen') > 0 || $has('cryo_fuel') > 0 || $has('helium3') > 0;
-            $flightReady = $fuelled && $hasShip;
+            $fuelUnits = $has('hydrogen') + $has('cryo_fuel') + $has('helium3');
+            $fuelled = $fuelUnits > 0;
+            // "flight-ready" means the ship can actually make a transfer, not
+            // just hold an altitude — reaching orbit on fumes only parks it.
+            $fuelReady = $fuelUnits >= self::DEPART_FUEL_MIN;
+            $flightReady = $hasShip && $fuelReady;
 
             // In space with no ship → dead end. Altitude decays, every verb up
             // here needs a vehicle, and `land` is rejected outright. Get back
@@ -1149,9 +1193,11 @@ final class Ladder
                     ?? self::noop($raw, 'expansionist — no ship in space, hold for decay then gear up');
             }
 
-            // In Earth orbit, flight-ready, a window open you can afford → depart
-            // (a moon first — a Forward Base discounts every later route).
-            if ($inSpace && $alt >= 300 && $atBody === null && $flightReady) {
+            // In Earth orbit with a ship + fuel and an open, shielded window →
+            // depart (a moon first — a Forward Base discounts every later
+            // route). The engine's Δv check is the real gate; if it rejects for
+            // thin fuel the HOLD block below tops the tank up for next time.
+            if ($inSpace && $alt >= 300 && $atBody === null && $hasShip && $fuelled) {
                 $order = ['deimos' => 50, 'phobos' => 55, 'mars' => 100, 'venus' => 130];
                 foreach ($order as $dest => $dv) {
                     $w = (array) (($expansion['windows'][$dest] ?? []));
@@ -1165,17 +1211,56 @@ final class Ladder
                 }
             }
 
+            // In Earth orbit with a depart-capable ship but NO open window (or
+            // still short on fuel) → HOLD PRODUCTIVELY. Top up the transfer
+            // fuel first (a ship in orbit on fumes is the whole failure mode),
+            // then a heat_shield for the Mars/Venus legs, then dock+mine an
+            // asteroid if one is here, else idle and wait the window out.
+            if ($inSpace && $alt >= 300 && $atBody === null && $hasShip) {
+                if (! $fuelReady && $credits >= 60) {
+                    return ['verb' => 'buy', 'args' => ['resource' => 'cryo_fuel', 'n' => 30], 'why' => "expansionist — stock cryo_fuel ({$fuelUnits}/" . self::DEPART_FUEL_MIN . ') so the ship clears the transfer Δv'];
+                }
+                if ($has('heat_shield') === 0) {
+                    if ($has('superalloy') > 0 && $has('composite') > 0) {
+                        return ['verb' => 'combine', 'args' => ['ingredients' => ['superalloy' => 1, 'composite' => 1]], 'why' => 'expansionist — combine a heat_shield while holding for a window'];
+                    }
+                    if ($has('superalloy') === 0 && $credits >= 60) {
+                        return ['verb' => 'buy', 'args' => ['resource' => 'superalloy', 'n' => 1], 'why' => 'expansionist — stock a heat_shield for the Mars/Venus legs while holding'];
+                    }
+                }
+                if ((array) ($raw['asteroids'] ?? []) !== [] && ! ($raw['docked'] ?? false)) {
+                    return ['verb' => 'dock', 'args' => [], 'why' => 'expansionist — dock the asteroid and mine while holding for a window'];
+                }
+
+                return self::noop($raw, 'expansionist — flight-ready ship in orbit; holding for a transfer window to open');
+            }
+
             // In orbit by an asteroid → grab space metals for parts.
             if ($inSpace && (array) ($raw['asteroids'] ?? []) !== [] && ! ($raw['docked'] ?? false)) {
                 return ['verb' => 'dock', 'args' => [], 'why' => 'expansionist — dock the asteroid and mine iridium/nickel for ship parts'];
             }
 
-            // On the ground and NOT flight-ready → GEAR UP toward a FLYER. The
+            // On the ground WITH a ship but under-fuelled → stock the transfer
+            // fuel before heading up; a ship that reaches orbit on fumes just
+            // parks there. Fall through to the generic ladder (sell a glut) if
+            // it cannot afford or craft fuel this turn.
+            if ($onGround && $hasShip && ! $fuelReady) {
+                if ($credits >= 60) {
+                    return ['verb' => 'buy', 'args' => ['resource' => 'cryo_fuel', 'n' => 30], 'why' => "expansionist — stock cryo_fuel ({$fuelUnits}/" . self::DEPART_FUEL_MIN . ') before riding up'];
+                }
+                if ($has('ice') > 0 && ($has('coal') > 0 || $has('oil') > 0)) {
+                    return ['verb' => 'combine', 'args' => ['ingredients' => ['ice' => 1, ($has('coal') > 0 ? 'coal' : 'oil') => 1]], 'why' => 'expansionist — combine cryo_fuel before riding up'];
+                }
+
+                return null;
+            }
+
+            // On the ground with NO orbital ship → GEAR UP toward a FLYER. The
             // recipe is closed-form (from the engine source): ~14 parts on a
             // LIGHT composite frame — 3 engines feeding 2 bearing-propellers
             // for the thrust, 3 composite wings for the lift, a chip cockpit
             // for control, an ion_thruster jet for the orbital drive.
-            if ($onGround && ! $flightReady) {
+            if ($onGround && ! $hasShip) {
                 $held = self::looseParts($raw);
                 $count = static fn(string $p): int => count(array_filter($held, static fn(string $q): bool => $q === $p));
 
@@ -1190,7 +1275,10 @@ final class Ladder
                     return $craft;
                 }
 
-                // 2. Fuel + a heat_shield for the Mars/Venus legs.
+                // 2. A token of fuel + a heat_shield for the Mars/Venus legs.
+                //    The transfer-sized fuel reserve is stocked once the ship
+                //    exists (the on-ground-with-ship and HOLD blocks above) —
+                //    while still gearing, parts come first.
                 if (! $fuelled) {
                     if ($credits >= 60) {
                         return ['verb' => 'buy', 'args' => ['resource' => 'cryo_fuel', 'n' => 3], 'why' => 'expansionist — buy cryo_fuel (a ship runs on it)'];

@@ -12,6 +12,33 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.29] - 2026-09-09
+
+### Fixed
+- **The "wait for a launch window" hold.** The agent built a `flies` +
+  `orbital_engine` ship and rode to Earth orbit — then thrashed for hours
+  because every transfer window was shut and it had no graceful way to wait.
+  It cycled `mine` / `move` / `land` / `ride` up there, tripped loop detection
+  every ~10 turns, and loop-break's objective rotation then did real damage
+  (`combine {slug, stimpack}` — destroying its own weapon ammo + medicine —
+  and selling stockpile).
+  - `Ladder::isHoldingForWindow()` — a depart-capable ship parked in Earth
+    orbit with no open window. `AutoPlayer` now **suppresses loop-break** while
+    this holds and **forces the deterministic hold** for any model pick except
+    a real `depart`.
+  - The hold, in order: stock `cryo_fuel` toward a transfer-sized reserve,
+    craft/buy a `heat_shield`, `dock`+mine an adjacent asteroid, else idle.
+- **Fuel folded into "flight-ready".** `DEPART_FUEL_MIN` (90 units) — a ship
+  that reaches orbit on fumes just parks there. The agent now stocks the
+  transfer fuel on the ground before riding up, and while holding in orbit.
+  `depart` itself still fires on any fuel + an open window (the engine's Δv
+  check is the real gate).
+- **Combat kit protected from research.** `AutoPlayer::COMBAT_KIT` — the
+  loop-break research pass no longer `combine`s away `slug` / `stimpack` /
+  weapons (the ladder's own `speculativeCombine()` already filtered these).
+- **No second ship.** A model `build` once a flying ship exists is swapped for
+  the fallback instead of accreting a redundant hull.
+
 ## [3.2.28] - 2026-09-09
 
 ### Added

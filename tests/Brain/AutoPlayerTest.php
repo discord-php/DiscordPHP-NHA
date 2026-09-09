@@ -910,4 +910,111 @@ class AutoPlayerTest extends NHAUnitTestCase
 
         $this->assertNotSame([], $this->posts, 'a manual one-off turn is not blocked by the loop lease');
     }
+
+    /** A depart-capable ship parked in orbit with no open window (combat kit on hand). */
+    private function shipHoldingOrbit(array $extraInv = []): NHA
+    {
+        return $this->nhaWith([
+            'tick' => 500, 'downed_until' => 0, 'position' => [30, 110],
+            'in_space' => true, 'altitude' => 560,
+            'inventory' => $extraInv + ['credits' => 4000, 'cryo_fuel' => 2, 'heat_shield' => 1,
+                'stimpack' => 1, 'kinetic_gun' => 1, 'slug' => 5],
+            'vehicles' => [['name' => 'skiff', 'flies' => true, 'orbital_engine' => true]],
+            'expansion' => ['at_body' => null, 'windows' => ['deimos' => ['open' => false], 'mars' => ['open' => false]]],
+            'asteroids' => [],
+        ]);
+    }
+
+    /**
+     * Holding for a window: whatever the model picks up there (mine / move /
+     * ride / land), the turn is rewritten to the deterministic hold — never a
+     * wasted `mine` in orbit.
+     *
+     * @covers \NHA\Brain\AutoPlayer::step
+     */
+    public function testAShipHoldingForAWindowIsForcedOntoTheHoldAction(): void
+    {
+        $player = new AutoPlayer($this->shipHoldingOrbit(), $this->brainReturning('{"verb":"mine","args":{"n":15,"resource":"ice"}}'), new StateStore($this->statePath));
+
+        $player->step(142287, 'tok');
+
+        $verb = $this->posts[0][1]['verb'];
+        $this->assertNotSame('mine', $verb, 'no mining in orbit while holding');
+        $this->assertContains($verb, ['buy', 'dock', 'deposit', 'ride'], 'a real hold action (stock fuel / dock / idle)');
+        if ($verb === 'buy') {
+            $this->assertSame('cryo_fuel', $this->posts[0][1]['args']['resource']);
+        }
+    }
+
+    /**
+     * Repeating the hold action must NOT trip loop-break — objective rotation
+     * up here only burns the combat kit and the stockpile.
+     *
+     * @covers \NHA\Brain\AutoPlayer::step
+     */
+    public function testHoldingForAWindowSuppressesLoopBreak(): void
+    {
+        $state = new StateStore($this->statePath);
+        for ($i = 1; $i <= 10; $i++) {
+            $state->recordDecision(142287, ['verb' => 'deposit', 'args' => ['resource' => 'ice', 'n' => 1], 'reason' => '', 'queued_intent' => null, 'tick' => $i, 'alt' => 560]);
+        }
+        $player = new AutoPlayer($this->shipHoldingOrbit(['cryo_fuel' => 150]), $this->brainReturning('{"verb":"deposit","args":{"resource":"ice","n":1}}'), $state);
+
+        $player->step(142287, 'tok');
+
+        // A loop-break would rotate to combine / sell / forced-land. The hold
+        // keeps it to an idle / dock instead.
+        $this->assertContains($this->posts[0][1]['verb'], ['deposit', 'move', 'dock']);
+    }
+
+    /**
+     * With a flying ship already finalized, a model `build` is a wasted turn on
+     * a second hull — it is swapped for the fallback.
+     *
+     * @covers \NHA\Brain\AutoPlayer::step
+     */
+    public function testBuildIsSuppressedOnceAFlyingShipExists(): void
+    {
+        $nha = $this->nhaWith([
+            'tick' => 500, 'downed_until' => 0, 'position' => [10, 10],
+            'in_space' => false, 'altitude' => 0,
+            'inventory' => ['credits' => 4000, 'metal' => 40, 'stimpack' => 1, 'kinetic_gun' => 1, 'slug' => 5],
+            'vehicles' => [['name' => 'skiff', 'flies' => true, 'orbital_engine' => true]],
+            'loose_parts' => ['frame', 'wing'],
+            'nearby_deposits' => [],
+        ]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"build","args":{"part":"wing"}}'), new StateStore($this->statePath));
+
+        $player->step(142287, 'tok');
+
+        $this->assertNotSame('build', $this->posts[0][1]['verb'], 'no second ship while one already flies');
+    }
+
+    /**
+     * A loop-break research pass must never `combine` away survival gear.
+     *
+     * @covers \NHA\Brain\AutoPlayer::loopBreakDecision
+     */
+    public function testLoopBreakResearchNeverBurnsTheCombatKit(): void
+    {
+        $state = new StateStore($this->statePath);
+        $state->bumpForcedObjective(142287, 1); // explore
+        $state->bumpForcedObjective(142287, 1); // wealth
+        $state->bumpForcedObjective(142287, 1); // build
+        for ($i = 1; $i <= 8; $i++) {
+            $state->recordDecision(142287, ['verb' => 'chop', 'args' => ['n' => 1], 'reason' => '', 'queued_intent' => null, 'tick' => $i]);
+        }
+        $nha = $this->nhaWith([
+            'tick' => 200, 'downed_until' => 0, 'position' => [1, 1],
+            'inventory' => ['slug' => 22, 'stimpack' => 3, 'wood' => 40, 'iron' => 40],
+        ]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"chop","args":{"n":1}}'), $state);
+
+        $player->step(142287, 'tok');
+
+        $this->assertSame('research', $state->getForcedObjective(142287, 200));
+        $this->assertSame('combine', $this->posts[0][1]['verb']);
+        $ingredients = array_keys($this->posts[0][1]['args']['ingredients']);
+        $this->assertSame([], array_intersect($ingredients, ['slug', 'stimpack']), 'the weapon ammo and medicine are left alone');
+    }
 }
