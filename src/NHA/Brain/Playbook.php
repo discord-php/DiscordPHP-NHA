@@ -45,7 +45,7 @@ final class Playbook
         'gather' => 'n:int — forage the nearest plant within 8 (herb/lichen/fungus/algae → medicine)',
         'plant' => 'no args — spend 1 wood to top up the most-drained tree on your cell (cap 22); rejected if all full',
         'combine' => 'ingredients:{res:qty}, name?:string, n?:int — craft; matches the SET of physics tags, 1 of each per copy',
-        'build' => 'part:string, with?:{res:qty} — craft ONE vehicle part into loose_parts. Parts COST metal (landing_gear 3, cockpit 4+crystal, frame 5+composite, fuel_tank 3, tail 2) — buy metal first. CONFIRMED parts: landing_gear, cockpit, wing, frame, fuel_tank, propeller, tail. REJECTED (never retry): chassis, hull, rotor, airframe, wheels, body, thruster. `frame` with:{steel|alloy|composite|superalloy}; `propeller` with:{bearing|alloy}; NEITHER takes ion_thruster. finalize needs 4+ parts INCLUDING A DRIVE (propeller/engine/motor) or the ship comes out drives=false — do not finalize a driveless bundle',
+        'build' => 'part:string, with?:{res:qty} — craft ONE vehicle part into loose_parts (costs metal). The ships that FLY are ENGINE-HEAVY: build `engine` parts, each with:{rocket_engine|advanced_motor|motor|steel:1}, 3-5 of them, plus frame/wing/fuel_tank/landing_gear, THEN finalize. First craft the propulsion items: combine iron+magnet+wire→motor, engine+motor→rocket_engine, engine+magnet+motor→advanced_motor. CONFIRMED parts: engine, frame, wing, cockpit, landing_gear, fuel_tank, propeller, tail. REJECTED (never retry): chassis, hull, rotor, airframe, wheels, body, thruster.',
         'finalize' => 'name?:string — assemble ALL loose_parts into one vehicle (computes drive/fly/thrust/fuel_cap/gear). Needs ≥1 loose part first — build them',
         'deploy' => 'no args — send a finalized vehicle off to mine autonomously',
         'construct' => 'shape:string (box/cylinder/sphere/cone/pyramid/monument/extractor/colony/terraform/ziggurat/station), size?, height?, body?, module?, kind?, stage?, name? — raise a structure OR fund a co-op board',
@@ -139,15 +139,15 @@ final class Playbook
             2. INVEST IN OPEN BOARDS — `invest{module, credits}` for a Station module, or fund a `colony` /
                `terraform` board straight from credits. A pure credit sink that moves the co-op bar. Do this
                whenever you hold spare credits and cannot progress your own flight this turn.
-            3. WHEN YOU CANNOT FLY THIS TURN — RESEARCH toward the flight recipe.
-               • `combine` a FRESH, uninvented tag set from any two raws sitting a little above their stockpile
-                 (~40+). The drive part that makes a `finalize`d ship actually fly is undocumented — inventing
-                 it is the way through, and every first-ever invention pays `inventor_points` toward the goal.
-                 Never resubmit a set listed as tried/invented.
-               • WEALTH only to fund the above: mine/chop/gather what is under you toward that ~40+ surplus,
-                 `sell` a genuine glut (a raw past ~80) or when credits < ~300, `fulfill` contracts you cover.
-                 Depot "buy" = credits it pays YOU on `sell`; "sell" = what YOU pay to `buy`.
-               • Do NOT `construct` towers for builder points — that is not the goal.
+            3. WHEN YOU CANNOT FLY THIS TURN — work the SHIP.
+               • DRIVE CHAIN: `combine iron+magnet+wire → motor`, then `engine+motor → rocket_engine` /
+                 `engine+magnet+motor → advanced_motor`; `iron+carbon → steel`. Then `build{part:engine,
+                 with:{that item}}` x3-5 and `finalize` an engine-heavy bundle. The ships that fly are
+                 engine-heavy — this is the blocker, not a gamble.
+               • RESEARCH only after: a FRESH uninvented `combine` off a ~40+ raw surplus (a real shot + inventor
+                 points). Never resubmit a tried/invented set.
+               • WEALTH only to fund it: harvest what is under you, `sell` a glut (raw past ~80) or credits < ~300.
+               • Do NOT `construct` towers — not the goal.
 
             DECISION LADDER (check top to bottom, act on the FIRST that applies)
             The report ends with a "SUGGESTED next action" line computed from this ladder — follow it unless the
@@ -173,19 +173,18 @@ final class Playbook
                is true and your ship's Δv clears that gate → `depart{dest:b}` for the nearest such body (prefer a moon
                first — a Forward Base cheapens every later route). If flight-ready but still on the ground → `ride` the
                elevator base (free) or `launch` toward orbit.
-            5. GEAR FOR DEPARTURE. Grounded and NOT flight-ready → close the gap, one step per turn:
-               • No `heat_shield` → `combine` superalloy+composite; no `acid_skin` (Venus) → acid/sulfur+rubber;
-                 thin fuel → `buy cryo_fuel` or `combine` water+motor for `hydrogen`.
-               • Have an `ion_thruster` + fuel + shield but `vehicles` is still empty → `build` a SPREAD of
-                 airframe parts (one/turn into loose_parts), then `finalize` and see what comes out. `part` is
-                 an undocumented enum — CONFIRMED: propeller, engine, frame, wing, cockpit, landing_gear,
-                 fuel_tank, tail; REJECTED (never retry): chassis, hull, rotor, airframe, wheels, body,
-                 thruster. Every `finalize` so far is inert (drives=false) — the drive recipe is still unknown.
-            6. RESEARCH toward that recipe — the PRIORITY while you cannot fly. Any two raws a little above their
-               stockpile (~40+) → `combine` a fresh, uninvented tag set. This is how the missing part gets
-               discovered, and each first-ever invention pays `inventor_points` toward the goal. Vary the set;
-               NEVER resubmit one listed as tried/invented. A rejected `combine` = you were an ingredient short:
-               harvest or `buy` it, don't repeat the same set.
+            5. GEAR FOR DEPARTURE — grounded, `vehicles` empty. The ships that FLY are ENGINE-HEAVY (agents with
+               flying craft built "triple/quad/penta-engine" hulls). One step per turn:
+               • DRIVE CHAIN first: `combine iron+magnet+wire → motor`; `combine engine+motor → rocket_engine`
+                 (or `engine+composite`); `combine engine+magnet+motor → advanced_motor`; `combine metal+salt+
+                 silicon → battery`. `combine iron+carbon → steel` for the cheap upgrade.
+               • Then BUILD 3-5 `engine` parts, each `build{part:engine, with:{rocket_engine|advanced_motor|
+                 motor|steel:1}}`, plus `frame`/`wing`/`fuel_tank`/`landing_gear`. `finalize` at ~7 parts with
+                 3+ engines. REJECTED parts (never retry): chassis, hull, rotor, airframe, wheels, body, thruster.
+               • `heat_shield` for Mars/Venus → `combine superalloy+composite`; thin fuel → `buy cryo_fuel`.
+            6. RESEARCH — only once the drive chain + engine build are underway and it still will not fly. Any two
+               raws ~40+ → `combine` a FRESH, uninvented tag set (a real shot at a missing item + inventor points).
+               NEVER resubmit a set listed as tried/invented. Rejected `combine` = ingredient short: harvest/buy it.
             7. INVEST IN THE CO-OP. Spare credits (≳ 200) and an open board (`invest{module,credits}` for a Station
                module, or fund a `colony`/`terraform` board) → put credits in. Never wasted.
             8. STOCKPILE to feed research — standing on a deposit of a raw you hold < ~45 → `mine`/`chop`/`gather`

@@ -12,6 +12,30 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.17] - 2026-09-09
+
+### Changed
+- **The bot was guided at the wrong altitude — fixed by reading the agents that
+  already have flying ships.** `codex-inventor` holds 4+ vehicles with
+  `flies:true, drives:true` named "steel-engine" / "triple/quad/penta-engine";
+  `Miner`/`Trader` hold the "Cosmonaut" title and are in space; the **Phobos
+  Forward Base colony exists** and is being funded with moon-mined `c_regolith`.
+  Our agent had ~0 inventor points and 27 inert hulls because the guidance was
+  random-pair `combine` research + a rote 1-of-each `build` rotation — it never
+  worked the concrete drive-craft chain.
+- New `Ladder::driveChainStep()` + `bestDriveUpgrade()`, now the **top priority**
+  in the expansionist gear-up (ahead of the flight kit, the random research, and
+  everything else): `iron+magnet+wire → motor`; `engine+motor → rocket_engine`
+  (or `engine+composite`); `engine+magnet+motor → advanced_motor`;
+  `metal+salt+silicon → battery`; `iron+carbon → steel`. Then the airframe is
+  built **engine-heavy** — `build{part:engine, with:{rocket_engine|
+  advanced_motor|motor|steel:1}}` ×up to 4, plus frame/wing/fuel_tank/
+  landing_gear — and `finalize` fires at 7+ parts with 3+ engines (was a
+  5-part any-spread stub). `AutoPlayer`'s finalize guard enforces the same.
+- Random `speculativeCombine` research demoted below the drive chain + engine
+  build (still ahead of harvest/idle; still never towers).
+- Playbook / Expansionist steps rewritten around the drive chain.
+
 ## [3.2.16] - 2026-09-09
 
 ### Changed

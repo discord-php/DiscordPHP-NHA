@@ -517,6 +517,70 @@ final class Ladder
     }
 
     /**
+     * The DIRECTED drive-research chain — the concrete craft path a working
+     * ship needs, reverse-engineered from the agents that have flying vehicles
+     * (`codex-inventor`'s "steel-engine" / "penta-engine" ships) and the live
+     * `/rules` dynamic recipes:
+     *
+     *   iron + magnet + wire        → motor
+     *   engine + motor              → rocket_engine   (engine + composite also works)
+     *   engine + magnet + motor     → advanced_motor
+     *   metal + salt + silicon      → battery         (feeds a richer motor line)
+     *
+     * Then the airframe is built ENGINE-HEAVY: `build{part:engine, with:{<the
+     * best propulsion item held>}}` several times before `finalize`. This takes
+     * priority over the random {@see speculativeCombine} — it is the actual
+     * blocker, not a gamble.
+     *
+     * @param array<string,mixed> $inv
+     *
+     * @return array{verb: string, args: array<string,mixed>, why: string}|null
+     */
+    public static function driveChainStep(array $inv): ?array
+    {
+        $has = static fn(string $k): int => (int) ($inv[$k] ?? 0);
+        $c = static fn(array $ing, string $why): array => ['verb' => 'combine', 'args' => ['ingredients' => $ing], 'why' => $why];
+
+        // 1. steel — the cheap engine upgrade (iron + carbon).
+        if ($has('steel') < 3 && $has('iron') > 0 && $has('carbon') > 0) {
+            return $c(['iron' => 1, 'carbon' => 1], 'drive chain — smelt steel (iron + carbon) for engine upgrades');
+        }
+        // 2. motor — the core kinetic part (iron + magnet + wire).
+        if ($has('motor') < 3 && $has('iron') > 0 && $has('magnet') > 0 && $has('wire') > 0) {
+            return $c(['iron' => 1, 'magnet' => 1, 'wire' => 1], 'drive chain — combine a motor (iron + magnet + wire)');
+        }
+        // 3. battery — opens the advanced_motor / richer lines (metal + salt + silicon).
+        if ($has('battery') < 2 && $has('metal') > 0 && $has('salt') > 0 && $has('silicon') > 0) {
+            return $c(['metal' => 1, 'salt' => 1, 'silicon' => 1], 'drive chain — combine a battery (metal + salt + silicon)');
+        }
+        // 4. rocket_engine — the orbital drive (engine + motor, or engine + composite).
+        if ($has('rocket_engine') < 3 && $has('engine') > 0 && $has('motor') > 0) {
+            return $c(['engine' => 1, 'motor' => 1], 'drive chain — combine a rocket_engine (engine + motor)');
+        }
+        if ($has('rocket_engine') < 3 && $has('engine') > 0 && $has('composite') > 0) {
+            return $c(['engine' => 1, 'composite' => 1], 'drive chain — combine a rocket_engine (engine + composite)');
+        }
+        // 5. advanced_motor — a stronger drive (engine + magnet + motor).
+        if ($has('advanced_motor') < 2 && $has('engine') > 0 && $has('magnet') > 0 && $has('motor') > 0) {
+            return $c(['engine' => 1, 'magnet' => 1, 'motor' => 1], 'drive chain — combine an advanced_motor (engine + magnet + motor)');
+        }
+
+        return null;
+    }
+
+    /** The best propulsion `with:` item on hand for `build{part:engine}`, or `null`. */
+    public static function bestDriveUpgrade(array $inv): ?string
+    {
+        foreach (['rocket_engine', 'advanced_motor', 'motor', 'steel'] as $item) {
+            if ((int) ($inv[$item] ?? 0) > 0) {
+                return $item;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * The first novel `combine` the agent can afford from its surplus: two raws
      * that each sit at least {@see RESEARCH_SURPLUS} deep, whose sorted `a+b`
      * signature is neither in `$tried` (this run) nor `$worldKnown` (already
@@ -923,80 +987,92 @@ final class Ladder
                 return ['verb' => 'dock', 'args' => [], 'why' => 'expansionist — dock the asteroid and mine iridium/nickel for ship parts'];
             }
 
-            // On the ground and NOT flight-ready → GEAR UP toward a ship. The
-            // drive recipe is unsolved, so this keeps *experimenting* — build a
-            // varied spread of parts, `finalize`, see what comes out — rather
-            // than grinding towers. It runs ahead of the generic ladder.
+            // On the ground and NOT flight-ready → GEAR UP toward a WORKING ship.
+            // Agents that have flying vehicles (`codex-inventor`'s multi-engine
+            // ships) got there via a concrete craft chain, not a random search:
+            // motor → rocket_engine / advanced_motor, then an engine-heavy
+            // `build` + `finalize`. That chain is the priority here.
             if ($onGround && ! $flightReady) {
-                // A full spread of loose parts → assemble and see what flies.
-                if (count((array) ($raw['loose_parts'] ?? [])) >= 5) {
-                    return ['verb' => 'finalize', 'args' => ['name' => 'accord_runner'], 'why' => 'expansionist — finalize the full spread of loose parts'];
+                $held = self::looseParts($raw);
+                $engineParts = count(array_filter($held, static fn(string $p): bool => $p === 'engine'));
+
+                // An engine-heavy spread on hand → assemble and fly-test it.
+                if (count($held) >= 7 && $engineParts >= 3) {
+                    return ['verb' => 'finalize', 'args' => ['name' => 'accord_runner'], 'why' => 'expansionist — finalize the engine-heavy airframe'];
                 }
-                // The orbital engine.
-                if ($has('ion_thruster') === 0) {
-                    if ($credits >= 150) {
-                        return ['verb' => 'buy', 'args' => ['resource' => 'ion_thruster', 'n' => 1], 'why' => 'expansionist — buy the ion_thruster the depot stocks'];
-                    }
-                    // magnet + conductor + battery — approximate with what a
-                    // grounded agent can hold: magnet + copper + energy_cell.
-                    if ($has('magnet') > 0 && $has('copper') > 0 && $has('energy_cell') > 0) {
-                        return ['verb' => 'combine', 'args' => ['ingredients' => ['magnet' => 1, 'copper' => 1, 'energy_cell' => 1]], 'why' => 'expansionist — combine a motor toward the ion_thruster'];
-                    }
+
+                // 1. DRIVE CHAIN — craft the propulsion items (motor,
+                //    rocket_engine, advanced_motor, battery). The real blocker.
+                if ($drive = self::driveChainStep($inv)) {
+                    return $drive;
                 }
-                // Fuel.
+
+                // 2. Cheap flight kit from credits, so launch is instant once
+                //    the ship exists. (`ion_thruster` is the depot's orbital
+                //    upgrade; fuel + a heat_shield for the Mars/Venus legs.)
+                if ($has('ion_thruster') === 0 && $credits >= 150) {
+                    return ['verb' => 'buy', 'args' => ['resource' => 'ion_thruster', 'n' => 1], 'why' => 'expansionist — buy the depot ion_thruster'];
+                }
                 if (! $fuelled) {
                     if ($credits >= 60) {
-                        return ['verb' => 'buy', 'args' => ['resource' => 'cryo_fuel', 'n' => 3], 'why' => 'expansionist — buy cryo_fuel from the depot'];
+                        return ['verb' => 'buy', 'args' => ['resource' => 'cryo_fuel', 'n' => 3], 'why' => 'expansionist — buy cryo_fuel'];
                     }
                     if ($has('ice') > 0 && ($has('coal') > 0 || $has('oil') > 0)) {
-                        return ['verb' => 'combine', 'args' => ['ingredients' => ['ice' => 1, ($has('coal') > 0 ? 'coal' : 'oil') => 1]], 'why' => 'expansionist — combine cryo_fuel (ice + an energy source)'];
+                        return ['verb' => 'combine', 'args' => ['ingredients' => ['ice' => 1, ($has('coal') > 0 ? 'coal' : 'oil') => 1]], 'why' => 'expansionist — combine cryo_fuel'];
                     }
                 }
-                // Re-entry shield for the Mars/Venus legs (moons do not need it,
-                // but it is cheap insurance and lets the depart rung fire).
                 if ($has('heat_shield') === 0) {
                     if ($has('superalloy') > 0 && $has('composite') > 0) {
-                        return ['verb' => 'combine', 'args' => ['ingredients' => ['superalloy' => 1, 'composite' => 1]], 'why' => 'expansionist — combine a heat_shield for the Mars/Venus route'];
+                        return ['verb' => 'combine', 'args' => ['ingredients' => ['superalloy' => 1, 'composite' => 1]], 'why' => 'expansionist — combine a heat_shield'];
                     }
                     if ($has('superalloy') === 0 && $credits >= 60) {
                         return ['verb' => 'buy', 'args' => ['resource' => 'superalloy', 'n' => 1], 'why' => 'expansionist — buy superalloy toward a heat_shield'];
                     }
                 }
-                // RESEARCH is the priority now. The flight recipe is undocumented,
-                // so once the cheap kit is in hand a novel `combine` is the real
-                // way forward — a shot at the missing item, plus inventor points
-                // toward the goal. It fires whenever two raws sit a margin above
-                // the stockpile target, so it never digs into the reserve.
-                if ($allowSpeculation && ($research = self::speculativeCombine($raws, $tried, $worldKnown))) {
-                    return $research;
-                }
-                // A light airframe experiment on the side: keep ~one part of
-                // every valid archetype on hand so the LLM (or rung 1) has a
-                // full spread to `finalize` and test. Only while metal is
-                // stocked — parts must not compete with research for raws.
-                $held = self::looseParts($raw);
-                $missing = array_values(array_diff(self::SHIP_PART_ARCHETYPES, $held));
-                if ($has('ion_thruster') > 0 && $missing !== [] && count($held) < 5) {
-                    if ($has('metal') < 15 && $credits >= 60) {
-                        return ['verb' => 'buy', 'args' => ['resource' => 'metal', 'n' => 12], 'why' => 'expansionist — stock metal for a spread of ship parts'];
+
+                // 3. BUILD the airframe ENGINE-HEAVY: `engine` parts first, each
+                //    fitted with the best propulsion item held, then structural
+                //    pieces once at least one engine is on the bundle. Only when
+                //    metal is available (parts cost 2-5) — else fall through to
+                //    harvest / buy it.
+                $upg = self::bestDriveUpgrade($inv);
+                $canBuild = $has('metal') >= 5 || ($has('metal') < 10 && $credits >= 60);
+                if ($upg !== null && $engineParts < 4 && $has('engine') > 0 && $canBuild) {
+                    if ($has('metal') < 5) {
+                        return ['verb' => 'buy', 'args' => ['resource' => 'metal', 'n' => 12], 'why' => 'expansionist — stock metal for engine parts'];
                     }
-                    if ($has('metal') >= 5) {
-                        $offset = self::inertVehicleCount($raw) % count($missing);
-                        $part = $missing[$offset];
-                        $args = ['part' => $part];
-                        foreach (self::PART_UPGRADES[$part] ?? [] as $up) {
+
+                    return ['verb' => 'build', 'args' => ['part' => 'engine', 'with' => [$upg => 1]], 'why' => "expansionist — build engine #" . ($engineParts + 1) . " with {$upg}"];
+                }
+                if ($engineParts >= 1 && $canBuild) {
+                    foreach (['frame', 'wing', 'fuel_tank', 'landing_gear', 'cockpit'] as $p) {
+                        if (in_array($p, $held, true)) {
+                            continue;
+                        }
+                        if ($has('metal') < 5) {
+                            return ['verb' => 'buy', 'args' => ['resource' => 'metal', 'n' => 12], 'why' => 'expansionist — stock metal for airframe parts'];
+                        }
+                        $args = ['part' => $p];
+                        foreach (self::PART_UPGRADES[$p] ?? [] as $up) {
                             if ($has($up) > 0) {
                                 $args['with'] = [$up => 1];
                                 break;
                             }
                         }
 
-                        return ['verb' => 'build', 'args' => $args, 'why' => "expansionist — build a {$part} toward a full airframe spread to finalize"];
+                        return ['verb' => 'build', 'args' => $args, 'why' => "expansionist — build the {$p} for the airframe"];
                     }
                 }
-                // Nothing pressing — let the generic ladder HARVEST, building the
-                // raw surplus that feeds the next research combine. No towers
-                // (the tower rung is gated for a shipless expansionist).
+
+                // 4. Drive chain + airframe done and it still won't fly → a
+                //    novel `combine` off the raw surplus (a real shot at the
+                //    missing piece, and inventor points), then harvest.
+                if ($allowSpeculation && ($research = self::speculativeCombine($raws, $tried, $worldKnown))) {
+                    return $research;
+                }
+
+                // Nothing pressing — the generic ladder HARVESTS the raws the
+                // chain and research need next. No towers.
                 return null;
             }
 

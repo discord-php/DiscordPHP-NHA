@@ -945,30 +945,34 @@ final class AutoPlayer
                     }
                 }
 
-                // Don't `finalize` a stub. Every ship so far has come out inert,
-                // so a `finalize` is only worth a turn on a full spread — hold it
-                // until loose_parts has 5+ entries, and until then keep building
-                // parts (buying the metal they cost). The junk hulls this leaves
-                // are cosmetic — there is no scrap verb, and abandoning assembly
-                // to grind towers is not the goal.
-                if ($verb === 'finalize' && count(Ladder::looseParts($rawObs)) < 5 && ! Ladder::hasOrbitalShip($rawObs)) {
-                    $held = (array) $observation->getInventory();
-                    $tickNow = (int) ($observation->get('tick') ?? 0);
-                    if ((int) ($held['metal'] ?? 0) < 12 && (int) ($held['credits'] ?? 0) >= 60) {
-                        $decision = ['verb' => 'buy', 'args' => ['resource' => 'metal', 'n' => 10], 'reason' => 'ship parts cost metal — stock it before finalizing a stub'];
-                    } else {
-                        $held0 = Ladder::looseParts($rawObs);
-                        $part = null;
-                        foreach (Ladder::SHIP_PART_ARCHETYPES as $cand) {
-                            if (! in_array($cand, $held0, true)) {
-                                $part = $cand;
-                                break;
+                // Don't `finalize` a stub. The ships that fly are engine-heavy
+                // (codex's triple/quad/penta-engine hulls), so hold `finalize`
+                // until the bundle has 6+ parts AND at least 2 `engine` parts;
+                // until then keep working the drive chain / building engines.
+                if ($verb === 'finalize' && ! Ladder::hasOrbitalShip($rawObs)) {
+                    $held0 = Ladder::looseParts($rawObs);
+                    $engineParts = count(array_filter($held0, static fn(string $p): bool => $p === 'engine'));
+                    if (count($held0) < 6 || $engineParts < 2) {
+                        $held = (array) $observation->getInventory();
+                        if ($drive = Ladder::driveChainStep($held)) {
+                            $decision = ['verb' => $drive['verb'], 'args' => $drive['args'], 'reason' => $drive['why']];
+                        } elseif ((int) ($held['metal'] ?? 0) < 12 && (int) ($held['credits'] ?? 0) >= 60) {
+                            $decision = ['verb' => 'buy', 'args' => ['resource' => 'metal', 'n' => 10], 'reason' => 'ship parts cost metal — stock it before finalizing a stub'];
+                        } elseif (($upg = Ladder::bestDriveUpgrade($held)) !== null && (int) ($held['engine'] ?? 0) > 0) {
+                            $decision = ['verb' => 'build', 'args' => ['part' => 'engine', 'with' => [$upg => 1]], 'reason' => "only {$engineParts} engine parts — build another with {$upg}"];
+                        } else {
+                            $part = null;
+                            foreach (Ladder::SHIP_PART_ARCHETYPES as $cand) {
+                                if (! in_array($cand, $held0, true)) {
+                                    $part = $cand;
+                                    break;
+                                }
                             }
+                            $part ??= 'engine';
+                            $decision = ['verb' => 'build', 'args' => ['part' => $part], 'reason' => 'building toward an engine-heavy bundle before finalizing'];
                         }
-                        $part ??= Ladder::SHIP_PART_ARCHETYPES[$tickNow % count(Ladder::SHIP_PART_ARCHETYPES)];
-                        $decision = ['verb' => 'build', 'args' => ['part' => $part], 'reason' => "only " . count($held0) . " loose parts — build a {$part} toward a fuller bundle first"];
+                        $verb = (string) $decision['verb'];
                     }
-                    $verb = (string) $decision['verb'];
                 }
 
                 // `build` is a forward verb the loop guard will not flag, so

@@ -263,9 +263,9 @@ class LadderTest extends NHAUnitTestCase
             'elevators' => [['x' => 10, 'y' => 10]], 'nearby_deposits' => [],
         ];
 
-        // A full spread of loose parts (5+) → assemble the ship and see what flies.
+        // An engine-heavy spread (7+ parts, 3+ engines) → finalize and fly-test.
         $parts = Ladder::suggestion(
-            ['tick' => 5, 'in_space' => false, 'altitude' => 0, 'inventory' => self::KIT, 'loose_parts' => ['propeller', 'wing', 'cockpit', 'landing_gear', 'frame']],
+            ['tick' => 5, 'in_space' => false, 'altitude' => 0, 'inventory' => self::KIT, 'loose_parts' => ['engine', 'engine', 'engine', 'frame', 'wing', 'fuel_tank', 'landing_gear']],
             [],
             [],
             false,
@@ -273,15 +273,30 @@ class LadderTest extends NHAUnitTestCase
         );
         $this->assertSame('finalize', $parts['verb']);
 
-        // Fewer than 5 parts → keep building the airframe spread, don't finalize a stub.
-        $stub = Ladder::suggestion(
-            ['tick' => 5, 'in_space' => false, 'altitude' => 0, 'inventory' => self::KIT + ['ion_thruster' => 1, 'cryo_fuel' => 3, 'heat_shield' => 1, 'metal' => 20], 'loose_parts' => ['wing', 'cockpit', 'landing_gear', 'tail'], 'position' => [10, 10], 'nearby_deposits' => []],
+        // Holds `engine` items + magnet/wire/iron → the DRIVE CHAIN fires first
+        // (combine a motor), ahead of any bare part-building.
+        $drive = Ladder::suggestion(
+            ['tick' => 5, 'in_space' => false, 'altitude' => 0, 'inventory' => self::KIT + ['ion_thruster' => 1, 'cryo_fuel' => 3, 'heat_shield' => 1, 'metal' => 20, 'engine' => 5, 'iron' => 10, 'magnet' => 5, 'wire' => 5], 'loose_parts' => [], 'position' => [10, 10], 'nearby_deposits' => []],
             [],
             [],
             false,
             'expansionist',
         );
-        $this->assertSame('build', $stub['verb']);
+        $this->assertSame('combine', $drive['verb']);
+        $this->assertSame(['iron' => 1, 'magnet' => 1, 'wire' => 1], $drive['args']['ingredients']);
+
+        // Drive chain exhausted (rocket_engines in hand), no bundle yet →
+        // `build` an engine part fitted with the best propulsion item.
+        $engine = Ladder::suggestion(
+            ['tick' => 5, 'in_space' => false, 'altitude' => 0, 'inventory' => self::KIT + ['ion_thruster' => 1, 'cryo_fuel' => 3, 'heat_shield' => 1, 'metal' => 20, 'engine' => 5, 'rocket_engine' => 3, 'steel' => 3], 'loose_parts' => [], 'position' => [10, 10], 'nearby_deposits' => []],
+            [],
+            [],
+            false,
+            'expansionist',
+        );
+        $this->assertSame('build', $engine['verb']);
+        $this->assertSame('engine', $engine['args']['part']);
+        $this->assertSame(['rocket_engine' => 1], $engine['args']['with']);
 
         // Credits, no ion_thruster → buy the one the depot stocks.
         $thruster = Ladder::suggestion($base(['credits' => 4000]), [], [], false, 'expansionist');
@@ -293,16 +308,18 @@ class LadderTest extends NHAUnitTestCase
         $this->assertSame('buy', $fuel['verb']);
         $this->assertSame('cryo_fuel', $fuel['args']['resource']);
 
-        // Full kit + no metal → buy metal (every ship part costs it).
-        $needMetal = Ladder::suggestion($base(['credits' => 4000, 'ion_thruster' => 1, 'cryo_fuel' => 3, 'heat_shield' => 1]), [], [], false, 'expansionist');
+        // Full kit + a propulsion item + engine items, but no metal for the
+        // part → buy metal (engine parts cost it).
+        $needMetal = Ladder::suggestion($base(['credits' => 4000, 'ion_thruster' => 1, 'cryo_fuel' => 3, 'heat_shield' => 1, 'rocket_engine' => 2, 'engine' => 3, 'metal' => 1]), [], [], false, 'expansionist');
         $this->assertSame('buy', $needMetal['verb']);
         $this->assertSame('metal', $needMetal['args']['resource']);
 
-        // Full kit + metal stocked but still NO vehicle → `build` a part
-        // (then `finalize`). A loose `ion_thruster` resource is cargo, not a
-        // ship — it must not ride yet.
-        $assemble = Ladder::suggestion($base(['credits' => 4000, 'ion_thruster' => 1, 'cryo_fuel' => 3, 'heat_shield' => 1, 'metal' => 20]), [], [], false, 'expansionist');
+        // Full kit + metal + a propulsion item + engine items, no bundle yet →
+        // `build` an engine part (an `ion_thruster` resource is cargo, not a
+        // ship — it must not ride yet).
+        $assemble = Ladder::suggestion($base(['credits' => 4000, 'ion_thruster' => 1, 'cryo_fuel' => 3, 'heat_shield' => 1, 'metal' => 20, 'steel' => 3, 'engine' => 4]), [], [], false, 'expansionist');
         $this->assertSame('build', $assemble['verb']);
+        $this->assertSame('engine', $assemble['args']['part']);
 
         // A finalized ship + fuel, standing on a tall elevator → NOW ride up.
         $ready = $base(['credits' => 4000, 'cryo_fuel' => 3]);
