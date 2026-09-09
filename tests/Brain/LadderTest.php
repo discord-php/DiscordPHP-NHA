@@ -516,6 +516,44 @@ class LadderTest extends NHAUnitTestCase
     }
 
     /**
+     * @covers \NHA\Brain\Ladder::departTarget
+     */
+    public function testDepartTargetPicksTheCheapestOpenShieldedWindow(): void
+    {
+        $orbit = static fn(array $windows, array $inv): array => [
+            'in_space' => true, 'altitude' => 420,
+            'inventory' => $inv,
+            'vehicles' => [['name' => 'skiff', 'flies' => true, 'orbital_engine' => true]],
+            'expansion' => ['at_body' => null, 'windows' => $windows],
+        ];
+
+        // deimos + mars open, fuelled → deimos (cheapest, no shield needed).
+        $this->assertSame('deimos', Ladder::departTarget($orbit(
+            ['deimos' => ['open' => true], 'mars' => ['open' => true]],
+            ['cryo_fuel' => 80],
+        )));
+
+        // only mars open, but no heat_shield → null (cannot service it).
+        $this->assertNull(Ladder::departTarget($orbit(
+            ['deimos' => ['open' => false], 'mars' => ['open' => true]],
+            ['cryo_fuel' => 80],
+        )));
+        // …with the shield → mars.
+        $this->assertSame('mars', Ladder::departTarget($orbit(
+            ['mars' => ['open' => true]],
+            ['cryo_fuel' => 80, 'heat_shield' => 1],
+        )));
+
+        // no fuel, or no open window, or on the ground → null.
+        $this->assertNull(Ladder::departTarget($orbit(['deimos' => ['open' => true]], ['cryo_fuel' => 0])));
+        $this->assertNull(Ladder::departTarget($orbit(['deimos' => ['open' => false]], ['cryo_fuel' => 80])));
+        $ground = $orbit(['deimos' => ['open' => true]], ['cryo_fuel' => 80]);
+        $ground['in_space'] = false;
+        $ground['altitude'] = 0;
+        $this->assertNull(Ladder::departTarget($ground));
+    }
+
+    /**
      * @covers \NHA\Brain\Ladder::suggestion
      */
     public function testExpansionistHeadsForTheElevatorWhenFlightReadyOnTheGround(): void

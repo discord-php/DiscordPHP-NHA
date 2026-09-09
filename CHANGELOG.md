@@ -12,6 +12,26 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.30] - 2026-09-09
+
+### Fixed
+- **Take the window.** With 3.2.29 the agent stocked fuel and reached orbit,
+  then — with **deimos, phobos and mars windows all open** and 91 cryo_fuel on
+  hand — sat there selling crystal. An open window is a ~30-tick chance and the
+  model frittered it away; the deterministic `depart` only ran on a rejection.
+  - `Ladder::departTarget()` — the body to leave for right now (cheapest open,
+    shielded, fuelled destination) or `null`. `AutoPlayer` **forces `depart`**
+    over any other model pick whenever it returns non-null. `stanceMove` uses
+    the same helper.
+- **Grounded with a ship = go to orbit.** A finished ship on the ground has one
+  job: fuel up, ride the tall elevator, depart. `AutoPlayer` now forces the
+  ladder's get-to-orbit move (`buy cryo_fuel` → walk to the elevator → `ride` /
+  `launch`) over the model's `mine` / `sell` / `combine` wandering.
+- **`combine` can't eat flight fuel.** `AutoPlayer::FLIGHT_CONSUMABLES`
+  (`cryo_fuel`, `hydrogen`, `heat_shield`, `acid_skin`) — a model
+  `combine {cryo_fuel, silicon}` is refused outright (`helium3` stays allowed:
+  it is an `ion_thruster` ingredient).
+
 ## [3.2.29] - 2026-09-09
 
 ### Fixed

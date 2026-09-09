@@ -353,12 +353,13 @@ class AutoPlayerTest extends NHAUnitTestCase
         $state->recordDecision(142287, ['verb' => 'land', 'args' => [], 'reason' => '', 'queued_intent' => null, 'tick' => 1]);
 
         // Last transit was 19 turns ago — the agent has earned the trip. It is
-        // flight-ready (a finalized orbital ship + fuel), so `launch` is not
-        // swapped for gearing; only the dwell gate is under test here.
+        // flight-ready (a finalized orbital ship + a transfer-sized fuel
+        // reserve), so `launch` is not swapped for gearing or fuel-stocking;
+        // only the dwell gate is under test here.
         $nha = $this->nhaWith([
             'tick' => 20, 'downed_until' => 0, 'position' => [10, 10],
             'in_space' => false, 'altitude' => 0,
-            'inventory' => ['cryo_fuel' => 3],
+            'inventory' => ['cryo_fuel' => 95],
             'vehicles' => [['name' => 'runner', 'flies' => true, 'orbital_engine' => true]],
             'nearby_deposits' => [['resource' => 'iron', 'dist' => 0, 'amount' => 20]],
         ]);
@@ -988,6 +989,78 @@ class AutoPlayerTest extends NHAUnitTestCase
         $player->step(142287, 'tok');
 
         $this->assertNotSame('build', $this->posts[0][1]['verb'], 'no second ship while one already flies');
+    }
+
+    /**
+     * An open transfer window with a fuelled, shielded ship in orbit → DEPART,
+     * whatever the model picked.
+     *
+     * @covers \NHA\Brain\AutoPlayer::step
+     */
+    public function testAnOpenWindowForcesDepartOverAModelMine(): void
+    {
+        $nha = $this->nhaWith([
+            'tick' => 500, 'downed_until' => 0, 'position' => [30, 110],
+            'in_space' => true, 'altitude' => 480,
+            'inventory' => ['credits' => 3000, 'cryo_fuel' => 95, 'heat_shield' => 1,
+                'stimpack' => 1, 'kinetic_gun' => 1, 'slug' => 5],
+            'vehicles' => [['name' => 'skiff', 'flies' => true, 'orbital_engine' => true]],
+            'expansion' => ['at_body' => null, 'windows' => ['deimos' => ['open' => true], 'venus' => ['open' => false]]],
+            'asteroids' => [],
+        ]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"mine","args":{"n":15,"resource":"crystal"}}'), new StateStore($this->statePath));
+
+        $player->step(142287, 'tok');
+
+        $this->assertSame('depart', $this->posts[0][1]['verb']);
+        $this->assertSame('deimos', $this->posts[0][1]['args']['dest']);
+    }
+
+    /**
+     * On the ground with a finished ship, the model's mine/sell wandering is
+     * swapped for the get-to-orbit move (stock fuel / head for the elevator).
+     *
+     * @covers \NHA\Brain\AutoPlayer::step
+     */
+    public function testGroundedWithAShipIsForcedTowardOrbit(): void
+    {
+        $nha = $this->nhaWith([
+            'tick' => 500, 'downed_until' => 0, 'position' => [10, 10],
+            'in_space' => false, 'altitude' => 0,
+            'inventory' => ['credits' => 3000, 'cryo_fuel' => 10,
+                'stimpack' => 1, 'kinetic_gun' => 1, 'slug' => 5, 'iron' => 60],
+            'vehicles' => [['name' => 'skiff', 'flies' => true, 'orbital_engine' => true]],
+            'nearby_deposits' => [['resource' => 'iron', 'dist' => 0, 'amount' => 30]],
+        ]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"mine","args":{"n":15,"resource":"iron"}}'), new StateStore($this->statePath));
+
+        $player->step(142287, 'tok');
+
+        $verb = $this->posts[0][1]['verb'];
+        $this->assertNotSame('mine', $verb, 'no mining while a finished ship waits to fly');
+        $this->assertContains($verb, ['buy', 'move', 'ride', 'launch']);
+        if ($verb === 'buy') {
+            $this->assertSame('cryo_fuel', $this->posts[0][1]['args']['resource']);
+        }
+    }
+
+    /**
+     * The model must not `combine` away the transfer fuel.
+     *
+     * @covers \NHA\Brain\AutoPlayer::step
+     */
+    public function testACombineThatEatsFlightFuelIsRefused(): void
+    {
+        $nha = $this->nhaWith([
+            'tick' => 5, 'downed_until' => 0, 'position' => [1, 1],
+            'inventory' => ['cryo_fuel' => 80, 'silicon' => 20,
+                'stimpack' => 1, 'kinetic_gun' => 1, 'slug' => 5],
+        ]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"combine","args":{"ingredients":{"cryo_fuel":1,"silicon":1}}}'), new StateStore($this->statePath));
+
+        $player->step(142287, 'tok');
+
+        $this->assertNotSame('combine', $this->posts[0][1]['verb'], 'the transfer fuel is protected from a combine');
     }
 
     /**

@@ -521,6 +521,51 @@ final class Ladder
         return true;
     }
 
+    /** Destinations ordered cheapest-Δv first, with the protective items each arrival consumes. */
+    public const DEPART_ORDER = [
+        'deimos' => [], 'phobos' => [], 'mars' => ['heat_shield'], 'venus' => ['heat_shield', 'acid_skin'],
+    ];
+
+    /**
+     * The body to `depart` for RIGHT NOW, or `null`. The agent must be in Earth
+     * orbit (alt ≥ 300, `at_body` unset) with a `depart`-capable ship and some
+     * fuel; the cheapest destination whose window is open and whose arrival
+     * items are all on hand wins. {@see AutoPlayer} forces this over any model
+     * pick — an open window is a ~30-tick chance and the model tends to fritter
+     * it away mining.
+     *
+     * @param array<string,mixed> $raw
+     */
+    public static function departTarget(array $raw): ?string
+    {
+        if (! ($raw['in_space'] ?? false) || (int) ($raw['altitude'] ?? 0) < 300) {
+            return null;
+        }
+        if (($raw['expansion']['at_body'] ?? null) !== null || ! self::hasOrbitalShip($raw)) {
+            return null;
+        }
+        $inv = (array) ($raw['inventory'] ?? []);
+        $fuel = (int) ($inv['cryo_fuel'] ?? 0) + (int) ($inv['hydrogen'] ?? 0) + (int) ($inv['helium3'] ?? 0);
+        if ($fuel < 1) {
+            return null;
+        }
+        $windows = (array) ($raw['expansion']['windows'] ?? []);
+        foreach (self::DEPART_ORDER as $dest => $items) {
+            if (empty(((array) ($windows[$dest] ?? []))['open'])) {
+                continue;
+            }
+            foreach ($items as $item) {
+                if ((int) ($inv[$item] ?? 0) < 1) {
+                    continue 2;
+                }
+            }
+
+            return $dest;
+        }
+
+        return null;
+    }
+
     /**
      * Whether the agent has ANY finalized vehicle in hold — orbital or not. A
      * loose `ion_thruster` *resource* in the inventory is NOT a vehicle: `land`,
@@ -1197,18 +1242,8 @@ final class Ladder
             // depart (a moon first — a Forward Base discounts every later
             // route). The engine's Δv check is the real gate; if it rejects for
             // thin fuel the HOLD block below tops the tank up for next time.
-            if ($inSpace && $alt >= 300 && $atBody === null && $hasShip && $fuelled) {
-                $order = ['deimos' => 50, 'phobos' => 55, 'mars' => 100, 'venus' => 130];
-                foreach ($order as $dest => $dv) {
-                    $w = (array) (($expansion['windows'][$dest] ?? []));
-                    if (! empty($w['open'])) {
-                        $needShield = in_array($dest, ['mars', 'venus'], true);
-                        $needAcid = $dest === 'venus';
-                        if ((! $needShield || $has('heat_shield') > 0) && (! $needAcid || $has('acid_skin') > 0)) {
-                            return ['verb' => 'depart', 'args' => ['dest' => $dest], 'why' => "expansionist — {$dest} window is open and you are fuelled and shielded"];
-                        }
-                    }
-                }
+            if (($dest = self::departTarget($raw)) !== null) {
+                return ['verb' => 'depart', 'args' => ['dest' => $dest], 'why' => "expansionist — {$dest} window is open and you are fuelled and shielded"];
             }
 
             // In Earth orbit with a depart-capable ship but NO open window (or

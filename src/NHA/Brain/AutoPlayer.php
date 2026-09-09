@@ -113,6 +113,14 @@ final class AutoPlayer
     ];
 
     /**
+     * Finished flight consumables — a `combine` that eats one is always a
+     * mistake (`cryo_fuel` is the transfer fuel, the shields are one-shot EDL
+     * gear), so the guardrail blocks any combine naming one as an ingredient.
+     * `helium3` is deliberately absent: it IS an ion_thruster ingredient.
+     */
+    private const FLIGHT_CONSUMABLES = ['cryo_fuel', 'hydrogen', 'heat_shield', 'acid_skin'];
+
+    /**
      * `a+b => true` for every combine set the world has already invented, from
      * `GET /rules`, plus any set this loop has since seen a `combine` APPLY for.
      * Refreshed every {@see self::RULES_TTL}s — the codex only grows, so a stale
@@ -870,6 +878,14 @@ final class AutoPlayer
                     if (! $isProduction) {
                         $held = (array) $observation->getInventory();
                         foreach ($ingredients as $res => $qty) {
+                            // Flight consumables are never an ingredient for
+                            // anything the agent should be making — a model
+                            // `combine {cryo_fuel, silicon}` just burns the
+                            // transfer fuel. Block outright.
+                            if (in_array((string) $res, self::FLIGHT_CONSUMABLES, true)) {
+                                $dipsReserve = (string) $res;
+                                break;
+                            }
                             // Reserve = the static floor, raised to what the live
                             // ship bill still needs; 0 means unprotected.
                             $reserve = $this->reserveFor((string) $res, $rawObs);
@@ -961,6 +977,35 @@ final class AutoPlayer
                         $verb = (string) $decision['verb'];
                     } elseif (! in_array($verb, ['dock', 'buy', 'deposit', 'wait'], true)) {
                         $decision = self::idle($rawObs, 'flight-ready ship in orbit — holding for a transfer window');
+                        $verb = (string) $decision['verb'];
+                    }
+                }
+
+                // An open transfer window is a ~30-tick chance and the model
+                // tends to fritter it away mining / selling. If the agent is in
+                // orbit, fuelled and shielded for a destination whose window is
+                // open, DEPART — nothing else on Earth matters more.
+                if ($stance === Stance::Expansionist->value
+                    && $verb !== 'depart'
+                    && ($dest = Ladder::departTarget($rawObs)) !== null
+                ) {
+                    $decision = ['verb' => 'depart', 'args' => ['dest' => $dest], 'reason' => "{$dest} window is open and the ship is fuelled + shielded — go"];
+                    $verb = 'depart';
+                }
+
+                // On the ground with a finished ship, the only task is to get to
+                // orbit and depart — top up fuel / a shield, then walk to the
+                // tall elevator and ride. Force that over the model's
+                // mine/sell/combine wandering (combat already ran earlier).
+                if ($stance === Stance::Expansionist->value
+                    && $verb !== 'depart'
+                    && ! ($rawObs['in_space'] ?? false)
+                    && (int) ($observation->get('altitude') ?? 0) === 0
+                    && Ladder::hasOrbitalShip($rawObs)
+                ) {
+                    $up = Ladder::suggestion($rawObs, $tried, $known, false, $stance);
+                    if ($up !== null && ! in_array((string) ($up['verb'] ?? ''), ['land', $verb], true)) {
+                        $decision = ['verb' => (string) $up['verb'], 'args' => (array) ($up['args'] ?? []), 'reason' => (string) ($up['why'] ?? '')];
                         $verb = (string) $decision['verb'];
                     }
                 }
