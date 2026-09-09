@@ -942,11 +942,15 @@ final class AutoPlayer
                 // fall back to gearing / earning.
                 if ($verb === 'deploy') {
                     $recentDeploys = count(array_filter(
-                        array_slice($recent, -4),
+                        array_slice($recent, -5),
                         static fn($r): bool => (string) ($r['verb'] ?? '') === 'deploy',
                     ));
+                    // A `drives`/`flies` vehicle already in hand + a repeated
+                    // `deploy` = the observe feed isn't flagging it as out, but
+                    // it is (it's auto-mining). Stop after one repeat.
                     $inertOnly = ! Ladder::hasAnyVehicle($rawObs) && Ladder::hasDeadHull($rawObs);
-                    if ($inertOnly || $recentDeploys >= 2) {
+                    $alreadyHasMiner = Ladder::hasAnyVehicle($rawObs) && $recentDeploys >= 1;
+                    if ($inertOnly || $alreadyHasMiner || $recentDeploys >= 2) {
                         $gear = $this->fallbackDecision($observation, 'nothing left to deploy — build / earn instead', $tried, $known, $researchPaying, $stance);
                         if ($gear !== null && ($gear['verb'] ?? '') !== 'deploy') {
                             $decision = $gear;

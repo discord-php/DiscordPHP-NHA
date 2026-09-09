@@ -12,6 +12,15 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.22] - 2026-09-09
+
+### Fixed
+- 3.2.21 tamed but did not stop the `deploy` churn: rung 1b still re-offers
+  `deploy` because the observe `vehicles[]` never flags the two auto-mining
+  hulls as out. `AutoPlayer` now suppresses `deploy` on the FIRST repeat when
+  a `drives`/`flies` vehicle is already in hand (it is mining — `auto_mine`
+  x85 in the window) — build / earn instead.
+
 ## [3.2.21] - 2026-09-09
 
 ### Fixed
