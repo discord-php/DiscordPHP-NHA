@@ -509,13 +509,33 @@ final class Ladder
         if ($stance !== Stance::Expansionist->value) {
             return false;
         }
-        // The whole space tier (≥ 100), not just the orbit band — a held ship
-        // decays ~2 alt/tick, and the ~130-tick sink from 300 to the ground
-        // would otherwise fall through to loop-break and thrash.
-        if (! ($raw['in_space'] ?? false) || (int) ($raw['altitude'] ?? 0) < 100) {
+        if (($raw['expansion']['at_body'] ?? null) !== null || ! self::hasOrbitalShip($raw)) {
             return false;
         }
-        if (($raw['expansion']['at_body'] ?? null) !== null || ! self::hasOrbitalShip($raw)) {
+
+        $alt = (int) ($raw['altitude'] ?? 0);
+        $inSpace = (bool) ($raw['in_space'] ?? false);
+
+        // The single on-ground tick between the two halves of the station-keep
+        // elevator bounce (see stanceMove): a flight-ready ship parked on a
+        // tall elevator base with no serviceable window rides straight back up
+        // next tick — loop-break must not rotate objectives on it.
+        if (! $inSpace && $alt === 0) {
+            $inv = (array) ($raw['inventory'] ?? []);
+            $fuel = (int) ($inv['cryo_fuel'] ?? 0) + (int) ($inv['hydrogen'] ?? 0) + (int) ($inv['helium3'] ?? 0);
+
+            return $fuel >= self::DEPART_FUEL_MIN
+                && self::orbitElevator($raw) !== null
+                && self::departTarget($raw, $unreachable) === null;
+        }
+
+        // The whole space tier (≥ 100), not just the 300-600 orbit band — a
+        // held ship decays ~2 alt/tick, and the sink from 300 toward the
+        // ground would otherwise fall through to loop-break and thrash. The
+        // station-keep rung in stanceMove bounces a tall elevator to reset
+        // altitude before it leaves the band, so an opening window still finds
+        // the ship in position; below 100 it is genuinely on its way down.
+        if (! $inSpace || $alt < 100) {
             return false;
         }
 
@@ -1261,9 +1281,22 @@ final class Ladder
             // orbit on fumes is the whole failure mode), then a heat_shield for
             // the Mars/Venus legs, then dock+mine an asteroid if one is in
             // range, else idle. Covers the whole space tier so the slow
-            // orbital-decay sink to the ground does not fall through to churn;
-            // once it lands, the grounded-with-ship path rides it back up.
+            // orbital-decay sink to the ground does not fall through to churn.
             if ($inSpace && $alt >= 100 && $atBody === null && $hasShip) {
+                // STATION-KEEP. `depart` only fires from altitude 300-600, but
+                // a held ship loses ~2 alt/tick to orbital decay — left to idle
+                // it slides out the bottom of the band and spends most of every
+                // cycle too low to leave, so an opening window finds it out of
+                // position (the "waited for the window, never departed" bug).
+                // The moment it drops below the 300 floor, reset with the
+                // no-fuel elevator bounce: `ride` from space drops to the base,
+                // the on-ground rung climbs back to the top. Transfer fuel
+                // (cryo_fuel/hydrogen/helium3) is never spent on lift.
+                if ($alt < 300 && ($lift = self::orbitElevator($raw)) !== null) {
+                    return ($lift['x'] === $x && $lift['y'] === $y)
+                        ? ['verb' => 'ride', 'args' => [], 'why' => "expansionist — alt {$alt} below the 300 depart floor; ride the elevator to reset into the band"]
+                        : ['verb' => 'move', 'args' => ['x' => $lift['x'], 'y' => $lift['y']], 'why' => "expansionist — alt {$alt} below the depart floor; get to the tall elevator base to reset altitude"];
+                }
                 if (! $fuelReady && $credits >= 60) {
                     return ['verb' => 'buy', 'args' => ['resource' => 'cryo_fuel', 'n' => 30], 'why' => "expansionist — stock cryo_fuel ({$fuelUnits}/" . self::DEPART_FUEL_MIN . ') so the ship clears the transfer Δv'];
                 }

@@ -47,3 +47,4 @@ composer.lock
 /tools/
 /phive.xml
 /.phive/
+.tok

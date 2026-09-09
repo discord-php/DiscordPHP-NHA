@@ -12,6 +12,23 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.35] - 2026-09-09
+
+### Fixed
+- **The held ship now station-keeps in the depart band instead of decaying
+  straight through it.** `depart` only fires from altitude 300–600, but a ship
+  "holding for a window" loses ~2 alt/tick to orbital decay — left to idle it
+  slid out the bottom of the band and spent most of every cycle too low to
+  leave, so an opening window kept finding it out of position (observed live:
+  agent parked on `deposit {ice}` for 12+ minutes per cycle, never departing).
+  The hold now bounces the orbital elevator (no fuel: `ride` down to the base,
+  the on-ground rung rides back up to the top) the moment altitude drops below
+  the 300 floor, giving a ~600→300 sawtooth that keeps the ship in the band
+  ~98% of the time. Transfer fuel (`cryo_fuel`/`hydrogen`/`helium3`) is never
+  spent on lift. `Ladder::isHoldingForWindow()` also covers the single
+  on-ground tick between the two halves of the bounce so loop-break does not
+  rotate objectives on it.
+
 ## [3.2.34] - 2026-09-09
 
 ### Fixed

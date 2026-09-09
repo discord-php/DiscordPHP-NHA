@@ -502,6 +502,18 @@ class LadderTest extends NHAUnitTestCase
         $sinking['altitude'] = 60;
         $this->assertFalse(Ladder::isHoldingForWindow($sinking, 'expansionist'));
 
+        // STATION-KEEP: dropped below the 300 depart floor with a tall elevator
+        // on the cell → bounce it (ride down, the on-ground rung rides back up)
+        // rather than idle straight past the band while a window is shut.
+        $keep = $orbit(['credits' => 4000, 'cryo_fuel' => 120, 'heat_shield' => 1]);
+        $keep['altitude'] = 250;
+        $keep['position'] = [30, 110];
+        $keep['elevators'] = [['id' => 1, 'x' => 30, 'y' => 110, 'height' => 680, 'dist' => 0]];
+        $this->assertSame('ride', Ladder::suggestion($keep, [], [], false, 'expansionist')['verb']);
+        // Comfortably in the band → no bounce, just idle.
+        $keep['altitude'] = 480;
+        $this->assertContains(Ladder::suggestion($keep, [], [], false, 'expansionist')['verb'], ['deposit', 'move']);
+
         // Under-fuelled + credits → stock cryo_fuel toward the transfer reserve.
         $buyFuel = Ladder::suggestion($held, [], [], false, 'expansionist');
         $this->assertSame('buy', $buyFuel['verb']);
