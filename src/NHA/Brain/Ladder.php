@@ -252,9 +252,15 @@ final class Ladder
         // is the Accord, not a field of vanity spires. Only once a real ship
         // (not a loose `ion_thruster` resource) is in hold does a tower to fund
         // the trip become fair game again.
+        // …unless ship assembly is a proven dead end (3+ inert hulls), in which
+        // case towers are the only thing left to score and the gate lifts.
         $gearingShip = $stance === Stance::Expansionist->value && $onGround
-            && ! self::hasOrbitalShip($raw);
+            && ! self::hasOrbitalShip($raw)
+            && ! self::shipBuildStuck($raw);
         if ($onGround && ! $gearingShip && $has('composite') >= 2 && $has('metal') >= 8) {
+            if (self::cellOccupied($raw)) {
+                return self::stepToClearGround($raw);
+            }
             $shape = ['box', 'cylinder', 'pyramid', 'cone', 'sphere'][$tick % 5];
             $size = min(8, $has('metal'));
             $height = 14 * min($has('composite'), 3);
@@ -463,6 +469,21 @@ final class Ladder
         }
 
         return $n;
+    }
+
+    /**
+     * Whether ship assembly is a proven dead end for this agent: 3+ `finalize`d
+     * hulls all came out driveless and there is no scrap verb to clear them.
+     * The `build`/`finalize` drive recipe is undocumented and unsolved. When
+     * this holds, the gear-up chain is abandoned and the expansionist falls
+     * back to the generic ladder (towers for builder points) so it keeps
+     * scoring instead of spinning on `deposit`/`move`.
+     *
+     * @param array<string,mixed> $raw
+     */
+    public static function shipBuildStuck(array $raw): bool
+    {
+        return self::inertVehicleCount($raw) >= 3 && ! self::hasOrbitalShip($raw);
     }
 
     /** Drive-part `build` archetypes — a `finalize` bundle needs one or the ship comes out inert. */
@@ -799,7 +820,7 @@ final class Ladder
             // generic ladder (towers / co-op invest / stockpile) so the agent
             // at least scores while the recipe stays unknown. Flight/at-body
             // rungs below still fire if a real ship ever appears.
-            $shipBuildStuck = $onGround && self::inertVehicleCount($raw) >= 3 && ! self::hasOrbitalShip($raw);
+            $shipBuildStuck = $onGround && self::shipBuildStuck($raw);
 
             // Arrived at a body but still in its orbit → put down.
             if ($atBody !== null && $alt > 0) {

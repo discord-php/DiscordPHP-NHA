@@ -335,6 +335,12 @@ class LadderTest extends NHAUnitTestCase
 
         // Homestead in the same spot still towers.
         $this->assertSame('construct', Ladder::suggestion($raw, [], [], false, 'homestead')['verb']);
+
+        // BUT once ship assembly is a proven dead end (3+ inert hulls), towers
+        // are the only thing left to score — the gate lifts.
+        $stuck = $raw;
+        $stuck['vehicles'] = array_fill(0, 3, ['name' => 'hull', 'drives' => false, 'flies' => false, 'fuel_cap' => 0]);
+        $this->assertSame('construct', Ladder::suggestion($stuck, [], [], false, 'expansionist')['verb']);
     }
 
     /**

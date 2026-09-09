@@ -12,6 +12,19 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.14] - 2026-09-08
+
+### Fixed
+- Live loop: with the LLM host briefly unreachable (ETIMEDOUT / 120s timeout),
+  the agent ran ladder-only — and a ship-blocked (`shipBuildStuck`) grounded
+  expansionist had **no productive rung**: `$gearingShip` still gated out the
+  tower rung, so it bottomed out cycling `deposit ice` / `move (33,114)` /
+  `ride`. Now `Ladder::shipBuildStuck()` (3+ inert hulls, no orbital ship)
+  **lifts the `$gearingShip` tower gate** — towers are the only thing a
+  grounded shipless agent can score, so it builds them (and `combine`s
+  `composite` toward them via rung 3b) instead of spinning. The tower rung also
+  steps to clear ground first when its cell is already built on.
+
 ## [3.2.13] - 2026-09-08
 
 ### Fixed
