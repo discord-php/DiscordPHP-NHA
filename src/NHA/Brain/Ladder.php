@@ -184,8 +184,9 @@ final class Ladder
             $vehicle = (array) $vehicle;
             $isOrbital = ! empty($vehicle['orbital_engine']) || ! empty($vehicle['ion_thruster']);
             $canWork = ! empty($vehicle['drives']) || ! empty($vehicle['flies']);
-            if ($canWork && empty($vehicle['deployed']) && empty($vehicle['roaming']) && empty($vehicle['out'])
-                && ! ($stance === Stance::Expansionist->value && $isOrbital)) {
+            $out = ! empty($vehicle['deployed']) || ! empty($vehicle['roaming']) || ! empty($vehicle['out'])
+                || ! empty($vehicle['autonomous']);
+            if ($canWork && ! $out && ! ($stance === Stance::Expansionist->value && $isOrbital)) {
                 return ['verb' => 'deploy', 'args' => [], 'why' => 'you have a finished vehicle — deploy it for passive mining income'];
             }
         }

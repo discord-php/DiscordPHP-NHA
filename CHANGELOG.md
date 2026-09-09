@@ -12,6 +12,15 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.21] - 2026-09-09
+
+### Fixed
+- After 3.2.20 the agent (holding the 2 probe-built `drives=true` vehicles)
+  wedged spamming `deploy` — the observe feed does not reliably flag a
+  deployed vehicle, so rung 1b kept re-offering it. Rung 1b now also treats
+  `autonomous`/`roaming`/`out` as deployed, and `AutoPlayer` breaks a run of
+  2+ `deploy`s in the recent window (fall back to gearing / earning / idle).
+
 ## [3.2.20] - 2026-09-09
 
 ### Added

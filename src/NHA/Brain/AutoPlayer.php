@@ -935,13 +935,26 @@ final class AutoPlayer
                     $decision = ['verb' => 'build', 'args' => ['part' => $part], 'reason' => "\"{$decision['args']['part']}\" is a rejected part — trying {$part} instead"];
                 }
 
-                // `deploy` on an inert finalized hull (drives=false, flies=false)
-                // is rejected forever. Fall back to gearing a real ship.
-                if ($verb === 'deploy' && ! Ladder::hasAnyVehicle($rawObs) && Ladder::hasDeadHull($rawObs)) {
-                    $gear = $this->fallbackDecision($observation, 'the finalized hull is inert — build more parts, not deploy', $tried, $known, $researchPaying, $stance);
-                    if ($gear !== null && ($gear['verb'] ?? '') !== 'deploy') {
-                        $decision = $gear;
-                        $verb = (string) ($decision['verb'] ?? '');
+                // `deploy` when there is nothing to deploy — an inert hull, or
+                // the drives=true vehicles are already out roaming (the observe
+                // feed does not always flag `deployed`). Either way a repeated
+                // `deploy` just spins; after 2 of them in the recent window,
+                // fall back to gearing / earning.
+                if ($verb === 'deploy') {
+                    $recentDeploys = count(array_filter(
+                        array_slice($recent, -4),
+                        static fn($r): bool => (string) ($r['verb'] ?? '') === 'deploy',
+                    ));
+                    $inertOnly = ! Ladder::hasAnyVehicle($rawObs) && Ladder::hasDeadHull($rawObs);
+                    if ($inertOnly || $recentDeploys >= 2) {
+                        $gear = $this->fallbackDecision($observation, 'nothing left to deploy — build / earn instead', $tried, $known, $researchPaying, $stance);
+                        if ($gear !== null && ($gear['verb'] ?? '') !== 'deploy') {
+                            $decision = $gear;
+                            $verb = (string) ($decision['verb'] ?? '');
+                        } else {
+                            $decision = self::idle($rawObs, 'nothing to deploy this turn');
+                            $verb = (string) $decision['verb'];
+                        }
                     }
                 }
 
