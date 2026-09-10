@@ -6,6 +6,21 @@ SemVer with the **major tracking the NHA world API version**.
 
 ## [Unreleased]
 
+## [3.3.2] - 2026-09-10
+
+### Fixed
+- **Deimos body-surface guardrail (3.3.1) only looked at the single newest
+  `construct` rejection and missed.** The model cycles three bad shapes on the
+  surface (`shape:colony/module:…` → "module must be one of…", `kind:mine` →
+  "kind must be one buildable on Deimos: cregolith_cracker", and the real
+  `kind:cregolith_cracker` → "insufficient … need {…}"), so the newest feed
+  entry was usually not the materials one and the guardrail no-oped. It now
+  scans **every** recent `construct` rejection, taking the engine's named
+  buildable `kind` for the body from one and a `need {…}` shortfall from
+  another. Short on materials → `Ladder::bodyBuildStep` (buy / combine); else
+  it submits the exact `{shape:extractor, kind:<named>, body:<body>}` the
+  engine asked for, dropping the model's bad `shape`/`module`.
+
 ## [3.3.1] - 2026-09-10
 
 ### Fixed

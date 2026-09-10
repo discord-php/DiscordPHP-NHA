@@ -1126,38 +1126,49 @@ final class AutoPlayer
                     $verb = 'move';
                 }
 
-                // A body-surface project (`construct` colony / terraform /
-                // extractor / station) the engine just refused for missing
-                // materials — the classic Deimos spin: 25k credits in the bank
-                // and `construct cregolith_cracker` rejected "need {metal: 80,
-                // chip: 10}" every tick because nothing buys the metal or
-                // crafts the chips. Read the newest `construct` rejection off
-                // the world feed and, if the agent is still short, substitute
-                // the acquisition step. A "kind must be one buildable on X: Y"
-                // rejection instead rewrites the bad `kind` arg in place.
+                // A body-surface project the engine keeps refusing — the live
+                // Deimos spin: 25k credits in the bank and `construct` of the
+                // `cregolith_cracker` module rejected every tick, the model
+                // flailing between a bad `shape:colony/module:…`, a bad
+                // `kind:mine`, and the real `kind:cregolith_cracker` that then
+                // fails "insufficient … (need {metal: 80, chip: 10})". The loop
+                // guard just re-emits `construct`. Take over deterministically:
+                // scan ALL recent `construct` rejections on the world feed for
+                // (a) the engine's named buildable `kind` for this body, and
+                // (b) a materials shortfall. If short → acquire; else → submit
+                // the exact `{shape:extractor, kind:<named>, body:<body>}` the
+                // engine asked for.
                 if ($verb === 'construct'
+                    && Ladder::atBody($rawObs) !== null
                     && (isset($decision['args']['body'])
                         || in_array((string) ($decision['args']['shape'] ?? ''), ['colony', 'terraform', 'extractor', 'station'], true))
                 ) {
-                    $why = '';
+                    $atBody = (string) Ladder::atBody($rawObs);
+                    $namedKind = '';
+                    $need = [];
                     foreach ((array) (is_object($pre['profile'] ?? null) ? ($pre['profile']->recent ?? []) : []) as $e) {
                         $d = (array) (((array) $e)['data'] ?? []);
-                        if (($d['verb'] ?? '') === 'construct' && ($d['status'] ?? '') === 'rejected') {
-                            $why = (string) ($d['result'] ?? '');
-                            break;
+                        if (($d['verb'] ?? '') !== 'construct' || ($d['status'] ?? '') !== 'rejected') {
+                            continue;
+                        }
+                        $w = (string) ($d['result'] ?? '');
+                        if ($namedKind === '' && preg_match('/kind must be one[^:]*:\s*([a-z_]+)/i', $w, $k) === 1) {
+                            $namedKind = $k[1];
+                        }
+                        if ($need === [] && ($p = Ladder::parseNeed($w)) !== []) {
+                            $need = $p;
                         }
                     }
-                    if ($why !== '') {
-                        $inv = (array) $observation->getInventory();
-                        if (preg_match('/kind must be one[^:]*:\s*([a-z_]+)/i', $why, $k) === 1
-                            && (string) ($decision['args']['kind'] ?? '') !== $k[1]) {
-                            $decision['args']['kind'] = $k[1];
-                            $decision['reason'] = "the engine names `{$k[1]}` as the buildable kind here — use it";
-                        } elseif (($need = Ladder::parseNeed($why)) !== []
-                            && ($acq = Ladder::bodyBuildStep($inv, $need)) !== null) {
-                            $decision = ['verb' => $acq['verb'], 'args' => $acq['args'], 'reason' => 'base project blocked on materials — ' . $acq['why']];
-                            $verb = (string) $decision['verb'];
-                        }
+                    $inv = (array) $observation->getInventory();
+                    if ($need !== [] && ($acq = Ladder::bodyBuildStep($inv, $need)) !== null) {
+                        $decision = ['verb' => $acq['verb'], 'args' => $acq['args'], 'reason' => 'base project blocked on materials — ' . $acq['why']];
+                        $verb = (string) $decision['verb'];
+                    } elseif ($namedKind !== '' && (
+                        (string) ($decision['args']['kind'] ?? '') !== $namedKind
+                        || (string) ($decision['args']['shape'] ?? '') !== 'extractor'
+                        || isset($decision['args']['module'])
+                    )) {
+                        $decision = ['verb' => 'construct', 'args' => ['shape' => 'extractor', 'kind' => $namedKind, 'body' => $atBody], 'reason' => "the engine names `{$namedKind}` as the buildable kind on {$atBody} — build exactly that"];
                     }
                 }
 
