@@ -657,6 +657,75 @@ final class AutoPlayer
     }
 
     /**
+     * Folds the world's own activity feed ({@see \NHA\Parts\AgentProfile::$recent})
+     * into the capability ledger: every `act` entry newer than the last review
+     * that the engine `rejected` is run through {@see RejectionClassifier}, and
+     * a durable verdict is landed via {@see StateStore::recordCapability()} so
+     * the brain stops re-attempting — and stops *holding for* — something it
+     * currently cannot do. A `needs_item` block whose gating consumable is now
+     * on hand is cleared here too; the review high-water mark only advances.
+     *
+     * Best-effort, side-effect only: a missing / unreadable feed is a no-op.
+     *
+     * @param object|null             $profile   the resolved {@see \NHA\Parts\AgentProfile}, or null on a failed fetch
+     * @param array<string,int|float> $inventory the current observation inventory
+     */
+    private function reviewCapabilityFeed(int $agent_id, ?object $profile, array $inventory): void
+    {
+        // A held consumable clears its gating `needs_item` entry regardless of
+        // whether the feed came back this turn.
+        $this->state->clearCapabilitiesWithItem($agent_id, $inventory);
+
+        $recent = [];
+        if (is_object($profile)) {
+            try {
+                $recent = (array) ($profile->recent ?? []);
+            } catch (\Throwable) {
+                $recent = [];
+            }
+        }
+        if ($recent === []) {
+            return;
+        }
+
+        $since = $this->state->capabilityReviewTick($agent_id);
+        $highWater = $since;
+        foreach ($recent as $entry) {
+            $entry = (array) $entry;
+            $etick = (int) ($entry['tick'] ?? 0);
+            if ($etick <= $since) {
+                continue;
+            }
+            $highWater = max($highWater, $etick);
+
+            if (($entry['kind'] ?? '') !== 'act') {
+                continue;
+            }
+            $data = (array) ($entry['data'] ?? []);
+            if (($data['status'] ?? '') !== 'rejected') {
+                continue;
+            }
+
+            // The feed carries no args — everything the classifier needs is in
+            // the verb + the engine's reason string. Any extra keys the world
+            // adds to `data` later are passed through as best-effort args.
+            $args = array_diff_key($data, array_flip(['verb', 'result', 'status']));
+            $hit = RejectionClassifier::classify((string) ($data['verb'] ?? ''), $args, (string) ($data['result'] ?? ''));
+            if ($hit === null) {
+                continue;
+            }
+            $this->state->recordCapability($agent_id, $hit['key'], $hit['class'], $hit['reason'], $etick, $hit['item']);
+        }
+
+        // Advance only across a feed we actually walked — never regress, and
+        // never jump to the live tick (that would skip entries the feed has
+        // not surfaced yet).
+        if ($highWater > $since) {
+            $this->state->setCapabilityReviewTick($agent_id, $highWater);
+        }
+    }
+
+    /**
      * Executes a single turn.
      *
      * @param int    $agent_id
@@ -775,6 +844,10 @@ final class AutoPlayer
                     // and thrust, not the dead end it replaced.
                     if ($lastWasFinalize && $status === 'applied') {
                         $this->state->clearDepartRejections($agent_id);
+                        // The same fresh-hull reasoning clears every ledger
+                        // verdict a `finalize` could have amended.
+                        $this->state->clearCapabilityClass($agent_id, 'needs_part');
+                        $this->state->clearCapabilityClass($agent_id, 'capability');
                     }
 
                     return ['status' => $status, 'result' => (string) ($s->result ?? '')];
@@ -784,7 +857,15 @@ final class AutoPlayer
             )
             : resolve(null);
 
-        return all(['outcome' => $outcome, 'known' => $this->knownCombines()])->then(fn(array $pre) => $this->nha->observe($agent_id)->then(function (AgentObservation $observation) use ($agent_id, $token, $last, $pre) {
+        // The world's own activity feed ({@see RejectionClassifier}) — every
+        // rejected act with its reason, so a refusal that landed between intent
+        // polls is not lost. Best-effort: a failed lookup just omits it.
+        $profile = $this->nha->agents->getAgentInfo($agent_id)->then(
+            static fn($p) => $p,
+            static fn(): ?object => null,
+        );
+
+        return all(['outcome' => $outcome, 'known' => $this->knownCombines(), 'profile' => $profile])->then(fn(array $pre) => $this->nha->observe($agent_id)->then(function (AgentObservation $observation) use ($agent_id, $token, $last, $pre) {
             $tick = (int) ($observation->get('tick') ?? 0);
             $downedUntil = (int) ($observation->get('downed_until') ?? 0);
 
@@ -794,6 +875,12 @@ final class AutoPlayer
 
             $rawObs = json_decode(json_encode($observation->jsonSerialize()), true);
             $rawObs = is_array($rawObs) ? $rawObs : [];
+
+            // Fold the world's activity feed into the capability ledger before
+            // deciding: durable rejections (`needs_part`, `capability`,
+            // `needs_item`, `needs_enum`) gate a retry; a held item clears its
+            // `needs_item` entry.
+            $this->reviewCapabilityFeed($agent_id, $pre['profile'] ?? null, (array) ($rawObs['inventory'] ?? []));
 
             // Pick and persist the strategic stance for this turn (hysteresis in
             // Stance::pick keeps it from flip-flopping).
@@ -852,7 +939,12 @@ final class AutoPlayer
             // Depart gating: skip destinations a prior `depart` was permanently
             // (TWR) rejected for, and after any rejection hold off for a short
             // cooldown so an observe/intent window race is not spammed.
-            $departUnreachable = $this->state->departUnreachable($agent_id);
+            $departUnreachable = array_values(array_unique(array_merge(
+                $this->state->departUnreachable($agent_id),
+                // Bodies the capability ledger has independently marked out of
+                // reach (a `depart` rejection folded in from the world feed).
+                $this->state->capabilityTargets($agent_id, 'depart'),
+            )));
             $departCooldown = $this->state->departRetryCooldownActive($agent_id, $tick);
             $departServiceable = Ladder::departTarget($rawObs, $departUnreachable); // null unless a window we can take is open
             $departNow = $departServiceable !== null && ! $departCooldown;
@@ -892,6 +984,12 @@ final class AutoPlayer
             $context['known_combines'] = array_keys($known);
             $context['tried_combines'] = $tried;
             $context['dead_combines'] = $dead;
+            // Durable "this was refused, here's the class of reason" verdicts
+            // learned from the world's activity feed ({@see reviewCapabilityFeed()}).
+            $blockedCapabilities = $this->state->capabilities($agent_id);
+            if ($blockedCapabilities !== []) {
+                $context['blocked_capabilities'] = $blockedCapabilities;
+            }
             if ($loop !== null) {
                 $context['loop'] = $loop;
                 $context['forced_objective'] = $loopObjective;
@@ -1358,6 +1456,11 @@ final class AutoPlayer
                 // fails, the verdicts are re-learned on the next depart anyway.
                 if (($decision['verb'] ?? '') === 'finalize') {
                     $this->state->clearDepartRejections($agent_id);
+                    // A fresh hull also clears every capability verdict a
+                    // `finalize` can amend — a missing part (landing_gear), or
+                    // a thrust-to-weight ceiling the old bundle could not meet.
+                    $this->state->clearCapabilityClass($agent_id, 'needs_part');
+                    $this->state->clearCapabilityClass($agent_id, 'capability');
                 }
 
                 return $this->nha->intentWithToken($agent_id, $token, $decision['verb'], $decision['args'])

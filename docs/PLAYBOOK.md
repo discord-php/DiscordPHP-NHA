@@ -33,13 +33,15 @@ flowchart TD
     dead --> rules
     deprej --> rules
     clr --> rules
-    rules[knownCombines&#40;&#41;<br/>re-pull GET /rules &#8804; every 90s] --> obs[NHA::observe]
-    obs --> downed{downed?}
+    rules[knownCombines&#40;&#41;<br/>re-pull GET /rules &#8804; every 90s] --> prof["AgentRepository::getAgentInfo<br/>&#40;the world's activity feed; best-effort&#41;"]
+    prof --> obs[NHA::observe]
+    obs --> capfeed["reviewCapabilityFeed:<br/>fold every NEW rejected act from /agent/&#123;id&#125;.recent<br/>through RejectionClassifier &#8594; state.recordCapability<br/>&#40;needs_part / capability / needs_item / needs_enum&#41;;<br/>clear a needs_item block once its item is held;<br/>advance the review high-water tick"]
+    capfeed --> downed{downed?}
     downed -- yes --> skipD[["&#129657; skip"]]
     downed -- no --> stance["Stance::pick &#8594; aggressive &#40;defend&#41; / expansionist &#40;the mission&#41;<br/>&#40;persisted&#41;"]
     stance --> combat{Ladder::defensiveAction<br/>&#40;recent attack / robber / hostile closing while hurt&#41;?}
     combat -- yes --> defend[["&#128737;&#65039; heal / attack back / break contact<br/>&#8594; submit &amp; record, skip the brain entirely"]]
-    combat -- no --> ctx["build context:<br/>&#8226; known &#8746; dead combine sigs<br/>&#8226; tried sigs &#40;whole run&#41;<br/>&#8226; noteInventorPoints &#8594; researchPaying<br/>&#8226; recent 12 decisions"]
+    combat -- no --> ctx["build context:<br/>&#8226; known &#8746; dead combine sigs<br/>&#8226; tried sigs &#40;whole run&#41;<br/>&#8226; noteInventorPoints &#8594; researchPaying<br/>&#8226; recent 12 decisions<br/>&#8226; blocked_capabilities &#40;the ledger&#41;<br/>&#8226; departUnreachable &#8746; ledger depart:* targets"]
     ctx --> detect["detectLoop recent<br/>&#40;a 'stuck land/launch' bypasses the cooldown&#41;"]
     detect --> isloop{loop found &amp;<br/>not in cooldown?}
     isloop -- yes --> peek["state.peekNextForcedObjective<br/>&#40;name it for the prompt; do NOT commit yet&#41;"]
@@ -76,6 +78,18 @@ flowchart TD
 below with the tried &#8746; known space marked exhausted; if `researchPaying`
 is false it also suppresses the speculative-combine rung. It returns `null` only
 when the ladder has nothing, and the turn is skipped.
+
+**Capability ledger** (`reviewCapabilityFeed` + [`CapabilityLedgerTrait`](../src/NHA/State/CapabilityLedgerTrait.php)).
+The world's `GET /agent/{id}.recent` feed lists every rejected act with its
+reason — including refusals that landed between intent polls and would otherwise
+be lost. Each new entry is run through
+[`RejectionClassifier`](../src/NHA/Brain/RejectionClassifier.php), which drops
+transient reasons (closed window, one-turn shortage) and classes the durable
+ones: `needs_part` / `capability` (a hull limit — cleared on the next
+`finalize`), `needs_item` (a missing consumable — cleared when it is held),
+`needs_enum` (a bad enum arg — sticky for the run). A `depart:<body>` verdict
+merges into `departUnreachable`, so the flight guardrails stop holding for — and
+stop retrying — a hop the ship cannot make.
 
 ---
 

@@ -6,7 +6,26 @@ SemVer with the **major tracking the NHA world API version**.
 
 ## [Unreleased]
 
+## [3.3.0] - 2026-09-10
+
 ### Added
+- **Capability ledger — the brain now learns from the world's own activity
+  feed.** Every turn `AutoPlayer` pulls `GET /agent/{id}` and folds each *new*
+  rejected act from its `recent` feed through the new
+  `NHA\Brain\RejectionClassifier`, which drops transient reasons (closed
+  window, a one-turn shortage) and classes the durable ones onto a per-agent
+  ledger (`NHA\State\CapabilityLedgerTrait` on `StateStore`):
+  - `needs_part` / `capability` — a hull limit (`landing_gear`,
+    thrust-to-weight); cleared the moment a new `finalize` is committed.
+  - `needs_item` — a missing arrival consumable (`acid_skin`, `heat_shield`);
+    cleared as soon as the item is seen in inventory.
+  - `needs_enum` — a bad enum argument (`construct` module, unknown `build`
+    part); sticky for the run.
+  A `depart:<body>` verdict merges into `departUnreachable`, so the flight
+  guardrails stop *holding for* — and stop retrying — a hop the current ship
+  cannot make, even when the refusal only ever appeared on the feed and never
+  came back through an intent poll. The whole ledger is surfaced to the LLM as
+  `blocked_capabilities` in the turn context.
 - `docs/PLAYBOOK.md` — maintained UML (Mermaid) for the autoplay brain: the
   per-turn flow of `AutoPlayer::step()`, the `AgentBrain::suggestion()` ladder,
   the loop guard, and a component diagram. Update it alongside any change to

@@ -1192,6 +1192,48 @@ class AutoPlayerTest extends NHAUnitTestCase
     }
 
     /**
+     * A rejection that landed on the world's own activity feed between intent
+     * polls is not lost: {@see \NHA\Brain\AutoPlayer::reviewCapabilityFeed()}
+     * folds it into the capability ledger, and that verdict merges into the
+     * depart-unreachable set the decision phase honours.
+     *
+     * @covers \NHA\Brain\AutoPlayer::step
+     */
+    public function testARejectionOnlySeenInTheWorldFeedStillParksTheDestination(): void
+    {
+        $state = new StateStore($this->statePath);
+
+        $nha = $this->nhaWith([
+            'tick' => 1300, 'downed_until' => 0, 'position' => [30, 110],
+            'in_space' => true, 'altitude' => 480,
+            'inventory' => ['credits' => 3000, 'cryo_fuel' => 95,
+                'stimpack' => 1, 'kinetic_gun' => 1, 'slug' => 5],
+            'vehicles' => [['name' => 'skiff', 'flies' => true, 'orbital_engine' => true]],
+            'expansion' => ['at_body' => null, 'windows' => ['deimos' => ['open' => true]]],
+            'asteroids' => [],
+            // The activity feed the bot never saw an intent outcome for.
+            'recent' => [
+                ['tick' => 1288, 'kind' => 'act', 'data' => [
+                    'verb' => 'depart', 'status' => 'rejected',
+                    'result' => 'Deimos needs LANDING GEAR on the ship before you can depart',
+                ]],
+                ['tick' => 1290, 'kind' => 'act', 'data' => [
+                    'verb' => 'construct', 'status' => 'rejected',
+                    'result' => 'module must be one of: anchor_truss/cracker/depot/mass_driver',
+                ]],
+            ],
+        ]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"depart","args":{"dest":"deimos"}}'), $state);
+
+        $player->step(142287, 'tok');
+
+        $this->assertContains('deimos', $state->capabilityTargets(142287, 'depart'), 'the feed rejection parked deimos');
+        $this->assertTrue($state->capabilityBlocked(142287, 'construct:module'), 'the bad-enum construct is on the ledger too');
+        $this->assertSame(1290, $state->capabilityReviewTick(142287), 'the review mark advanced to the newest entry walked');
+        $this->assertNotSame('depart', $this->posts[0][1]['verb'], 'and the decision phase no longer departs for deimos');
+    }
+
+    /**
      * `finalize`-ing a new hull wipes the previous ship's depart verdicts, so
      * the fresh (gear-carrying) flyer is judged on its own merits.
      *

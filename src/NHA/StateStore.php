@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace NHA;
 
 use NHA\State\AutoplayLeaseTrait;
+use NHA\State\CapabilityLedgerTrait;
 use NHA\State\CombineMemoryTrait;
 use NHA\State\DecisionLogTrait;
 use NHA\State\IdentityStateTrait;
@@ -40,6 +41,7 @@ use NHA\State\PositionStateTrait;
 class StateStore
 {
     use AutoplayLeaseTrait;
+    use CapabilityLedgerTrait;
     use CombineMemoryTrait;
     use DecisionLogTrait;
     use IdentityStateTrait;
