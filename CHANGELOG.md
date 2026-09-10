@@ -6,6 +6,20 @@ SemVer with the **major tracking the NHA world API version**.
 
 ## [Unreleased]
 
+## [3.4.1] - 2026-09-10
+
+### Fixed
+- **3.4.0's colony-fund `construct {shape:colony}` was clobbered one line
+  later.** The materials-blocked-construct fixer (3.3.2) saw the feed's stale
+  `"kind must be one buildable on Deimos: cregolith_cracker"` rejections and
+  its `elseif` rewrote *any* body-surface `construct` without a `kind` — the
+  colony fund call included — back to `construct {shape:extractor,
+  kind:cregolith_cracker}`. Verified live: the first turn funded
+  (`buy superalloy`), every turn after went back to spamming extractors. That
+  fixer now skips a `shape:colony` construct **when a real colony board with an
+  open module backs it** (`Ladder::colonyNextModule() !== null`); a bare
+  `shape:colony` with no board is still the model's spin and still gets fixed.
+
 ## [3.4.0] - 2026-09-10
 
 ### Added

@@ -1192,8 +1192,15 @@ final class AutoPlayer
                 // (b) a materials shortfall. If short → acquire; else → submit
                 // the exact `{shape:extractor, kind:<named>, body:<body>}` the
                 // engine asked for.
+                // Leave a `shape:colony` construct alone ONLY when a real colony
+                // board with an open module is backing it (the fund call the
+                // block above emits). With no board, `shape:colony` is just the
+                // model's malformed body-project spin and still needs fixing.
+                $colonyFundBacked = (string) ($decision['args']['shape'] ?? '') === 'colony'
+                    && Ladder::colonyNextModule($colonyBoard) !== null;
                 if ($verb === 'construct'
                     && Ladder::atBody($rawObs) !== null
+                    && ! $colonyFundBacked
                     && (isset($decision['args']['body'])
                         || in_array((string) ($decision['args']['shape'] ?? ''), ['colony', 'terraform', 'extractor', 'station'], true))
                 ) {
