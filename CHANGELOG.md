@@ -12,6 +12,18 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.39] - 2026-09-10
+
+### Fixed
+- **A stranded hull now actually rebuilds instead of churning.** 3.2.38 made
+  `hasDepartCapableShip()` correctly report a gearless hull as a dead end, but
+  the recovery — descend, craft/build the ~14-part bundle, `finalize` — is a
+  long deterministic sequence that `detectLoop()` reads as "buy/sell churn,
+  nothing built", so objective rotation kept yanking the agent onto
+  `research`/`wealth` moves that fought the descent. `AutoPlayer` now suppresses
+  loop-break while `$shipStranded` and forces `Ladder::suggestion()`'s rebuild
+  step over any model pick that is not already `build`/`finalize`/`combine`.
+
 ## [3.2.38] - 2026-09-10
 
 ### Fixed

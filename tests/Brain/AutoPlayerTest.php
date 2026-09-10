@@ -1220,6 +1220,37 @@ class AutoPlayerTest extends NHAUnitTestCase
     }
 
     /**
+     * A dead-end hull (every gear body rejected) on the ground: the model's
+     * mine/sell wandering is overridden by the deterministic rebuild step, not
+     * left to churn.
+     *
+     * @covers \NHA\Brain\AutoPlayer::step
+     */
+    public function testAStrandedHullIsDrivenToRebuildNotLeftToChurn(): void
+    {
+        $state = new StateStore($this->statePath);
+        foreach (['deimos', 'phobos', 'mars'] as $d) {
+            $state->recordDepartRejection(142287, $d, 400, true);
+        }
+
+        $nha = $this->nhaWith([
+            'tick' => 500, 'downed_until' => 0, 'position' => [10, 10],
+            'in_space' => false, 'altitude' => 0,
+            'inventory' => ['credits' => 8000, 'metal' => 40, 'composite' => 6, 'chip' => 2, 'ion_thruster' => 1,
+                'stimpack' => 1, 'kinetic_gun' => 1, 'slug' => 5],
+            'vehicles' => [['name' => 'deadend', 'flies' => true, 'orbital_engine' => true]],
+            'loose_parts' => [], 'nearby_deposits' => [], 'elevators' => [['x' => 10, 'y' => 10, 'height' => 500]],
+        ]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"sell","args":{"resource":"iron","n":80}}'), $state);
+
+        $player->step(142287, 'tok');
+
+        $verb = $this->posts[0][1]['verb'];
+        $this->assertNotSame('sell', $verb, 'not left day-trading — the hull is a dead end');
+        $this->assertContains($verb, ['build', 'combine', 'buy'], 'driven toward a fresh geared flyer');
+    }
+
+    /**
      * A loop-break research pass must never `combine` away survival gear.
      *
      * @covers \NHA\Brain\AutoPlayer::loopBreakDecision

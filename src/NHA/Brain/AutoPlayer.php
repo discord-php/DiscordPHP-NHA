@@ -866,7 +866,11 @@ final class AutoPlayer
                 || ($departCooldown && ($rawObs['in_space'] ?? false) && Ladder::hasOrbitalShip($rawObs))
             );
             $loopRaw = self::detectLoop($recent);
-            $loop = ($loopRaw !== null && ! $holdingForWindow
+            // A dead-end hull ({@see Ladder::hasDepartCapableShip()}) is driven
+            // through a fixed ~15-turn rebuild (descend → craft/build the
+            // bundle → finalize) that detectLoop reads as churn — suppress the
+            // guard so objective rotation does not fight the sequence.
+            $loop = ($loopRaw !== null && ! $holdingForWindow && ! $shipStranded
                 && (str_starts_with($loopRaw, 'stuck ') || ! $this->state->loopBreakCooldownActive($agent_id, $tick)))
                 ? $loopRaw
                 : null;
@@ -1060,6 +1064,20 @@ final class AutoPlayer
                         $verb = (string) $decision['verb'];
                     } elseif (! in_array($verb, ['dock', 'buy', 'deposit', 'wait'], true)) {
                         $decision = self::idle($rawObs, 'flight-ready ship in orbit — holding for a transfer window');
+                        $verb = (string) $decision['verb'];
+                    }
+                }
+
+                // Dead-end hull: every body is `depart`-rejected and `finalize`
+                // cannot amend a built vehicle, so the only way forward is a
+                // fresh geared flyer. Drive the deterministic rebuild (descend →
+                // craft / build the SHIP_BUNDLE_TARGET → finalize) over any
+                // model pick that is not already part of it. Loop-break is
+                // suppressed above so the long sequence can play out.
+                if ($shipStranded && ! in_array($verb, ['build', 'finalize', 'combine'], true)) {
+                    $step = Ladder::suggestion($rawObs, $tried, $known, false, $stance, $departUnreachable);
+                    if ($step !== null && (string) ($step['verb'] ?? '') !== 'depart') {
+                        $decision = ['verb' => (string) $step['verb'], 'args' => (array) ($step['args'] ?? []), 'reason' => 'dead-end hull — ' . (string) ($step['why'] ?? 'gear a fresh flyer')];
                         $verb = (string) $decision['verb'];
                     }
                 }
