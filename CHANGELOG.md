@@ -12,6 +12,24 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.44] - 2026-09-10
+
+### Fixed
+- **The agent HAD departed — it just didn't know it.** A successful `depart`
+  puts the agent on the interplanetary crossing: `expansion.transit = {to,
+  eta_tick}`, `altitude = 600`, `at_body` still unset. Every "in Earth orbit,
+  hold / depart" gate only checked `at_body`, so the agent read itself as
+  parked-and-waiting, kept re-issuing `depart deimos` (rejected "already in
+  transit to Deimos"), and fell back to `deposit`. New `Ladder::inTransit()`
+  short-circuits `isHoldingForWindow()`, `departTarget()` and the expansionist
+  `stanceMove` (→ idle "en route to … ETA n"); `AutoPlayer` suppresses
+  loop-break and forces the no-op until arrival sets `at_body`.
+
+### Changed
+- The `[autoplay]` status line now appends last turn's intent outcome when it
+  was **rejected** (`⤷ last turn's \`depart\` was rejected: already in transit
+  to Deimos`), so a silently-dropped intent is visible.
+
 ## [3.2.43] - 2026-09-10
 
 ### Fixed

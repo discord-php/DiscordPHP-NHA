@@ -492,6 +492,24 @@ final class Ladder
     }
 
     /**
+     * The agent has DEPARTED and is on the interplanetary crossing — the engine
+     * parks it at `altitude = SKY_TOP` with `expansion.transit = {to, eta_tick}`
+     * and `at_body` still unset. Every "in Earth orbit, hold / depart" gate must
+     * bail here: the only move in transit is to wait for arrival (then `at_body`
+     * is set and the land-and-build path takes over).
+     *
+     * @param array<string,mixed> $raw
+     */
+    public static function inTransit(array $raw): bool
+    {
+        $ex = (array) ($raw['expansion'] ?? []);
+
+        return ! empty(((array) ($ex['transit'] ?? []))['to'])
+            || in_array((string) ($ex['location'] ?? ''), ['transit', 'adrift'], true)
+            || in_array((string) (((array) ($ex['place'] ?? []))['where'] ?? ''), ['transit', 'adrift'], true);
+    }
+
+    /**
      * Whether the agent has a flying orbital ship that can still reach a
      * mission body. The bar is the three GEAR bodies — deimos, phobos, mars
      * (moons + Mars, TWR ≤ 0.7). Once every one of those is in `$unreachable`
@@ -534,7 +552,7 @@ final class Ladder
         if ($stance !== Stance::Expansionist->value) {
             return false;
         }
-        if (($raw['expansion']['at_body'] ?? null) !== null || ! self::hasOrbitalShip($raw)) {
+        if (self::inTransit($raw) || ($raw['expansion']['at_body'] ?? null) !== null || ! self::hasOrbitalShip($raw)) {
             return false;
         }
 
@@ -590,7 +608,7 @@ final class Ladder
     public static function departTarget(array $raw, array $unreachable = []): ?string
     {
         $alt = (int) ($raw['altitude'] ?? 0);
-        if (! ($raw['in_space'] ?? false) || $alt < 300 || $alt > 600) {
+        if (self::inTransit($raw) || ! ($raw['in_space'] ?? false) || $alt < 300 || $alt > 600) {
             return null;
         }
         if (($raw['expansion']['at_body'] ?? null) !== null || ! self::hasOrbitalShip($raw)) {
@@ -1246,6 +1264,14 @@ final class Ladder
             $alt = (int) ($raw['altitude'] ?? 0);
             $inSpace = (bool) ($raw['in_space'] ?? false);
             $onGround = ! $inSpace && $alt === 0;
+
+            // Already departed — riding the interplanetary transfer. Nothing to
+            // do but wait for arrival; every flight verb is rejected mid-crossing.
+            if (self::inTransit($raw)) {
+                $t = (array) ($expansion['transit'] ?? []);
+                $eta = (int) ($t['eta_in'] ?? 0);
+                return self::noop($raw, 'expansionist — en route to ' . (string) ($t['to'] ?? 'a body') . ($eta > 0 ? " (ETA {$eta} ticks)" : '') . ', hold');
+            }
 
             // Arrived at a body but still in its orbit → put down.
             if ($atBody !== null && $alt > 0) {

@@ -323,6 +323,30 @@ class LadderTest extends NHAUnitTestCase
      *
      * @covers \NHA\Brain\Ladder::shipCraftStep
      */
+    /**
+     * A departed agent riding the transfer: no hold, no re-depart — just wait.
+     *
+     * @covers \NHA\Brain\Ladder::inTransit
+     */
+    public function testInTransitStopsTheHoldAndDepartGates(): void
+    {
+        $transit = [
+            'tick' => 5, 'in_space' => true, 'altitude' => 600,
+            'inventory' => self::KIT + ['cryo_fuel' => 90, 'heat_shield' => 1],
+            'vehicles' => [['name' => 'skiff', 'flies' => true, 'orbital_engine' => true]],
+            'expansion' => ['at_body' => null, 'transit' => ['to' => 'deimos', 'eta_tick' => 99, 'eta_in' => 30],
+                'windows' => ['deimos' => ['open' => true]]],
+        ];
+
+        $this->assertTrue(Ladder::inTransit($transit));
+        $this->assertNull(Ladder::departTarget($transit), 'cannot depart mid-crossing');
+        $this->assertFalse(Ladder::isHoldingForWindow($transit, 'expansionist'), 'not holding — already left');
+
+        $pick = Ladder::suggestion($transit, [], [], false, 'expansionist');
+        $this->assertNotSame('depart', $pick['verb'] ?? null);
+        $this->assertStringContainsString('deimos', (string) ($pick['why'] ?? ''));
+    }
+
     public function testTheUnobtainableBearingUpgradeIsNotChased(): void
     {
         $this->assertArrayNotHasKey('propeller', Ladder::SHIP_PART_UPGRADE);

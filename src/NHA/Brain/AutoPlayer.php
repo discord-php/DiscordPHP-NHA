@@ -859,9 +859,13 @@ final class AutoPlayer
             // The current hull has been `depart`-rejected for every body — a
             // dead end. Don't hold or force-depart; let the ladder gear a fresh
             // (gear-carrying) flyer.
-            $shipStranded = Ladder::hasOrbitalShip($rawObs)
+            // Already departed — riding the interplanetary transfer. Every
+            // flight verb is rejected mid-crossing; the only move is to wait.
+            $inTransit = Ladder::inTransit($rawObs);
+            $shipStranded = ! $inTransit
+                && Ladder::hasOrbitalShip($rawObs)
                 && ! Ladder::hasDepartCapableShip($rawObs, $departUnreachable);
-            $holdingForWindow = ! $shipStranded && (
+            $holdingForWindow = ! $shipStranded && ! $inTransit && (
                 Ladder::isHoldingForWindow($rawObs, $stance, $departUnreachable)
                 || ($departCooldown && ($rawObs['in_space'] ?? false) && Ladder::hasOrbitalShip($rawObs))
             );
@@ -869,8 +873,9 @@ final class AutoPlayer
             // A dead-end hull ({@see Ladder::hasDepartCapableShip()}) is driven
             // through a fixed ~15-turn rebuild (descend → craft/build the
             // bundle → finalize) that detectLoop reads as churn — suppress the
-            // guard so objective rotation does not fight the sequence.
-            $loop = ($loopRaw !== null && ! $holdingForWindow && ! $shipStranded
+            // guard so objective rotation does not fight the sequence. Same for
+            // an in-transit agent: there is nothing to do but wait.
+            $loop = ($loopRaw !== null && ! $holdingForWindow && ! $shipStranded && ! $inTransit
                 && (str_starts_with($loopRaw, 'stuck ') || ! $this->state->loopBreakCooldownActive($agent_id, $tick)))
                 ? $loopRaw
                 : null;
@@ -894,7 +899,7 @@ final class AutoPlayer
 
             $altNow = (int) ($observation->get('altitude') ?? 0);
 
-            return $this->brain->decide($observation, $context ?: null, $stance)->then(function (?array $decision) use ($agent_id, $token, $tick, $altNow, $observation, $rawObs, $known, $tried, $dead, $researchPaying, $recent, $loop, $loopObjective, $stance, $holdingForWindow, $departNow, $departServiceable, $departCooldown, $departUnreachable, $shipStranded) {
+            return $this->brain->decide($observation, $context ?: null, $stance)->then(function (?array $decision) use ($agent_id, $token, $tick, $altNow, $observation, $rawObs, $known, $tried, $dead, $researchPaying, $recent, $loop, $loopObjective, $stance, $holdingForWindow, $departNow, $departServiceable, $departCooldown, $departUnreachable, $shipStranded, $inTransit, $pre, $last) {
                 if ($decision === null && $loopObjective === null && ! $holdingForWindow) {
                     // Record the pass so a wait-streak is visible to detectLoop.
                     $this->state->recordDecision($agent_id, ['verb' => 'wait', 'args' => [], 'reason' => '', 'queued_intent' => null, 'tick' => $tick, 'alt' => $altNow]);
@@ -1052,6 +1057,16 @@ final class AutoPlayer
                 // sanctioned `depart` — `mine`/`move`/`ride`/`land` all just
                 // burn turns up here. `$loopObjective` is null because
                 // loop-break is suppressed while holding.
+                // Already departed and riding the transfer: every flight verb is
+                // rejected ("already in transit to …"), and the window still
+                // reads "open" so the model / loop-break keep re-firing `depart`.
+                // Force the idle no-op until arrival sets `at_body`.
+                if ($inTransit && ! in_array($verb, ['deposit', 'wait'], true)) {
+                    $t = (array) (($rawObs['expansion'] ?? [])['transit'] ?? []);
+                    $decision = self::idle($rawObs, 'en route to ' . (string) ($t['to'] ?? 'a body') . ' (ETA ' . (int) ($t['eta_in'] ?? 0) . ' ticks) — nothing to do but wait');
+                    $verb = (string) $decision['verb'];
+                }
+
                 if ($holdingForWindow && $verb !== 'depart') {
                     // `$holdingForWindow` is only set when the deterministic
                     // check says NOT to depart (no serviceable window, or a
@@ -1355,7 +1370,15 @@ final class AutoPlayer
                             ? "♻️ Agent #{$agent_id} loop ({$loop}) → forced **{$loopObjective}**:"
                             : "🤖 [{$stance}] Agent #{$agent_id} →";
 
-                        return "{$head} **{$decision['verb']}**{$args}{$ref}{$reason}";
+                        // Surface last turn's intent outcome so a silent rejection
+                        // (e.g. "already in transit", "needs LANDING GEAR") is visible.
+                        $prev = '';
+                        $oc = (array) ($pre['outcome'] ?? []);
+                        if (($oc['status'] ?? '') === 'rejected' && ($oc['result'] ?? '') !== '') {
+                            $prev = "\n⤷ last turn's `" . (string) (($last['verb'] ?? '?')) . '` was rejected: ' . (string) $oc['result'];
+                        }
+
+                        return "{$head} **{$decision['verb']}**{$args}{$ref}{$reason}{$prev}";
                     });
             });
         }));
