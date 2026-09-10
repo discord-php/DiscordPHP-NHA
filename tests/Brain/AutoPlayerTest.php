@@ -1270,6 +1270,74 @@ class AutoPlayerTest extends NHAUnitTestCase
     }
 
     /**
+     * On a body with an unfinished colony, the model's "build another personal
+     * extractor" is overridden by funding the next incomplete module — the live
+     * Deimos failure (12 redundant crackers while Mass Driver sat at 1/160).
+     * The `nhaWith` mock returns one payload for every GET, so the observation
+     * here doubles as `GET /colony/deimos`.
+     *
+     * @covers \NHA\Brain\AutoPlayer::step
+     */
+    public function testOnABodyItFundsTheNextColonyModuleRatherThanBuildingExtractors(): void
+    {
+        $state = new StateStore($this->statePath);
+
+        $nha = $this->nhaWith([
+            'tick' => 1300, 'downed_until' => 0, 'position' => [37, 114],
+            'in_space' => false, 'altitude' => 0,
+            'inventory' => ['credits' => 15000, 'superalloy' => 30,
+                'stimpack' => 1, 'kinetic_gun' => 1, 'slug' => 5],
+            'expansion' => ['at_body' => 'deimos'],
+            'body' => 'deimos', 'cap_pct_per_agent' => 60, 'complete' => false,
+            'modules' => [
+                ['module' => 'depot', 'complete' => true, 'need' => [], 'remaining' => [], 'contrib' => []],
+                [
+                    'module' => 'mass_driver', 'label' => 'Mass Driver', 'complete' => false,
+                    'need' => ['superalloy' => 160, 'nickel' => 120],
+                    'remaining' => ['superalloy' => 159, 'nickel' => 120],
+                    'contrib' => ['142285' => ['superalloy' => 1]],
+                ],
+            ],
+            'extractors' => array_fill(0, 12, ['id' => 1, 'kind' => 'cregolith_cracker', 'owner' => 142285]),
+        ]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"construct","args":{"shape":"extractor","kind":"cregolith_cracker","body":"deimos"}}'), $state);
+
+        $player->step(142285, 'tok');
+
+        $post = $this->posts[0][1];
+        $this->assertSame('construct', $post['verb']);
+        $this->assertSame('colony', $post['args']['shape']);
+        $this->assertSame('mass_driver', $post['args']['module']);
+    }
+
+    /**
+     * Colony complete + already running the extractor cap → a further
+     * `construct extractor` is dropped for an earning / holding move.
+     *
+     * @covers \NHA\Brain\AutoPlayer::step
+     */
+    public function testItStopsSpammingExtractorsOnceTheColonyIsFinished(): void
+    {
+        $state = new StateStore($this->statePath);
+
+        $nha = $this->nhaWith([
+            'tick' => 1300, 'downed_until' => 0, 'position' => [37, 114],
+            'in_space' => false, 'altitude' => 0,
+            'inventory' => ['credits' => 15000, 'crystal' => 90,
+                'stimpack' => 1, 'kinetic_gun' => 1, 'slug' => 5],
+            'expansion' => ['at_body' => 'deimos'],
+            'body' => 'deimos', 'cap_pct_per_agent' => 60, 'complete' => true,
+            'modules' => [['module' => 'mass_driver', 'complete' => true, 'need' => [], 'remaining' => [], 'contrib' => []]],
+            'extractors' => array_fill(0, 12, ['id' => 1, 'kind' => 'cregolith_cracker', 'owner' => 142285]),
+        ]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"construct","args":{"shape":"extractor","kind":"cregolith_cracker","body":"deimos"}}'), $state);
+
+        $player->step(142285, 'tok');
+
+        $this->assertNotSame('construct', $this->posts[0][1]['verb'], 'a 13th extractor is churn — do something else');
+    }
+
+    /**
      * The engine's named buildable `kind` for the body is adopted when the feed
      * has no materials shortfall to act on — the model's bad `shape`/`kind` is
      * replaced with exactly what the engine asked for.

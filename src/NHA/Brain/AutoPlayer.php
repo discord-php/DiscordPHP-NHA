@@ -882,6 +882,20 @@ final class AutoPlayer
             // `needs_item` entry.
             $this->reviewCapabilityFeed($agent_id, $pre['profile'] ?? null, (array) ($rawObs['inventory'] ?? []));
 
+            // Standing on a body → pull its colony board so the decision can
+            // FUND the next incomplete module (and stop raising redundant
+            // personal extractors) instead of churning. Best-effort: a failed
+            // fetch (or not being on a body) just yields an empty board.
+            $onBodySurface = Ladder::atBody($rawObs) !== null
+                && (int) ($rawObs['altitude'] ?? 0) === 0
+                && ! ($rawObs['in_space'] ?? false);
+            $colonyBoardPromise = $onBodySurface
+                ? $this->nha->world->getColony((string) Ladder::atBody($rawObs))->then(
+                    static fn($c): array => (array) (json_decode(json_encode($c), true) ?: []),
+                    static fn(): array => [],
+                )
+                : resolve([]);
+
             // Pick and persist the strategic stance for this turn (hysteresis in
             // Stance::pick keeps it from flip-flopping).
             $stancePrev = $this->state->getStance($agent_id);
@@ -997,7 +1011,7 @@ final class AutoPlayer
 
             $altNow = (int) ($observation->get('altitude') ?? 0);
 
-            return $this->brain->decide($observation, $context ?: null, $stance)->then(function (?array $decision) use ($agent_id, $token, $tick, $altNow, $observation, $rawObs, $known, $tried, $dead, $researchPaying, $recent, $loop, $loopObjective, $stance, $holdingForWindow, $departNow, $departServiceable, $departCooldown, $departUnreachable, $shipStranded, $inTransit, $pre, $last) {
+            return $colonyBoardPromise->then(fn(array $colonyBoard) => $this->brain->decide($observation, $context ?: null, $stance)->then(function (?array $decision) use ($agent_id, $token, $tick, $altNow, $observation, $rawObs, $known, $tried, $dead, $researchPaying, $recent, $loop, $loopObjective, $stance, $holdingForWindow, $departNow, $departServiceable, $departCooldown, $departUnreachable, $shipStranded, $inTransit, $pre, $last, $colonyBoard) {
                 if ($decision === null && $loopObjective === null && ! $holdingForWindow) {
                     // Record the pass so a wait-streak is visible to detectLoop.
                     $this->state->recordDecision($agent_id, ['verb' => 'wait', 'args' => [], 'reason' => '', 'queued_intent' => null, 'tick' => $tick, 'alt' => $altNow]);
@@ -1124,6 +1138,46 @@ final class AutoPlayer
                     $step = Ladder::stepToClearGround($rawObs);
                     $decision = ['verb' => $step['verb'], 'args' => $step['args'], 'reason' => $step['why']];
                     $verb = 'move';
+                }
+
+                // COLONY BOARD (fetched for the body underfoot). The mission on
+                // a body is to FINISH its colony — fund the next incomplete
+                // module ({@see Ladder::colonyFundStep()}: hold the material →
+                // `construct {shape:colony, …}`, else buy it) and stop raising
+                // redundant personal extractors. Live failure this fixes: the
+                // agent finished 3/4 Deimos modules, then built 12 useless
+                // `cregolith_cracker` extractors while the Mass Driver sat at
+                // 1/160 superalloy because `expansion.colony` is never in the
+                // observation and the ladder fell back to "extractor for income"
+                // forever.
+                if ($colonyBoard !== [] && Ladder::atBody($rawObs) !== null && (int) ($observation->get('altitude') ?? 0) === 0) {
+                    $cInv = (array) $observation->getInventory();
+                    $cInv['credits'] = (int) ($cInv['credits'] ?? $rawObs['credits'] ?? $observation->get('credits') ?? 0);
+                    $ownExtractors = Ladder::ownedExtractors($colonyBoard, $agent_id);
+                    $fund = Ladder::colonyFundStep($colonyBoard, $agent_id, $cInv);
+
+                    $buildingExtractor = $verb === 'construct'
+                        && (string) ($decision['args']['shape'] ?? '') === 'extractor';
+
+                    if ($fund !== null) {
+                        $same = ($decision['verb'] ?? '') === $fund['verb']
+                            && json_encode($decision['args'] ?? []) === json_encode($fund['args']);
+                        if (! $same) {
+                            $decision = ['verb' => $fund['verb'], 'args' => $fund['args'], 'reason' => 'colony board — ' . $fund['why']];
+                            $verb = (string) $decision['verb'];
+                        }
+                    } elseif ($buildingExtractor && $ownExtractors >= Ladder::MAX_BODY_EXTRACTORS) {
+                        // Colony done (or our share of it is) AND we already run
+                        // enough extractors — a 13th is pure churn. Earn / hold.
+                        $alt = $this->fallbackDecision($observation, "already running {$ownExtractors} extractors here — colony needs nothing more from you", $tried, $known, $researchPaying, $stance);
+                        if ($alt !== null && ($alt['verb'] ?? '') !== 'construct') {
+                            $decision = $alt;
+                            $verb = (string) ($decision['verb'] ?? '');
+                        } else {
+                            $decision = self::idle($rawObs, 'colony funded to your cap — nothing to build here');
+                            $verb = (string) $decision['verb'];
+                        }
+                    }
                 }
 
                 // A body-surface project the engine keeps refusing — the live
@@ -1547,7 +1601,7 @@ final class AutoPlayer
 
                         return "{$head} **{$decision['verb']}**{$args}{$ref}{$reason}{$prev}";
                     });
-            });
+            }));
         }));
     }
 }

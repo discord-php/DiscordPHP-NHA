@@ -6,6 +6,28 @@ SemVer with the **major tracking the NHA world API version**.
 
 ## [Unreleased]
 
+## [3.4.0] - 2026-09-10
+
+### Added
+- **Colony-board awareness.** Standing on a body, `AutoPlayer` now fetches
+  `GET /colony/{body}` and folds it into the decision:
+  - `Ladder::colonyNextModule()` — the first still-incomplete module;
+  - `Ladder::colonyAgentHeadroom()` — `min(remaining, floor(need × cap%) −
+    own contribution)` per outstanding material, honouring the board's
+    `cap_pct_per_agent`;
+  - `Ladder::colonyFundStep()` — hold a needed material → `construct
+    {shape:colony, body, module}` (which consumes it), else **buy** the
+    material this agent has the most headroom on;
+  - `Ladder::ownedExtractors()` + `MAX_BODY_EXTRACTORS` (3) — once the colony
+    is done (or this agent has capped its share) and it already runs enough
+    personal extractors, a further `construct {shape:extractor}` is dropped for
+    an earning / holding move.
+  Fixes the live Deimos failure: after helping finish 3 of the 4 "Forward
+  Base" modules the agent raised **12 redundant `cregolith_cracker`
+  extractors** while the Mass Driver sat at 1/160 superalloy — because
+  `expansion.colony` is never in the observation and the ladder fell back to
+  "extractor for income" forever.
+
 ## [3.3.3] - 2026-09-10
 
 ### Fixed

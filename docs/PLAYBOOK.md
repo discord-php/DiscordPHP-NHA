@@ -36,7 +36,8 @@ flowchart TD
     rules[knownCombines&#40;&#41;<br/>re-pull GET /rules &#8804; every 90s] --> prof["AgentRepository::getAgentInfo<br/>&#40;the world's activity feed; best-effort&#41;"]
     prof --> obs[NHA::observe]
     obs --> capfeed["reviewCapabilityFeed:<br/>fold every NEW rejected act from /agent/&#123;id&#125;.recent<br/>through RejectionClassifier &#8594; state.recordCapability<br/>&#40;needs_part / capability / needs_item / needs_enum&#41;;<br/>clear a needs_item block once its item is held;<br/>advance the review high-water tick"]
-    capfeed --> downed{downed?}
+    capfeed --> colony["on a body surface &#8594; GET /colony/&#123;body&#125;<br/>&#40;best-effort; empty board otherwise&#41;"]
+    colony --> downed{downed?}
     downed -- yes --> skipD[["&#129657; skip"]]
     downed -- no --> stance["Stance::pick &#8594; aggressive &#40;defend&#41; / expansionist &#40;the mission&#41;<br/>&#40;persisted&#41;"]
     stance --> combat{Ladder::defensiveAction<br/>&#40;recent attack / robber / hostile closing while hurt&#41;?}
@@ -68,7 +69,7 @@ flowchart TD
     stay -- no --> exp
     useStay --> exp
     g2 -- no --> exp
-    exp{"&#40;expansionist flight guardrails&#41;<br/>dead-end hull &#40;deimos + phobos + mars all depart-rejected for a missing landing_gear part&#41; &#8594; gear a fresh flyer;<br/>on the ground w/ a depart-capable ship &#8594; force toward orbit;<br/>in orbit &amp; a window we can service is open &amp; no retry cooldown &#8594; force depart;<br/>a depart to any other dest &#40;model or ladder&#41; &#8594; force the deterministic hold;<br/>hold = station-keep: alt &lt; 300 &#8594; bounce the elevator back to the band &#40;no fuel&#41;, else stock fuel/shield &#8594; dock &#8594; idle;<br/>body-surface construct the feed shows refused for materials &#8594; Ladder::bodyBuildStep &#40;buy the short depot raw / combine chips&#41;, or rewrite a bad `kind` arg"}
+    exp{"&#40;expansionist flight guardrails&#41;<br/>dead-end hull &#40;deimos + phobos + mars all depart-rejected for a missing landing_gear part&#41; &#8594; gear a fresh flyer;<br/>on the ground w/ a depart-capable ship &#8594; force toward orbit;<br/>in orbit &amp; a window we can service is open &amp; no retry cooldown &#8594; force depart;<br/>a depart to any other dest &#40;model or ladder&#41; &#8594; force the deterministic hold;<br/>hold = station-keep: alt &lt; 300 &#8594; bounce the elevator back to the band &#40;no fuel&#41;, else stock fuel/shield &#8594; dock &#8594; idle;<br/>body-surface construct the feed shows refused for materials &#8594; Ladder::bodyBuildStep &#40;buy the short depot raw / combine chips&#41;, or rewrite a bad `kind` arg;<br/>colony board has an incomplete module &#8594; Ladder::colonyFundStep &#40;hold a needed material &#8594; construct shape=colony, else buy the one with the most headroom&#41;; colony done + &#8805;3 own extractors &#8594; drop a further construct extractor"}
     exp --> rec
     rec[if final verb == combine:<br/>state.recordCombineSignature] --> submit[NHA::intentWithToken<br/>state.recordDecision &#40;with altitude&#41;]
     submit --> done([&#129302; &#91;stance&#93; / &#128737;&#65039; / &#9851;&#65039; / &#128260; status line])
@@ -90,6 +91,20 @@ ones: `needs_part` / `capability` (a hull limit — cleared on the next
 `needs_enum` (a bad enum arg — sticky for the run). A `depart:<body>` verdict
 merges into `departUnreachable`, so the flight guardrails stop holding for — and
 stop retrying — a hop the ship cannot make.
+
+**Colony board** (`GET /colony/{body}` + `Ladder::colonyFundStep()`). On a body
+surface the mission is to finish that body's co-op colony. The board carries
+each module's `need` / `remaining` / `contrib` and a `cap_pct_per_agent`.
+`colonyNextModule()` picks the first incomplete one; `colonyAgentHeadroom()` is
+`min(remaining, floor(need × cap%) − own contribution)` per outstanding
+material; `colonyFundStep()` then either **funds** it (`construct
+{shape:colony, body, module}` consumes a held needed material) or **buys** the
+outstanding material this agent has the most room on. Once the colony is
+complete (or this agent has capped its share) and it already runs
+`MAX_BODY_EXTRACTORS` (3) personal extractors, a further `construct
+{shape:extractor}` is dropped for an earning / holding move — the observation
+never carries `expansion.colony`, so without this the ladder builds redundant
+extractors forever.
 
 ---
 

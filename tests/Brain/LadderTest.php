@@ -343,6 +343,91 @@ class LadderTest extends NHAUnitTestCase
         ));
     }
 
+    // ── Colony board — fund the next module, cap the extractors ────────
+
+    /** A trimmed Deimos "Forward Base" board: 3 modules done, Mass Driver open. */
+    private static function deimosBoard(): array
+    {
+        return [
+            'body' => 'deimos',
+            'cap_pct_per_agent' => 60,
+            'complete' => false,
+            'modules' => [
+                ['module' => 'depot', 'complete' => true, 'need' => ['titanium' => 120], 'remaining' => [], 'contrib' => []],
+                [
+                    'module' => 'mass_driver', 'label' => 'Mass Driver', 'complete' => false,
+                    'need' => ['superalloy' => 160, 'nickel' => 120, 'chip' => 80, 'c_regolith' => 100],
+                    'have' => ['superalloy' => 1, 'nickel' => 0, 'chip' => 80, 'c_regolith' => 100],
+                    'remaining' => ['superalloy' => 159, 'nickel' => 120],
+                    'contrib' => ['142285' => ['superalloy' => 1, 'c_regolith' => 40]],
+                ],
+            ],
+            'extractors' => array_fill(0, 12, ['id' => 1, 'kind' => 'cregolith_cracker', 'owner' => 142285]),
+        ];
+    }
+
+    /**
+     * @covers \NHA\Brain\Ladder::colonyNextModule
+     * @covers \NHA\Brain\Ladder::colonyAgentHeadroom
+     */
+    public function testColonyHeadroomIsRemainingCappedByThePerAgentShareMinusOwnContribution(): void
+    {
+        $module = Ladder::colonyNextModule(self::deimosBoard());
+        $this->assertSame('mass_driver', $module['module']);
+
+        // 60% of 160 = 96 cap, already funded 1 → 95 left; 60% of 120 = 72, funded 0 → 72.
+        $this->assertSame(['superalloy' => 95, 'nickel' => 72], Ladder::colonyAgentHeadroom($module, 142285, 60));
+
+        // An agent who has already maxed its 60% share has no headroom.
+        $module['contrib']['999'] = ['superalloy' => 96, 'nickel' => 72];
+        $this->assertSame([], Ladder::colonyAgentHeadroom($module, 999, 60));
+    }
+
+    /**
+     * @covers \NHA\Brain\Ladder::colonyFundStep
+     */
+    public function testColonyFundStepFundsWithAHeldMaterialElseBuysTheOutstandingOne(): void
+    {
+        $board = self::deimosBoard();
+
+        // Holds superalloy → construct the colony module (consumes the stock).
+        $held = Ladder::colonyFundStep($board, 142285, ['credits' => 15000, 'superalloy' => 30, 'nickel' => 0]);
+        $this->assertSame('construct', $held['verb']);
+        $this->assertSame(['shape' => 'colony', 'body' => 'deimos', 'module' => 'mass_driver'], $held['args']);
+
+        // Holds neither, has credits → buy the one with the most headroom (superalloy, 95 > 72).
+        $buy = Ladder::colonyFundStep($board, 142285, ['credits' => 15000, 'superalloy' => 0, 'nickel' => 0]);
+        $this->assertSame('buy', $buy['verb']);
+        $this->assertSame('superalloy', $buy['args']['resource']);
+        $this->assertLessThanOrEqual(40, $buy['args']['n']);
+    }
+
+    /**
+     * @covers \NHA\Brain\Ladder::colonyFundStep
+     */
+    public function testColonyFundStepIsNullOnACompleteColonyOrACappedAgent(): void
+    {
+        $done = self::deimosBoard();
+        $done['complete'] = true;
+        $this->assertNull(Ladder::colonyFundStep($done, 142285, ['credits' => 9999]));
+
+        $capped = self::deimosBoard();
+        $capped['modules'][1]['contrib']['142285'] = ['superalloy' => 96, 'nickel' => 72];
+        $this->assertNull(Ladder::colonyFundStep($capped, 142285, ['credits' => 9999, 'superalloy' => 50]));
+    }
+
+    /**
+     * @covers \NHA\Brain\Ladder::ownedExtractors
+     */
+    public function testOwnedExtractorsCountsOnlyThisAgents(): void
+    {
+        $board = self::deimosBoard();
+        $board['extractors'][] = ['id' => 2, 'kind' => 'cregolith_cracker', 'owner' => 999];
+        $this->assertSame(12, Ladder::ownedExtractors($board, 142285));
+        $this->assertSame(1, Ladder::ownedExtractors($board, 999));
+        $this->assertSame(0, Ladder::ownedExtractors([], 142285));
+    }
+
     /**
      * @covers \NHA\Brain\Ladder::suggestion
      */

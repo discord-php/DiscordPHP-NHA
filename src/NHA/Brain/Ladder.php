@@ -977,6 +977,131 @@ final class Ladder
     }
 
     /**
+     * The first still-incomplete module on a colony board (the decoded
+     * `GET /colony/{body}` body), or `null` when the colony is done / the board
+     * is empty / the only outstanding modules are waiting on other funders.
+     * Pure.
+     *
+     * @param array<string,mixed> $board
+     *
+     * @return array<string,mixed>|null the module dict (`module`, `label`, `need`, `have`, `remaining`, `contrib`)
+     */
+    public static function colonyNextModule(array $board): ?array
+    {
+        if (! empty($board['complete'])) {
+            return null;
+        }
+        foreach ((array) ($board['modules'] ?? []) as $m) {
+            $m = (array) $m;
+            if (empty($m['complete']) && (array) ($m['remaining'] ?? []) !== []) {
+                return $m;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * How much MORE of each still-needed material this agent may add to a colony
+     * module: `min(global remaining, floor(need × cap%) − own contribution)`,
+     * dropping anything at or below zero. Pure.
+     *
+     * @param array<string,mixed> $module a {@see colonyNextModule()} dict
+     * @param int                 $capPct `cap_pct_per_agent` from the board
+     *
+     * @return array<string,int> material => units this agent can still fund
+     */
+    public static function colonyAgentHeadroom(array $module, int $agent_id, int $capPct): array
+    {
+        $need = (array) ($module['need'] ?? []);
+        $mine = (array) (((array) ($module['contrib'] ?? []))[(string) $agent_id] ?? []);
+        $capPct = $capPct > 0 ? $capPct : 100;
+
+        $out = [];
+        foreach ((array) ($module['remaining'] ?? []) as $res => $left) {
+            $cap = (int) floor(((int) ($need[$res] ?? 0)) * $capPct / 100);
+            $room = min((int) $left, $cap - (int) ($mine[$res] ?? 0));
+            if ($room > 0) {
+                $out[(string) $res] = $room;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * The move toward finishing the colony on the body underfoot: FUND the next
+     * incomplete module when the agent holds any material it still needs
+     * (within its per-agent cap) — `construct {shape:colony, body, module}`
+     * consumes the relevant stock — otherwise BUY the outstanding material it
+     * has the most headroom on. `null` when the colony is complete, this agent
+     * has maxed its share of every outstanding material, or nothing helps this
+     * turn.
+     *
+     * @param array<string,mixed>     $board the decoded colony board
+     * @param array<string,int|float> $inv   the observation inventory (must include `credits`)
+     *
+     * @return array{verb:string,args:array<string,mixed>,why:string}|null
+     */
+    public static function colonyFundStep(array $board, int $agent_id, array $inv): ?array
+    {
+        $module = self::colonyNextModule($board);
+        if ($module === null) {
+            return null;
+        }
+        $headroom = self::colonyAgentHeadroom($module, $agent_id, (int) ($board['cap_pct_per_agent'] ?? 100));
+        if ($headroom === []) {
+            return null;
+        }
+
+        $has = static fn(string $k): int => (int) ($inv[$k] ?? 0);
+        $body = (string) ($board['body'] ?? '');
+        $label = (string) ($module['label'] ?? $module['module'] ?? 'the module');
+
+        $held = array_filter($headroom, static fn(int $room, string $res): bool => min($room, $has($res)) > 0, ARRAY_FILTER_USE_BOTH);
+        if ($held !== []) {
+            return [
+                'verb' => 'construct',
+                'args' => array_filter(['shape' => 'colony', 'body' => $body, 'module' => (string) $module['module']], 'strlen'),
+                'why' => "fund {$label} on {$body} with " . implode(' + ', array_keys($held)),
+            ];
+        }
+
+        arsort($headroom);
+        foreach ($headroom as $res => $room) {
+            if (in_array((string) $res, self::DEPOT_TRADEABLE, true) && $has('credits') >= 40) {
+                return ['verb' => 'buy', 'args' => ['resource' => (string) $res, 'n' => min($room, 40)], 'why' => "buy {$res} for {$label} on {$body}"];
+            }
+            $acq = self::bodyBuildStep($inv, [(string) $res => $has((string) $res) + $room]);
+            if ($acq !== null) {
+                return $acq;
+            }
+        }
+
+        return null;
+    }
+
+    /** Personal resource extractors the agent should run on one body before it is just churn. */
+    public const MAX_BODY_EXTRACTORS = 3;
+
+    /**
+     * How many extractors on a colony board are owned by `$agent_id`. Pure.
+     *
+     * @param array<string,mixed> $board
+     */
+    public static function ownedExtractors(array $board, int $agent_id): int
+    {
+        $n = 0;
+        foreach ((array) ($board['extractors'] ?? []) as $e) {
+            if ((int) (((array) $e)['owner'] ?? 0) === $agent_id) {
+                $n++;
+            }
+        }
+
+        return $n;
+    }
+
+    /**
      * The first novel `combine` the agent can afford from its surplus: two raws
      * that each sit at least {@see RESEARCH_SURPLUS} deep AND above their
      * (craft-raised) {@see floorFor()} floor, whose sorted `a+b` signature is
