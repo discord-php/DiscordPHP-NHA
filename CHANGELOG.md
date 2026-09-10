@@ -6,6 +6,17 @@ SemVer with the **major tracking the NHA world API version**.
 
 ## [Unreleased]
 
+## [3.4.6] - 2026-09-10
+
+### Fixed
+- **3.4.5 rode up ~400 ticks early and idle-decayed out of the band.** The
+  return window was `opens_in: 416` and the guardrail sent the agent straight
+  up the elevator to `deposit`-idle in orbit, fighting orbital decay the whole
+  time. It now only rides up when the window is **open or `opens_in ≤ 40`**;
+  while it is further out the guardrail just kills the doomed body `construct`s
+  and lets the model / ladder do productive surface work (mine the body's
+  resources, research) until it is time to go.
+
 ## [3.4.5] - 2026-09-10
 
 ### Fixed
