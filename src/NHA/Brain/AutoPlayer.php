@@ -1074,7 +1074,11 @@ final class AutoPlayer
                 // craft / build the SHIP_BUNDLE_TARGET → finalize) over any
                 // model pick that is not already part of it. Loop-break is
                 // suppressed above so the long sequence can play out.
-                if ($shipStranded && ! in_array($verb, ['build', 'finalize', 'combine'], true)) {
+                // Only `build` / `finalize` clearly advance the bundle; anything
+                // else from the model (including a `combine` — the agent has
+                // "learned" a `combine {metal,oil}` that mints superalloy, not a
+                // bearing) is replaced with the ladder's deterministic step.
+                if ($shipStranded && ! in_array($verb, ['build', 'finalize'], true)) {
                     $step = Ladder::suggestion($rawObs, $tried, $known, false, $stance, $departUnreachable);
                     if ($step !== null && (string) ($step['verb'] ?? '') !== 'depart') {
                         $decision = ['verb' => (string) $step['verb'], 'args' => (array) ($step['args'] ?? []), 'reason' => 'dead-end hull — ' . (string) ($step['why'] ?? 'gear a fresh flyer')];
@@ -1088,20 +1092,26 @@ final class AutoPlayer
                 // chasing the upgrade and build the next missing part BARE so
                 // the bundle actually completes.
                 if ($shipStranded && in_array($verb, ['combine', 'buy'], true)) {
-                    $win = array_slice($recent, -6);
-                    $stalled = count($win) >= 5 && count(array_filter(
+                    $win = array_slice($recent, -8);
+                    $stalled = count($win) >= 6 && count(array_filter(
                         $win,
                         static fn($r): bool => in_array((string) ($r['verb'] ?? ''), ['build', 'finalize', 'ride', 'land'], true),
                     )) === 0;
                     if ($stalled) {
                         $lp = Ladder::looseParts($rawObs);
                         $cnt = static fn(string $q): int => count(array_filter($lp, static fn(string $z): bool => $z === $q));
+                        $metal = (int) (((array) $observation->getInventory())['metal'] ?? 0);
                         foreach (Ladder::SHIP_BUNDLE_TARGET as $p => $want) {
-                            if ($cnt($p) < $want && (int) (((array) $observation->getInventory())['metal'] ?? 0) >= 5) {
-                                $decision = ['verb' => 'build', 'args' => ['part' => $p], 'reason' => "craft spin on the flyer upgrades — build a bare {$p} to move the bundle on"];
-                                $verb = 'build';
-                                break;
+                            if ($cnt($p) >= $want) {
+                                continue;
                             }
+                            // Enough metal to build it → build it bare; otherwise
+                            // buy metal (never combine — that is what is spinning).
+                            $decision = $metal >= 5
+                                ? ['verb' => 'build', 'args' => ['part' => $p], 'reason' => "craft spin on the flyer upgrades — build a bare {$p} to move the bundle on"]
+                                : ['verb' => 'buy', 'args' => ['resource' => 'metal', 'n' => 20], 'reason' => "craft spin — stock metal to build a bare {$p}"];
+                            $verb = (string) $decision['verb'];
+                            break;
                         }
                     }
                 }

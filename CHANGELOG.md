@@ -12,6 +12,18 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.41] - 2026-09-10
+
+### Fixed
+- **The stranded-rebuild override now also replaces a model `combine`.** 3.2.39
+  exempted `combine` from the dead-end-hull override on the theory that a craft
+  step is always legitimate — but the model had "learned" `combine {metal, oil}`
+  (hundreds of applies, each "crafted superalloy") and kept re-issuing it over
+  the ladder's `buy bearing`. A stranded agent's decision is now forced to the
+  ladder's deterministic step for anything except `build` / `finalize`.
+- The craft-spin safety net no longer needs `metal >= 5` to act — it buys metal
+  when short rather than falling through to the spinning combine.
+
 ## [3.2.40] - 2026-09-10
 
 ### Fixed
