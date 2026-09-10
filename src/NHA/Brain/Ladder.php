@@ -821,14 +821,11 @@ final class Ladder
                 return $buy('silicon', 6, 'ship — buy silicon for chips');
             }
         }
-        // bearing (metal + oil) — doubles a propeller's thrust.
-        if ($has('bearing') < 3) {
-            if ($has('metal') > 0 && $has('oil') > 0) {
-                return $c(['metal' => 1, 'oil' => 1], 'ship — combine a bearing (metal + oil) for the propellers');
-            }
-            if ($credits >= 60 && $has('oil') <= 0) {
-                return $buy('oil', 6, 'ship — buy oil for bearings');
-            }
+        // bearing (propeller thrust) — `combine metal+oil` currently mints
+        // superalloy, not a bearing (the world's physics-tag matcher drifted),
+        // which spun the gear-up forever. It is a depot good — just BUY it.
+        if ($has('bearing') < 3 && $credits >= 90) {
+            return $buy('bearing', 3, 'ship — buy bearings (the metal+oil craft mints superalloy here)');
         }
         // ion_thruster — the orbital drive (goes on the jet → orbital_engine).
         // The depot stocks it; the craft is fusion fuel + motor + chip.

@@ -12,6 +12,21 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.40] - 2026-09-10
+
+### Fixed
+- **The rebuild wedged on the `bearing` craft.** `Ladder::shipCraftStep()`
+  crafted the propeller upgrade with `combine {metal, oil}`, but the world's
+  physics-tag matcher now resolves that set to **superalloy**, not a bearing —
+  so `bearing` stayed at 0, the gear-up loop re-issued the same combine every
+  tick (183 `engine`/`superalloy` items minted), and with loop-break suppressed
+  for the stranded hull (3.2.39) nothing broke it out. `bearing` is now bought
+  from the depot when credits allow.
+- **Stranded-rebuild safety net.** If the last ~6 turns of a stranded rebuild
+  were `combine`/`buy` with no `build`/`finalize`, an upgrade craft is spinning
+  — `AutoPlayer` now forces a bare `build` of the next missing bundle part so it
+  completes anyway.
+
 ## [3.2.39] - 2026-09-10
 
 ### Fixed

@@ -316,6 +316,21 @@ class LadderTest extends NHAUnitTestCase
     /**
      * @covers \NHA\Brain\Ladder::suggestion
      */
+    /**
+     * The `bearing` upgrade is bought, not combined — `combine metal+oil` mints
+     * superalloy in this world and used to spin the gear-up forever.
+     *
+     * @covers \NHA\Brain\Ladder::shipCraftStep
+     */
+    public function testShipCraftStepBuysBearingsRatherThanCombiningThem(): void
+    {
+        // Frame / cockpit upgrades satisfied, bearing short, credits on hand.
+        $step = Ladder::shipCraftStep(['composite' => 6, 'chip' => 2, 'wire' => 6, 'bearing' => 0, 'metal' => 20, 'oil' => 10, 'credits' => 5000]);
+
+        $this->assertSame('buy', $step['verb']);
+        $this->assertSame('bearing', $step['args']['resource']);
+    }
+
     public function testExpansionistGearsTheShipBeforeRidingUp(): void
     {
         $base = static fn(array $extra): array => [

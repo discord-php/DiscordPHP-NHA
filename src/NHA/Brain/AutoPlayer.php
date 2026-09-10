@@ -1082,6 +1082,30 @@ final class AutoPlayer
                     }
                 }
 
+                // The rebuild advances by BUILDING parts. If the last several
+                // turns were `combine`/`buy` with no `build` and no `finalize`,
+                // an upgrade-item craft is spinning (world recipe drift) — stop
+                // chasing the upgrade and build the next missing part BARE so
+                // the bundle actually completes.
+                if ($shipStranded && in_array($verb, ['combine', 'buy'], true)) {
+                    $win = array_slice($recent, -6);
+                    $stalled = count($win) >= 5 && count(array_filter(
+                        $win,
+                        static fn($r): bool => in_array((string) ($r['verb'] ?? ''), ['build', 'finalize', 'ride', 'land'], true),
+                    )) === 0;
+                    if ($stalled) {
+                        $lp = Ladder::looseParts($rawObs);
+                        $cnt = static fn(string $q): int => count(array_filter($lp, static fn(string $z): bool => $z === $q));
+                        foreach (Ladder::SHIP_BUNDLE_TARGET as $p => $want) {
+                            if ($cnt($p) < $want && (int) (((array) $observation->getInventory())['metal'] ?? 0) >= 5) {
+                                $decision = ['verb' => 'build', 'args' => ['part' => $p], 'reason' => "craft spin on the flyer upgrades — build a bare {$p} to move the bundle on"];
+                                $verb = 'build';
+                                break;
+                            }
+                        }
+                    }
+                }
+
                 // An open transfer window is a ~120-tick chance and the model
                 // tends to fritter it away mining / selling. If the agent is in
                 // orbit, fuelled and shielded for a destination whose window is
