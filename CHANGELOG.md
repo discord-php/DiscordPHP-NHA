@@ -12,6 +12,17 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.37] - 2026-09-09
+
+### Fixed
+- **A fresh hull inherited the previous one's "nowhere is reachable" verdict.**
+  `agent_depart_unreachable` / `agent_depart_block` persist across restarts, so
+  after the agent scrapped a dead-end flyer and built a gear-carrying one, the
+  new ship was still refused every destination and never departed.
+  `LoopStrategyStateTrait::clearDepartRejections()` now wipes both sets when a
+  `finalize` intent APPLYs, so the new hull is judged on its own gear and
+  thrust.
+
 ## [3.2.36] - 2026-09-09
 
 ### Fixed
