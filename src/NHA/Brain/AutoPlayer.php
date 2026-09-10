@@ -1160,6 +1160,9 @@ final class AutoPlayer
                         }
                     }
                     $inv = (array) $observation->getInventory();
+                    // `getInventory()` may not carry credits — the depot buy in
+                    // bodyBuildStep needs them, so fold in the widest source.
+                    $inv['credits'] = (int) ($inv['credits'] ?? $rawObs['credits'] ?? $observation->get('credits') ?? 0);
                     if ($need !== [] && ($acq = Ladder::bodyBuildStep($inv, $need)) !== null) {
                         $decision = ['verb' => $acq['verb'], 'args' => $acq['args'], 'reason' => 'base project blocked on materials — ' . $acq['why']];
                         $verb = (string) $decision['verb'];
@@ -1296,14 +1299,18 @@ final class AutoPlayer
                     $verb = 'depart';
                 }
 
-                // On the ground with a finished ship, the only task is to get to
-                // orbit and depart — top up fuel / a shield, then walk to the
-                // tall elevator and ride. Force that over the model's
+                // On EARTH's ground with a finished ship, the only task is to
+                // get to orbit and depart — top up fuel / a shield, then walk
+                // to the tall elevator and ride. Force that over the model's
                 // mine/sell/combine wandering (combat already ran earlier).
+                // NOT on a destination body's surface — there the job is the
+                // colony, and this would revert the base-project acquisition
+                // guardrail back to the doomed `construct`.
                 if ($stance === Stance::Expansionist->value
                     && $verb !== 'depart'
                     && ! ($rawObs['in_space'] ?? false)
                     && (int) ($observation->get('altitude') ?? 0) === 0
+                    && Ladder::atBody($rawObs) === null
                     && Ladder::hasDepartCapableShip($rawObs, $departUnreachable)
                 ) {
                     $up = Ladder::suggestion($rawObs, $tried, $known, false, $stance, $departUnreachable);

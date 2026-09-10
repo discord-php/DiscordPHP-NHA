@@ -1249,6 +1249,9 @@ class AutoPlayerTest extends NHAUnitTestCase
             'in_space' => false, 'altitude' => 0,
             'inventory' => ['credits' => 25000, 'metal' => 33, 'chip' => 0, 'silicon' => 60, 'copper' => 60,
                 'stimpack' => 1, 'kinetic_gun' => 1, 'slug' => 5],
+            // A depart-capable ship on the surface — the "get to orbit" force
+            // used to revert the acquisition step back to the doomed construct.
+            'vehicles' => [['name' => 'lander', 'flies' => true, 'orbital_engine' => true]],
             'expansion' => ['at_body' => 'deimos', 'colony' => ['complete' => false, 'next_module' => 'cregolith_cracker']],
             'recent' => [
                 ['tick' => 1298, 'kind' => 'act', 'data' => [
@@ -1264,6 +1267,40 @@ class AutoPlayerTest extends NHAUnitTestCase
         $verb = $this->posts[0][1]['verb'];
         $this->assertNotSame('construct', $verb, 'the doomed construct is not re-issued');
         $this->assertContains($verb, ['buy', 'combine'], 'it acquires the missing metal / chips instead');
+    }
+
+    /**
+     * The engine's named buildable `kind` for the body is adopted when the feed
+     * has no materials shortfall to act on — the model's bad `shape`/`kind` is
+     * replaced with exactly what the engine asked for.
+     *
+     * @covers \NHA\Brain\AutoPlayer::step
+     */
+    public function testTheEngineNamedBuildableKindIsAdoptedOnTheBodySurface(): void
+    {
+        $state = new StateStore($this->statePath);
+
+        $nha = $this->nhaWith([
+            'tick' => 1300, 'downed_until' => 0, 'position' => [27, 111],
+            'in_space' => false, 'altitude' => 0,
+            'inventory' => ['credits' => 25000, 'metal' => 200, 'chip' => 40,
+                'stimpack' => 1, 'kinetic_gun' => 1, 'slug' => 5],
+            'vehicles' => [['name' => 'lander', 'flies' => true, 'orbital_engine' => true]],
+            'expansion' => ['at_body' => 'deimos', 'colony' => ['complete' => false, 'next_module' => 'cregolith_cracker']],
+            'recent' => [
+                ['tick' => 1298, 'kind' => 'act', 'data' => [
+                    'verb' => 'construct', 'status' => 'rejected',
+                    'result' => 'kind must be one buildable on Deimos: cregolith_cracker',
+                ]],
+            ],
+        ]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"construct","args":{"shape":"extractor","kind":"mine","body":"deimos"}}'), $state);
+
+        $player->step(142287, 'tok');
+
+        $this->assertSame('construct', $this->posts[0][1]['verb']);
+        $this->assertSame('cregolith_cracker', $this->posts[0][1]['args']['kind'], 'the bad kind:mine is replaced');
+        $this->assertArrayNotHasKey('module', $this->posts[0][1]['args']);
     }
 
     /**

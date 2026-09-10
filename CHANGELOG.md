@@ -6,6 +6,22 @@ SemVer with the **major tracking the NHA world API version**.
 
 ## [Unreleased]
 
+## [3.3.3] - 2026-09-10
+
+### Fixed
+- **The 3.3.2 body-surface guardrail's rewrite was immediately reverted.** It
+  correctly swapped the doomed Deimos `construct` for `buy metal` / a chip
+  `combine` — then the later "on the ground with a finished ship → get to
+  orbit and depart" force ran, saw `altitude 0` + a depart-capable ship, and
+  overwrote the decision with `Ladder::suggestion()`, which on a body surface
+  returns the same `construct extractor` (verified live: the guardrail logged
+  the right rewrite every turn while `construct kind:mine` still went out).
+  That Earth-gearing force is now gated to `Ladder::atBody($raw) === null` — it
+  never fires on a destination body, where the job is the colony, not a hop
+  home. Also: `bodyBuildStep` needs credits and `AgentObservation::getInventory()`
+  doesn't always carry them, so the guardrail folds `credits` in from the
+  observation before calling it.
+
 ## [3.3.2] - 2026-09-10
 
 ### Fixed
