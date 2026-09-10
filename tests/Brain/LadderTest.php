@@ -255,16 +255,17 @@ class LadderTest extends NHAUnitTestCase
      */
     public function testExpansionistLandsOnceArrivedAtABody(): void
     {
+        // Arrived: `at_body_orbit` set, `at_body` still null (until land_body).
         $inOrbitOfMars = [
             'tick' => 5, 'in_space' => true, 'altitude' => 320,
             'inventory' => self::KIT + ['credits' => 500],
-            'expansion' => ['at_body' => 'mars'],
+            'expansion' => ['at_body' => null, 'at_body_orbit' => 'mars'],
         ];
         $pick = Ladder::suggestion($inOrbitOfMars, [], [], false, 'expansionist');
         $this->assertSame('land_body', $pick['verb']);
 
         $atMoon = $inOrbitOfMars;
-        $atMoon['expansion']['at_body'] = 'moon';
+        $atMoon['expansion']['at_body_orbit'] = 'moon';
         $this->assertSame('land_moon', Ladder::suggestion($atMoon, [], [], false, 'expansionist')['verb']);
     }
 

@@ -12,6 +12,16 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.46] - 2026-09-10
+
+### Fixed
+- **Kept re-issuing `land_body` after it had already landed.** The arrival fix
+  keyed the "land now" force off `Ladder::atBody()`, which stays non-null once
+  ON the surface too, so a landed agent spammed a rejected `land_body`. New
+  `Ladder::atBodyOrbit()` is the body only while still in orbit (`at_body`
+  unset); ladder + `AutoPlayer` use it, so the force stops the moment `at_body`
+  is set.
+
 ## [3.2.45] - 2026-09-10
 
 ### Fixed

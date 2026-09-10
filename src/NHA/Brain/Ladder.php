@@ -529,6 +529,18 @@ final class Ladder
     }
 
     /**
+     * The body the agent is in ORBIT around, NOT yet landed (`at_body` unset).
+     * The one move from here is `land_body` / `land_moon`. `null` once on the
+     * surface, or at Earth / in transit.
+     *
+     * @param array<string,mixed> $raw
+     */
+    public static function atBodyOrbit(array $raw): ?string
+    {
+        return (($raw['expansion']['at_body'] ?? null) === null) ? self::atBody($raw) : null;
+    }
+
+    /**
      * Whether the agent has a flying orbital ship that can still reach a
      * mission body. The bar is the three GEAR bodies — deimos, phobos, mars
      * (moons + Mars, TWR ≤ 0.7). Once every one of those is in `$unreachable`
@@ -1294,7 +1306,7 @@ final class Ladder
             }
 
             // Arrived at a body but still in its orbit → put down.
-            if ($atBody !== null && $alt > 0) {
+            if ($atBody !== null && ! $onSurface) {
                 $verb = in_array((string) $atBody, ['moon', 'luna'], true) ? 'land_moon' : 'land_body';
 
                 return ['verb' => $verb, 'args' => [], 'why' => "expansionist — you have reached {$atBody}; land and build the base"];
