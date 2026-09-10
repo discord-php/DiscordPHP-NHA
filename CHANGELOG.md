@@ -12,6 +12,17 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.43] - 2026-09-10
+
+### Fixed
+- **`finalize` now clears the depart verdicts at decision time.** The clear ran
+  only when the finalize's *outcome* was polled and it was the last decision —
+  a double-`finalize` (the second rejected "no loose parts") or any decision in
+  between lost it, so a freshly-built geared hull kept inheriting
+  `agent_depart_unreachable` and the agent rebuilt forever. Wiped the moment a
+  `finalize` is committed instead; if it fails the verdicts re-learn on the
+  next `depart` anyway.
+
 ## [3.2.42] - 2026-09-10
 
 ### Fixed

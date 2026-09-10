@@ -1220,6 +1220,41 @@ class AutoPlayerTest extends NHAUnitTestCase
     }
 
     /**
+     * Committing a `finalize` clears the depart verdicts immediately — not only
+     * when its outcome is polled (a double-finalize loses that).
+     *
+     * @covers \NHA\Brain\AutoPlayer::step
+     */
+    public function testCommittingAFinalizeClearsDepartVerdictsAtDecisionTime(): void
+    {
+        $state = new StateStore($this->statePath);
+        foreach (['deimos', 'phobos', 'mars'] as $d) {
+            $state->recordDepartRejection(142287, $d, 400, true);
+        }
+
+        // A completed geared bundle on the ground; the model asks to finalize.
+        $bundle = array_merge(
+            ['frame', 'cockpit', 'jet', 'tail', 'fuel_tank', 'fuel_tank', 'landing_gear'],
+            array_fill(0, 3, 'engine'),
+            array_fill(0, 2, 'propeller'),
+            array_fill(0, 3, 'wing'),
+        );
+        $nha = $this->nhaWith([
+            'tick' => 500, 'downed_until' => 0, 'position' => [10, 10],
+            'in_space' => false, 'altitude' => 0,
+            'inventory' => ['credits' => 3000, 'stimpack' => 1, 'kinetic_gun' => 1, 'slug' => 5],
+            'vehicles' => [['name' => 'deadend', 'flies' => true, 'orbital_engine' => true]],
+            'loose_parts' => $bundle, 'nearby_deposits' => [],
+        ]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"finalize","args":{}}'), $state);
+
+        $player->step(142287, 'tok');
+
+        $this->assertSame('finalize', $this->posts[0][1]['verb']);
+        $this->assertSame([], $state->departUnreachable(142287));
+    }
+
+    /**
      * A dead-end hull (every gear body rejected) on the ground: the model's
      * mine/sell wandering is overridden by the deterministic rebuild step, not
      * left to churn.

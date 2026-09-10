@@ -1325,6 +1325,15 @@ final class AutoPlayer
                     $this->state->recordCombineSignature($agent_id, self::combineSignature((array) ($decision['args'] ?? [])));
                 }
 
+                // Wipe the previous hull's depart verdicts the moment a
+                // `finalize` is committed (not when its outcome is later
+                // polled — a double-finalize or any decision in between loses
+                // that). The new hull deserves a clean slate; if the finalize
+                // fails, the verdicts are re-learned on the next depart anyway.
+                if (($decision['verb'] ?? '') === 'finalize') {
+                    $this->state->clearDepartRejections($agent_id);
+                }
+
                 return $this->nha->intentWithToken($agent_id, $token, $decision['verb'], $decision['args'])
                     ->then(function ($queued) use ($agent_id, $decision, $tick, $altNow, $loop, $loopObjective, $stance) {
                         $queued = (array) $queued;
