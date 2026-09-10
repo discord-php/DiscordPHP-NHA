@@ -1234,6 +1234,39 @@ class AutoPlayerTest extends NHAUnitTestCase
     }
 
     /**
+     * On a body surface with credits in the bank, a colony `construct` the
+     * engine keeps refusing for missing materials is swapped for the step that
+     * acquires them — not re-issued every tick (the live Deimos spin).
+     *
+     * @covers \NHA\Brain\AutoPlayer::step
+     */
+    public function testABaseProjectBlockedOnMaterialsIsRoutedToAcquisition(): void
+    {
+        $state = new StateStore($this->statePath);
+
+        $nha = $this->nhaWith([
+            'tick' => 1300, 'downed_until' => 0, 'position' => [27, 111],
+            'in_space' => false, 'altitude' => 0,
+            'inventory' => ['credits' => 25000, 'metal' => 33, 'chip' => 0, 'silicon' => 60, 'copper' => 60,
+                'stimpack' => 1, 'kinetic_gun' => 1, 'slug' => 5],
+            'expansion' => ['at_body' => 'deimos', 'colony' => ['complete' => false, 'next_module' => 'cregolith_cracker']],
+            'recent' => [
+                ['tick' => 1298, 'kind' => 'act', 'data' => [
+                    'verb' => 'construct', 'status' => 'rejected',
+                    'result' => "insufficient for a Regolith Cracker (need {'metal': 80, 'chip': 10})",
+                ]],
+            ],
+        ]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"construct","args":{"shape":"colony","body":"deimos","module":"cregolith_cracker"}}'), $state);
+
+        $player->step(142287, 'tok');
+
+        $verb = $this->posts[0][1]['verb'];
+        $this->assertNotSame('construct', $verb, 'the doomed construct is not re-issued');
+        $this->assertContains($verb, ['buy', 'combine'], 'it acquires the missing metal / chips instead');
+    }
+
+    /**
      * `finalize`-ing a new hull wipes the previous ship's depart verdicts, so
      * the fresh (gear-carrying) flyer is judged on its own merits.
      *

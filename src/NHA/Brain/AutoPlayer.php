@@ -1126,6 +1126,41 @@ final class AutoPlayer
                     $verb = 'move';
                 }
 
+                // A body-surface project (`construct` colony / terraform /
+                // extractor / station) the engine just refused for missing
+                // materials — the classic Deimos spin: 25k credits in the bank
+                // and `construct cregolith_cracker` rejected "need {metal: 80,
+                // chip: 10}" every tick because nothing buys the metal or
+                // crafts the chips. Read the newest `construct` rejection off
+                // the world feed and, if the agent is still short, substitute
+                // the acquisition step. A "kind must be one buildable on X: Y"
+                // rejection instead rewrites the bad `kind` arg in place.
+                if ($verb === 'construct'
+                    && (isset($decision['args']['body'])
+                        || in_array((string) ($decision['args']['shape'] ?? ''), ['colony', 'terraform', 'extractor', 'station'], true))
+                ) {
+                    $why = '';
+                    foreach ((array) (is_object($pre['profile'] ?? null) ? ($pre['profile']->recent ?? []) : []) as $e) {
+                        $d = (array) (((array) $e)['data'] ?? []);
+                        if (($d['verb'] ?? '') === 'construct' && ($d['status'] ?? '') === 'rejected') {
+                            $why = (string) ($d['result'] ?? '');
+                            break;
+                        }
+                    }
+                    if ($why !== '') {
+                        $inv = (array) $observation->getInventory();
+                        if (preg_match('/kind must be one[^:]*:\s*([a-z_]+)/i', $why, $k) === 1
+                            && (string) ($decision['args']['kind'] ?? '') !== $k[1]) {
+                            $decision['args']['kind'] = $k[1];
+                            $decision['reason'] = "the engine names `{$k[1]}` as the buildable kind here — use it";
+                        } elseif (($need = Ladder::parseNeed($why)) !== []
+                            && ($acq = Ladder::bodyBuildStep($inv, $need)) !== null) {
+                            $decision = ['verb' => $acq['verb'], 'args' => $acq['args'], 'reason' => 'base project blocked on materials — ' . $acq['why']];
+                            $verb = (string) $decision['verb'];
+                        }
+                    }
+                }
+
                 // Sanity-check any `depart` (model or ladder) before it goes
                 // out: it is only worth submitting when it is serviceable RIGHT
                 // NOW — the right destination, a window open, the 300-600

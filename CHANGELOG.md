@@ -6,6 +6,24 @@ SemVer with the **major tracking the NHA world API version**.
 
 ## [Unreleased]
 
+## [3.3.1] - 2026-09-10
+
+### Fixed
+- **Stuck on the Deimos surface re-issuing a colony `construct` it could not
+  afford.** The agent landed on Deimos with 25k credits and then spun forever
+  on `construct` of the `cregolith_cracker` module — the engine refused it
+  every tick with `insufficient … (need {'metal': 80, 'chip': 10})` (it held
+  metal 33, chip 0) and nothing routed the credits toward the materials; the
+  loop-guard's objective rotation just produced the same `construct`. New
+  `Ladder::parseNeed()` pulls the `resource => qty` map out of that rejection
+  and `Ladder::bodyBuildStep()` returns the next acquisition step (buy the
+  depot raw it is short on, or `combine` a `chip` from silicon + a conductor,
+  crafting the whole shortfall in one `n`-batch). `AutoPlayer` reads the
+  newest `construct` rejection off the world feed and, for a body-surface
+  project (`shape` colony / terraform / extractor / station, or any args with
+  `body`), swaps the doomed `construct` for that step — or, on a "kind must be
+  one buildable on X: Y" rejection, rewrites the bad `kind` arg in place.
+
 ## [3.3.0] - 2026-09-10
 
 ### Added

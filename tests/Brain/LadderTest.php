@@ -290,6 +290,60 @@ class LadderTest extends NHAUnitTestCase
     }
 
     /**
+     * @covers \NHA\Brain\Ladder::parseNeed
+     */
+    public function testParseNeedPullsTheRequirementMapOutOfARejection(): void
+    {
+        $this->assertSame(
+            ['metal' => 80, 'chip' => 10],
+            Ladder::parseNeed("insufficient for a Regolith Cracker (need {'metal': 80, 'chip': 10})"),
+        );
+        $this->assertSame(['metal' => 80, 'chip' => 10], Ladder::parseNeed('need 80 metal, 10 chip'));
+        $this->assertSame(['metal' => 80], Ladder::parseNeed('need metal 80'));
+        $this->assertSame([], Ladder::parseNeed('a structure already stands on this cell'));
+    }
+
+    /**
+     * @covers \NHA\Brain\Ladder::bodyBuildStep
+     */
+    public function testBodyBuildStepBuysTheDepotRawItIsShortOn(): void
+    {
+        $step = Ladder::bodyBuildStep(
+            ['credits' => 25000, 'metal' => 33, 'chip' => 10, 'silicon' => 60, 'copper' => 60],
+            ['metal' => 80, 'chip' => 10],
+        );
+        $this->assertNotNull($step);
+        $this->assertSame('buy', $step['verb']);
+        $this->assertSame('metal', $step['args']['resource']);
+    }
+
+    /**
+     * @covers \NHA\Brain\Ladder::bodyBuildStep
+     */
+    public function testBodyBuildStepCraftsChipsFromSiliconAndAConductor(): void
+    {
+        $step = Ladder::bodyBuildStep(
+            ['credits' => 25000, 'metal' => 200, 'chip' => 0, 'silicon' => 60, 'copper' => 60],
+            ['metal' => 80, 'chip' => 10],
+        );
+        $this->assertNotNull($step);
+        $this->assertSame('combine', $step['verb']);
+        $this->assertSame(['silicon' => 1, 'copper' => 1], $step['args']['ingredients']);
+        $this->assertSame(10, $step['args']['n'], 'a known recipe crafts the whole shortfall in one intent');
+    }
+
+    /**
+     * @covers \NHA\Brain\Ladder::bodyBuildStep
+     */
+    public function testBodyBuildStepIsNullWhenEveryRequirementIsMet(): void
+    {
+        $this->assertNull(Ladder::bodyBuildStep(
+            ['credits' => 25000, 'metal' => 90, 'chip' => 12],
+            ['metal' => 80, 'chip' => 10],
+        ));
+    }
+
+    /**
      * @covers \NHA\Brain\Ladder::suggestion
      */
     public function testExpansionistDepartsFromEarthOrbitWhenReadyAndAWindowIsOpen(): void

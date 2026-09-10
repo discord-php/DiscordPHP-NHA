@@ -888,6 +888,95 @@ final class Ladder
     }
 
     /**
+     * Pull a `resource => qty` requirement map out of an engine rejection like
+     * `"insufficient for a Regolith Cracker (need {'metal': 80, 'chip': 10})"`
+     * (Python-repr dict) or a looser `"need 80 metal, 10 chip"` tail. Returns
+     * `[]` when nothing parseable is there.
+     *
+     * @return array<string,int>
+     */
+    public static function parseNeed(string $result): array
+    {
+        $need = [];
+        if (preg_match('/\{([^}]*)\}/', $result, $m) === 1) {
+            foreach (explode(',', $m[1]) as $pair) {
+                if (preg_match("/['\"]?([a-z_]+)['\"]?\\s*[:=]\\s*(\\d+)/i", trim($pair), $p) === 1) {
+                    $need[strtolower($p[1])] = (int) $p[2];
+                }
+            }
+        }
+        if ($need === [] && preg_match('/\bneeds?\b(.+)$/i', $result, $m) === 1) {
+            // "need 80 metal, 10 chip" OR "need metal 80, chip 10"
+            if (preg_match_all('/(\d+)\s+([a-z_]+)|([a-z_]+)\s+(\d+)/i', $m[1], $all, PREG_SET_ORDER)) {
+                foreach ($all as $g) {
+                    [$res, $qty] = $g[1] !== '' ? [$g[2], $g[1]] : [$g[3], $g[4]];
+                    $need[strtolower($res)] = (int) $qty;
+                }
+            }
+        }
+
+        return $need;
+    }
+
+    /**
+     * The next step toward affording a body-surface project (`construct
+     * shape=colony|terraform|extractor|…`) that the engine just refused for
+     * missing materials: buy the first depot raw the agent is short on, or
+     * combine a craftable intermediate (a `chip` from silicon + a conductor).
+     * `null` when every requirement is met (the `construct` should go through)
+     * or nothing can close the gap this turn.
+     *
+     * @param array<string,int|float> $inv  the observation inventory
+     * @param array<string,int>       $need a {@see parseNeed()} map
+     *
+     * @return array{verb: string, args: array<string,mixed>, why: string}|null
+     */
+    public static function bodyBuildStep(array $inv, array $need): ?array
+    {
+        $has = static fn(string $k): int => (int) ($inv[$k] ?? 0);
+        $credits = $has('credits');
+
+        foreach ($need as $res => $want) {
+            $short = $want - $has($res);
+            if ($short <= 0) {
+                continue;
+            }
+            if (in_array($res, self::DEPOT_TRADEABLE, true)) {
+                if ($credits < 40) {
+                    return null;
+                }
+
+                return ['verb' => 'buy', 'args' => ['resource' => $res, 'n' => min($short, 60)], 'why' => "stock {$res} for the base project (need {$want}, have " . $has($res) . ')'];
+            }
+            if ($res === 'chip') {
+                $conductor = $has('wire') > 0 ? 'wire' : ($has('copper') > 0 ? 'copper' : '');
+                if ($has('silicon') > 0 && $conductor !== '') {
+                    // A known recipe crafts `n` per intent — make the whole shortfall at once.
+                    $n = max(1, min($short, $has('silicon'), $has($conductor)));
+
+                    return ['verb' => 'combine', 'args' => ['ingredients' => ['silicon' => 1, $conductor => 1], 'n' => $n], 'why' => "combine {$n}× chip (silicon + {$conductor}) for the base project (need {$want})"];
+                }
+                if ($credits >= 40) {
+                    $buy = $has('silicon') <= 0 ? 'silicon' : 'copper';
+
+                    return ['verb' => 'buy', 'args' => ['resource' => $buy, 'n' => min(max($short, 6), 30)], 'why' => "buy {$buy} to craft chips for the base project"];
+                }
+            }
+            // A craftable intermediate with a known raw recipe (steel, alloy, …).
+            foreach (GameData::CRAFT_INPUTS[$res] ?? [] as $ing => $per) {
+                if ($has((string) $ing) > 0) {
+                    return ['verb' => 'combine', 'args' => ['ingredients' => [(string) $ing => 1]], 'why' => "combine {$res} from {$ing} for the base project (need {$want})"];
+                }
+                if ($credits >= 40 && in_array((string) $ing, self::DEPOT_TRADEABLE, true)) {
+                    return ['verb' => 'buy', 'args' => ['resource' => (string) $ing, 'n' => 6], 'why' => "buy {$ing} to craft {$res} for the base project"];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * The first novel `combine` the agent can afford from its surplus: two raws
      * that each sit at least {@see RESEARCH_SURPLUS} deep AND above their
      * (craft-raised) {@see floorFor()} floor, whose sorted `a+b` signature is
