@@ -6,6 +6,29 @@ SemVer with the **major tracking the NHA world API version**.
 
 ## [Unreleased]
 
+## [3.4.2] - 2026-09-10
+
+### Added
+- **`Ladder::acquire()` — get a needed resource by WHERE it is**, not always by
+  buying: a matching `nearby_deposits` entry underfoot → `mine` / `chop` /
+  `gather`; one within ~30 tiles → `move` to it; depot-tradeable + credits →
+  `buy`; an asteroid metal + a docked / adjacent rock → `mine` / `dock`;
+  craftable with an input on hand → `combine`; `null` when it can't be got
+  here. `colonyFundStep()` now routes its acquire branch through it (so the
+  agent mines free `iron` / `crystal` on Deimos instead of buying it) and
+  takes the observation as a new optional `$raw` argument.
+
+### Fixed
+- **Stuck churning on a body after its colony work was done.** Once the agent
+  had funded its full per-agent share of the last Deimos module it fell into a
+  `mine ↔ sell` loop and spammed `construct {shape:colony, module:…}` with
+  hallucinated module names (`habitat`, `power_grid`, `communications`, …) that
+  the engine rejected every tick. The colony guardrail now treats a
+  `shape:colony` construct whose `module` is not an open module on the board
+  (and a personal extractor past the cap) as dead: it hands off to the
+  expansionist flight ladder — station-keep, ride the elevator, depart for
+  home / the next body — instead of re-issuing the doomed `construct`.
+
 ## [3.4.1] - 2026-09-10
 
 ### Fixed

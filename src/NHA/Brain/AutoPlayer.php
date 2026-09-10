@@ -1154,10 +1154,23 @@ final class AutoPlayer
                     $cInv = (array) $observation->getInventory();
                     $cInv['credits'] = (int) ($cInv['credits'] ?? $rawObs['credits'] ?? $observation->get('credits') ?? 0);
                     $ownExtractors = Ladder::ownedExtractors($colonyBoard, $agent_id);
-                    $fund = Ladder::colonyFundStep($colonyBoard, $agent_id, $cInv);
+                    $fund = Ladder::colonyFundStep($colonyBoard, $agent_id, $cInv, $rawObs);
 
-                    $buildingExtractor = $verb === 'construct'
-                        && (string) ($decision['args']['shape'] ?? '') === 'extractor';
+                    // Any `construct` bound to this body that the colony can't
+                    // use — a personal extractor past the cap, or (the live
+                    // failure) a hallucinated `shape:colony` with a module that
+                    // is not on the board / is already complete.
+                    $hasRealBoard = (array) ($colonyBoard['modules'] ?? []) !== [];
+                    $openModules = array_map(
+                        static fn($m): string => (string) (((array) $m)['module'] ?? ''),
+                        array_filter((array) ($colonyBoard['modules'] ?? []), static fn($m): bool => empty(((array) $m)['complete'])),
+                    );
+                    $deadBodyConstruct = $verb === 'construct' && (
+                        (string) ($decision['args']['shape'] ?? '') === 'extractor'
+                        || ($hasRealBoard
+                            && (string) ($decision['args']['shape'] ?? '') === 'colony'
+                            && ! in_array((string) ($decision['args']['module'] ?? ''), $openModules, true))
+                    );
 
                     if ($fund !== null) {
                         $same = ($decision['verb'] ?? '') === $fund['verb']
@@ -1166,13 +1179,16 @@ final class AutoPlayer
                             $decision = ['verb' => $fund['verb'], 'args' => $fund['args'], 'reason' => 'colony board — ' . $fund['why']];
                             $verb = (string) $decision['verb'];
                         }
-                    } elseif ($buildingExtractor && $ownExtractors >= Ladder::MAX_BODY_EXTRACTORS) {
-                        // Colony done (or our share of it is) AND we already run
-                        // enough extractors — a 13th is pure churn. Earn / hold.
-                        $alt = $this->fallbackDecision($observation, "already running {$ownExtractors} extractors here — colony needs nothing more from you", $tried, $known, $researchPaying, $stance);
-                        if ($alt !== null && ($alt['verb'] ?? '') !== 'construct') {
-                            $decision = $alt;
-                            $verb = (string) ($decision['verb'] ?? '');
+                    } elseif ($deadBodyConstruct && ($ownExtractors >= Ladder::MAX_BODY_EXTRACTORS || ($hasRealBoard && (string) ($decision['args']['shape'] ?? '') === 'colony'))) {
+                        // Our colony work on this body is done / capped. Stop the
+                        // construct churn and let the expansionist ladder move on
+                        // — station-keep, ride the elevator, depart for home /
+                        // the next body.
+                        $go = Ladder::suggestion($rawObs, $tried, $known, false, $stance, $departUnreachable)
+                            ?? $this->fallbackDecision($observation, "colony work on this body is done — move on", $tried, $known, $researchPaying, $stance);
+                        if ($go !== null && ($go['verb'] ?? '') !== 'construct') {
+                            $decision = ['verb' => (string) $go['verb'], 'args' => (array) ($go['args'] ?? []), 'reason' => 'colony share funded — ' . (string) ($go['why'] ?? 'move on')];
+                            $verb = (string) $decision['verb'];
                         } else {
                             $decision = self::idle($rawObs, 'colony funded to your cap — nothing to build here');
                             $verb = (string) $decision['verb'];

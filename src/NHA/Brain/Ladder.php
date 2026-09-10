@@ -1040,10 +1040,13 @@ final class Ladder
      *
      * @param array<string,mixed>     $board the decoded colony board
      * @param array<string,int|float> $inv   the observation inventory (must include `credits`)
+     * @param array<string,mixed>     $raw   the observation — its `nearby_deposits` / `asteroids`
+     *                                       let the acquire step MINE a needed material for free
+     *                                       instead of always buying it ({@see acquire()})
      *
      * @return array{verb:string,args:array<string,mixed>,why:string}|null
      */
-    public static function colonyFundStep(array $board, int $agent_id, array $inv): ?array
+    public static function colonyFundStep(array $board, int $agent_id, array $inv, array $raw = []): ?array
     {
         $module = self::colonyNextModule($board);
         if ($module === null) {
@@ -1067,14 +1070,96 @@ final class Ladder
             ];
         }
 
+        // Acquire the outstanding material the agent has the most headroom on —
+        // by LOCATION: mine a nearby deposit / dock an asteroid before spending
+        // credits at the depot ({@see acquire()}).
         arsort($headroom);
         foreach ($headroom as $res => $room) {
-            if (in_array((string) $res, self::DEPOT_TRADEABLE, true) && $has('credits') >= 40) {
-                return ['verb' => 'buy', 'args' => ['resource' => (string) $res, 'n' => min($room, 40)], 'why' => "buy {$res} for {$label} on {$body}"];
+            $step = self::acquire((string) $res, (int) $room, $raw, $inv);
+            if ($step !== null) {
+                return ['verb' => $step['verb'], 'args' => $step['args'], 'why' => $step['why'] . " → {$label} on {$body}"];
             }
-            $acq = self::bodyBuildStep($inv, [(string) $res => $has((string) $res) + $room]);
-            if ($acq !== null) {
-                return $acq;
+        }
+
+        return null;
+    }
+
+    /**
+     * The cheapest / nearest way to obtain `$short` more of `$res`, weighing
+     * WHERE it is rather than always buying:
+     *
+     *   1. standing on a matching `nearby_deposits` entry → `mine` / `chop` / `gather`;
+     *   2. a matching deposit within `$reach` tiles       → `move` toward it;
+     *   3. depot-tradeable and ≥ 40 credits on hand       → `buy`;
+     *   4. an asteroid metal + a rock docked / adjacent   → `mine` / `dock`;
+     *   5. craftable ({@see GameData::CRAFT_INPUTS}) with an input on hand → `combine`.
+     *
+     * `null` when `$res` cannot be obtained from where the agent is. Pure.
+     *
+     * @param array<string,mixed>     $raw the observation (`nearby_deposits`, `asteroids`, `docked`, `position`)
+     * @param array<string,int|float> $inv inventory (must include `credits`)
+     *
+     * @return array{verb:string,args:array<string,mixed>,why:string}|null
+     */
+    public static function acquire(string $res, int $short, array $raw, array $inv, int $reach = 30): ?array
+    {
+        if ($short <= 0) {
+            return null;
+        }
+        $res = strtolower(trim($res));
+        $has = static fn(string $k): int => (int) ($inv[$k] ?? 0);
+        $pos = (array) ($raw['position'] ?? [0, 0]);
+        $x = (int) ($pos[0] ?? 0);
+        $y = (int) ($pos[1] ?? 0);
+
+        // 1 + 2 — a local deposit of exactly this resource.
+        $best = null;
+        foreach ((array) ($raw['nearby_deposits'] ?? []) as $d) {
+            $d = (array) $d;
+            if (strtolower((string) ($d['resource'] ?? '')) !== $res) {
+                continue;
+            }
+            $dist = (int) ($d['dist'] ?? 99);
+            if ($best === null || $dist < (int) $best['dist']) {
+                $best = ['dist' => $dist, 'x' => (int) ($d['x'] ?? $x), 'y' => (int) ($d['y'] ?? $y), 'amount' => (int) ($d['amount'] ?? 15)];
+            }
+        }
+        if ($best !== null) {
+            if ((int) $best['dist'] === 0) {
+                $verb = match (true) {
+                    $res === 'wood' => 'chop',
+                    in_array($res, ['herb', 'lichen', 'fungus', 'algae'], true) => 'gather',
+                    default => 'mine',
+                };
+
+                return ['verb' => $verb, 'args' => ['n' => max(1, min($short, (int) $best['amount'], 15))], 'why' => "mine the {$res} deposit underfoot (need {$short} more)"];
+            }
+            if ((int) $best['dist'] <= $reach) {
+                return ['verb' => 'move', 'args' => ['x' => (int) $best['x'], 'y' => (int) $best['y']], 'why' => "walk to the {$res} deposit {$best['dist']} tiles off (need {$short})"];
+            }
+        }
+
+        // 3 — the depot.
+        if (in_array($res, self::DEPOT_TRADEABLE, true) && $has('credits') >= 40) {
+            return ['verb' => 'buy', 'args' => ['resource' => $res, 'n' => min($short, 40)], 'why' => "buy {$res} from the depot (need {$short} more)"];
+        }
+
+        // 4 — asteroid metals.
+        if (in_array($res, ['nickel', 'iridium', 'iron', 'metal', 'ore', 'platinum'], true)) {
+            if (! empty($raw['docked'])) {
+                return ['verb' => 'mine', 'args' => ['n' => min($short, 15)], 'why' => "mine the docked asteroid for {$res}"];
+            }
+            foreach ((array) ($raw['asteroids'] ?? []) as $a) {
+                if ((int) (((array) $a)['dist'] ?? 99) <= 2) {
+                    return ['verb' => 'dock', 'args' => [], 'why' => "dock the asteroid to mine {$res}"];
+                }
+            }
+        }
+
+        // 5 — craft it from an input already on hand.
+        foreach (GameData::CRAFT_INPUTS[$res] ?? [] as $ing => $per) {
+            if ($has((string) $ing) > 0) {
+                return ['verb' => 'combine', 'args' => ['ingredients' => [(string) $ing => 1]], 'why' => "combine {$res} from {$ing}"];
             }
         }
 

@@ -69,7 +69,7 @@ flowchart TD
     stay -- no --> exp
     useStay --> exp
     g2 -- no --> exp
-    exp{"&#40;expansionist flight guardrails&#41;<br/>dead-end hull &#40;deimos + phobos + mars all depart-rejected for a missing landing_gear part&#41; &#8594; gear a fresh flyer;<br/>on the ground w/ a depart-capable ship &#8594; force toward orbit;<br/>in orbit &amp; a window we can service is open &amp; no retry cooldown &#8594; force depart;<br/>a depart to any other dest &#40;model or ladder&#41; &#8594; force the deterministic hold;<br/>hold = station-keep: alt &lt; 300 &#8594; bounce the elevator back to the band &#40;no fuel&#41;, else stock fuel/shield &#8594; dock &#8594; idle;<br/>body-surface construct the feed shows refused for materials &#8594; Ladder::bodyBuildStep &#40;buy the short depot raw / combine chips&#41;, or rewrite a bad `kind` arg;<br/>colony board has an incomplete module &#8594; Ladder::colonyFundStep &#40;hold a needed material &#8594; construct shape=colony, else buy the one with the most headroom&#41;; colony done + &#8805;3 own extractors &#8594; drop a further construct extractor"}
+    exp{"&#40;expansionist flight guardrails&#41;<br/>dead-end hull &#40;deimos + phobos + mars all depart-rejected for a missing landing_gear part&#41; &#8594; gear a fresh flyer;<br/>on the ground w/ a depart-capable ship &#8594; force toward orbit;<br/>in orbit &amp; a window we can service is open &amp; no retry cooldown &#8594; force depart;<br/>a depart to any other dest &#40;model or ladder&#41; &#8594; force the deterministic hold;<br/>hold = station-keep: alt &lt; 300 &#8594; bounce the elevator back to the band &#40;no fuel&#41;, else stock fuel/shield &#8594; dock &#8594; idle;<br/>body-surface construct the feed shows refused for materials &#8594; Ladder::bodyBuildStep &#40;buy the short depot raw / combine chips&#41;, or rewrite a bad `kind` arg;<br/>colony board has an incomplete module &#8594; Ladder::colonyFundStep &#40;hold a needed material &#8594; construct shape=colony, else Ladder::acquire it — mine a nearby deposit / dock an asteroid before buying&#41;; colony share funded &#8594; a construct extractor past the cap OR a construct shape=colony with a module not open on the board is dropped &#8594; hand off to the flight ladder &#40;ride / depart home&#41;"}
     exp --> rec
     rec[if final verb == combine:<br/>state.recordCombineSignature] --> submit[NHA::intentWithToken<br/>state.recordDecision &#40;with altitude&#41;]
     submit --> done([&#129302; &#91;stance&#93; / &#128737;&#65039; / &#9851;&#65039; / &#128260; status line])
@@ -98,13 +98,18 @@ each module's `need` / `remaining` / `contrib` and a `cap_pct_per_agent`.
 `colonyNextModule()` picks the first incomplete one; `colonyAgentHeadroom()` is
 `min(remaining, floor(need × cap%) − own contribution)` per outstanding
 material; `colonyFundStep()` then either **funds** it (`construct
-{shape:colony, body, module}` consumes a held needed material) or **buys** the
-outstanding material this agent has the most room on. Once the colony is
-complete (or this agent has capped its share) and it already runs
-`MAX_BODY_EXTRACTORS` (3) personal extractors, a further `construct
-{shape:extractor}` is dropped for an earning / holding move — the observation
-never carries `expansion.colony`, so without this the ladder builds redundant
-extractors forever.
+{shape:colony, body, module}` consumes a held needed material) or **acquires**
+the outstanding material this agent has the most room on via `Ladder::acquire()`
+— which weighs LOCATION: mine a matching `nearby_deposits` entry (free) or dock
+an asteroid before spending credits at the depot, and returns `null` when the
+resource can't be got where the agent is. Once this agent has funded its full
+per-agent share (or the colony is complete): a `construct {shape:extractor}`
+past `MAX_BODY_EXTRACTORS` (3), and a `construct {shape:colony}` whose `module`
+isn't an open module on the board (the model hallucinates `habitat`,
+`power_grid`, …), are both dropped — the guardrail hands off to the expansionist
+flight ladder to ride the elevator / depart for home. Without this the agent
+churns on a finished body forever, because the observation never carries
+`expansion.colony`.
 
 ---
 

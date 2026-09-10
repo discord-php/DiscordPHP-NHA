@@ -428,6 +428,66 @@ class LadderTest extends NHAUnitTestCase
         $this->assertSame(0, Ladder::ownedExtractors([], 142285));
     }
 
+    // ── acquire() — get a resource by where it actually is ────────────
+
+    /**
+     * @covers \NHA\Brain\Ladder::acquire
+     */
+    public function testAcquireMinesADepositUnderfootBeforeSpendingCredits(): void
+    {
+        $raw = ['position' => [10, 10], 'nearby_deposits' => [['resource' => 'nickel', 'dist' => 0, 'amount' => 30]]];
+        $step = Ladder::acquire('nickel', 48, $raw, ['credits' => 20000]);
+
+        $this->assertSame('mine', $step['verb'], 'nickel is underfoot — mine it, do not buy it');
+        $this->assertLessThanOrEqual(15, $step['args']['n']);
+    }
+
+    /**
+     * @covers \NHA\Brain\Ladder::acquire
+     */
+    public function testAcquireWalksToADepositThatIsNearbyButNotUnderfoot(): void
+    {
+        $raw = ['position' => [10, 10], 'nearby_deposits' => [['resource' => 'iron', 'dist' => 6, 'x' => 16, 'y' => 10, 'amount' => 40]]];
+        $step = Ladder::acquire('iron', 20, $raw, ['credits' => 20000]);
+
+        $this->assertSame('move', $step['verb']);
+        $this->assertSame(['x' => 16, 'y' => 10], $step['args']);
+    }
+
+    /**
+     * @covers \NHA\Brain\Ladder::acquire
+     */
+    public function testAcquireFallsBackToTheDepotWhenNothingIsMinableLocally(): void
+    {
+        $step = Ladder::acquire('superalloy', 90, ['position' => [0, 0]], ['credits' => 5000]);
+        $this->assertSame('buy', $step['verb']);
+        $this->assertSame('superalloy', $step['args']['resource']);
+        $this->assertSame(40, $step['args']['n'], 'capped per turn');
+
+        // …and a deposit too far to walk to is ignored in favour of the depot.
+        $far = ['position' => [0, 0], 'nearby_deposits' => [['resource' => 'superalloy', 'dist' => 80, 'x' => 80, 'y' => 0]]];
+        $this->assertSame('buy', Ladder::acquire('superalloy', 90, $far, ['credits' => 5000])['verb']);
+    }
+
+    /**
+     * @covers \NHA\Brain\Ladder::acquire
+     */
+    public function testAcquireDocksAnAsteroidForAMetalWithNoDepositAndNoDepotCredits(): void
+    {
+        $raw = ['position' => [0, 0], 'asteroids' => [['dist' => 1]]];
+        $step = Ladder::acquire('iridium', 10, $raw, ['credits' => 0]);
+        $this->assertSame('dock', $step['verb']);
+    }
+
+    /**
+     * @covers \NHA\Brain\Ladder::acquire
+     */
+    public function testAcquireIsNullWhenTheResourceCannotBeGotHere(): void
+    {
+        $this->assertNull(Ladder::acquire('void_pumice', 10, ['position' => [0, 0]], ['credits' => 0]));
+        $this->assertNull(Ladder::acquire('nickel', 0, ['position' => [0, 0]], ['credits' => 9999]), 'already have enough');
+    }
+
     /**
      * @covers \NHA\Brain\Ladder::suggestion
      */
