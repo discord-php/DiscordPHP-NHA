@@ -12,6 +12,18 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.45] - 2026-09-10
+
+### Fixed
+- **It flew to Deimos and then parked in its orbit doing nothing.** Arrival sets
+  `expansion.at_body_orbit` / `location: "orbit_deimos"` — `at_body` stays null
+  until you `land_body`. Every gate checked only `at_body`, so the agent read
+  itself as still holding in Earth orbit and `deposit`-ed. New
+  `Ladder::atBody()` resolves surface *or* orbit arrival; `isHoldingForWindow()`
+  / `departTarget()` / `stanceMove` treat it as "not in Earth orbit", and both
+  the ladder and `AutoPlayer` force `land_body` (or `land_moon`) from a body's
+  orbit.
+
 ## [3.2.44] - 2026-09-10
 
 ### Fixed

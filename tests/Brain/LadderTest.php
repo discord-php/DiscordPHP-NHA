@@ -328,6 +328,28 @@ class LadderTest extends NHAUnitTestCase
      *
      * @covers \NHA\Brain\Ladder::inTransit
      */
+    /**
+     * Arrived in a body's ORBIT (`at_body_orbit`, `at_body` still null) — land,
+     * don't keep holding for an Earth transfer window.
+     *
+     * @covers \NHA\Brain\Ladder::atBody
+     */
+    public function testArrivedInBodyOrbitLandsRatherThanHolds(): void
+    {
+        $arrived = [
+            'tick' => 5, 'in_space' => true, 'altitude' => 600,
+            'inventory' => self::KIT + ['cryo_fuel' => 90, 'heat_shield' => 1],
+            'vehicles' => [['name' => 'skiff', 'flies' => true, 'orbital_engine' => true]],
+            'expansion' => ['at_body' => null, 'at_body_orbit' => 'deimos', 'location' => 'orbit_deimos',
+                'windows' => ['deimos' => ['open' => true]]],
+        ];
+
+        $this->assertSame('deimos', Ladder::atBody($arrived));
+        $this->assertFalse(Ladder::isHoldingForWindow($arrived, 'expansionist'));
+        $this->assertNull(Ladder::departTarget($arrived));
+        $this->assertSame('land_body', Ladder::suggestion($arrived, [], [], false, 'expansionist')['verb']);
+    }
+
     public function testInTransitStopsTheHoldAndDepartGates(): void
     {
         $transit = [

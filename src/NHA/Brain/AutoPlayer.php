@@ -1057,6 +1057,16 @@ final class AutoPlayer
                 // sanctioned `depart` — `mine`/`move`/`ride`/`land` all just
                 // burn turns up here. `$loopObjective` is null because
                 // loop-break is suppressed while holding.
+                // Arrived in a body's orbit (`at_body_orbit` / `location:
+                // orbit_<body>`) — the one move is to put down. The model tends
+                // to keep `deposit`-ing as if still holding in Earth orbit.
+                if (($body = Ladder::atBody($rawObs)) !== null
+                    && (int) ($observation->get('altitude') ?? 0) > 0
+                    && ! in_array($verb, ['land_body', 'land_moon'], true)) {
+                    $verb = in_array($body, ['moon', 'luna'], true) ? 'land_moon' : 'land_body';
+                    $decision = ['verb' => $verb, 'args' => [], 'reason' => "reached {$body} — land and build the base"];
+                }
+
                 // Already departed and riding the transfer: every flight verb is
                 // rejected ("already in transit to …"), and the window still
                 // reads "open" so the model / loop-break keep re-firing `depart`.

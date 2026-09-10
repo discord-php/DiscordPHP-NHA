@@ -510,6 +510,25 @@ final class Ladder
     }
 
     /**
+     * The body the agent is AT — on the surface (`at_body`) or arrived in its
+     * orbit and not yet landed (`at_body_orbit` / `location: "orbit_<body>"`).
+     * `null` at Earth / in Earth orbit / in transit. Every "in EARTH orbit"
+     * gate must treat a non-null result as "not here — land / return".
+     *
+     * @param array<string,mixed> $raw
+     */
+    public static function atBody(array $raw): ?string
+    {
+        $ex = (array) ($raw['expansion'] ?? []);
+        $b = (string) ($ex['at_body'] ?? $ex['at_body_orbit'] ?? '');
+        if ($b === '' && str_starts_with((string) ($ex['location'] ?? ''), 'orbit_')) {
+            $b = substr((string) $ex['location'], 6);
+        }
+
+        return $b !== '' && $b !== 'earth' ? $b : null;
+    }
+
+    /**
      * Whether the agent has a flying orbital ship that can still reach a
      * mission body. The bar is the three GEAR bodies — deimos, phobos, mars
      * (moons + Mars, TWR ≤ 0.7). Once every one of those is in `$unreachable`
@@ -552,7 +571,7 @@ final class Ladder
         if ($stance !== Stance::Expansionist->value) {
             return false;
         }
-        if (self::inTransit($raw) || ($raw['expansion']['at_body'] ?? null) !== null || ! self::hasOrbitalShip($raw)) {
+        if (self::inTransit($raw) || self::atBody($raw) !== null || ! self::hasOrbitalShip($raw)) {
             return false;
         }
 
@@ -611,7 +630,7 @@ final class Ladder
         if (self::inTransit($raw) || ! ($raw['in_space'] ?? false) || $alt < 300 || $alt > 600) {
             return null;
         }
-        if (($raw['expansion']['at_body'] ?? null) !== null || ! self::hasOrbitalShip($raw)) {
+        if (self::atBody($raw) !== null || ! self::hasOrbitalShip($raw)) {
             return null;
         }
         $inv = (array) ($raw['inventory'] ?? []);
@@ -1260,7 +1279,8 @@ final class Ladder
 
         if ($stance === Stance::Expansionist->value) {
             $expansion = (array) ($raw['expansion'] ?? []);
-            $atBody = $expansion['at_body'] ?? null;
+            $atBody = self::atBody($raw);
+            $onSurface = ($expansion['at_body'] ?? null) !== null;
             $alt = (int) ($raw['altitude'] ?? 0);
             $inSpace = (bool) ($raw['in_space'] ?? false);
             $onGround = ! $inSpace && $alt === 0;
@@ -1282,7 +1302,7 @@ final class Ladder
 
             // On a body → the mission itself: fund the colony, then the
             // terraform stages; an extractor in between for standing income.
-            if ($atBody !== null && $alt === 0) {
+            if ($onSurface && $alt === 0) {
                 $colony = (array) ($expansion['colony'] ?? []);
                 $terraform = (array) ($expansion['terraform'] ?? []);
                 if ($colony !== [] && empty($colony['complete']) && $credits >= 200) {
