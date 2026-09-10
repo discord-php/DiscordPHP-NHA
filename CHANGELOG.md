@@ -6,6 +6,18 @@ SemVer with the **major tracking the NHA world API version**.
 
 ## [Unreleased]
 
+## [3.4.3] - 2026-09-10
+
+### Fixed
+- **3.4.2's "move on" hand-off never fired — the agent had ridden UP.** It was
+  gated on `altitude === 0`, but by the time its Deimos colony share was
+  funded it had ridden the elevator to orbit (alt 480) and was spamming
+  `construct {shape:colony, module:habitat}` from up there. The colony board is
+  now fetched whenever `Ladder::atBody()` is set (surface **or** orbit), and
+  the guardrail hands off to the flight ladder for any doomed body `construct`
+  from a body's orbit once this agent's colony share is funded — so it starts
+  the trip home instead of churning in orbit.
+
 ## [3.4.2] - 2026-09-10
 
 ### Added

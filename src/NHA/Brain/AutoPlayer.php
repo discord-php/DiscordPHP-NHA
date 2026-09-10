@@ -882,14 +882,12 @@ final class AutoPlayer
             // `needs_item` entry.
             $this->reviewCapabilityFeed($agent_id, $pre['profile'] ?? null, (array) ($rawObs['inventory'] ?? []));
 
-            // Standing on a body → pull its colony board so the decision can
-            // FUND the next incomplete module (and stop raising redundant
-            // personal extractors) instead of churning. Best-effort: a failed
-            // fetch (or not being on a body) just yields an empty board.
-            $onBodySurface = Ladder::atBody($rawObs) !== null
-                && (int) ($rawObs['altitude'] ?? 0) === 0
-                && ! ($rawObs['in_space'] ?? false);
-            $colonyBoardPromise = $onBodySurface
+            // At a body (surface OR its orbit) → pull the colony board so the
+            // decision can FUND the next incomplete module, stop raising
+            // redundant personal extractors, and — once this agent's share is
+            // funded — head home rather than churn. Best-effort: a failed fetch
+            // (or not being at a body) just yields an empty board.
+            $colonyBoardPromise = Ladder::atBody($rawObs) !== null
                 ? $this->nha->world->getColony((string) Ladder::atBody($rawObs))->then(
                     static fn($c): array => (array) (json_decode(json_encode($c), true) ?: []),
                     static fn(): array => [],
@@ -1150,17 +1148,29 @@ final class AutoPlayer
                 // 1/160 superalloy because `expansion.colony` is never in the
                 // observation and the ladder fell back to "extractor for income"
                 // forever.
-                if ($colonyBoard !== [] && Ladder::atBody($rawObs) !== null && (int) ($observation->get('altitude') ?? 0) === 0) {
+                if ($colonyBoard !== [] && Ladder::atBody($rawObs) !== null) {
+                    $onSurface = (int) ($observation->get('altitude') ?? 0) === 0 && ! ($rawObs['in_space'] ?? false);
                     $cInv = (array) $observation->getInventory();
                     $cInv['credits'] = (int) ($cInv['credits'] ?? $rawObs['credits'] ?? $observation->get('credits') ?? 0);
                     $ownExtractors = Ladder::ownedExtractors($colonyBoard, $agent_id);
                     $fund = Ladder::colonyFundStep($colonyBoard, $agent_id, $cInv, $rawObs);
-
-                    // Any `construct` bound to this body that the colony can't
-                    // use — a personal extractor past the cap, or (the live
-                    // failure) a hallucinated `shape:colony` with a module that
-                    // is not on the board / is already complete.
                     $hasRealBoard = (array) ($colonyBoard['modules'] ?? []) !== [];
+                    // This agent's colony work on this body is finished: every
+                    // module done, or its per-agent share of the open one is
+                    // funded / unreachable ({@see Ladder::colonyFundStep()}
+                    // returns null).
+                    $colonyDoneForMe = $hasRealBoard && $fund === null;
+                    // Only ACT on a surface fund; in orbit the fund would be a
+                    // rejected `construct` — the point there is to head home.
+                    if (! $onSurface) {
+                        $fund = null;
+                    }
+
+                    // A `construct` bound to this body the colony can't use — a
+                    // personal extractor past the cap, or a hallucinated
+                    // `shape:colony` with a module not open on the board
+                    // (habitat / power_grid / communications / … — the live
+                    // failure once the real modules were funded).
                     $openModules = array_map(
                         static fn($m): string => (string) (((array) $m)['module'] ?? ''),
                         array_filter((array) ($colonyBoard['modules'] ?? []), static fn($m): bool => empty(((array) $m)['complete'])),
@@ -1179,17 +1189,21 @@ final class AutoPlayer
                             $decision = ['verb' => $fund['verb'], 'args' => $fund['args'], 'reason' => 'colony board — ' . $fund['why']];
                             $verb = (string) $decision['verb'];
                         }
-                    } elseif ($deadBodyConstruct && ($ownExtractors >= Ladder::MAX_BODY_EXTRACTORS || ($hasRealBoard && (string) ($decision['args']['shape'] ?? '') === 'colony'))) {
-                        // Our colony work on this body is done / capped. Stop the
-                        // construct churn and let the expansionist ladder move on
-                        // — station-keep, ride the elevator, depart for home /
-                        // the next body.
+                    } elseif ($colonyDoneForMe && (
+                        $deadBodyConstruct
+                        || (! $onSurface && $verb === 'construct')
+                    )) {
+                        // Colony share funded and the pick is a doomed body
+                        // `construct`. Hand off to the expansionist flight
+                        // ladder — station-keep, ride the elevator, depart —
+                        // instead of re-issuing it. From this body's orbit that
+                        // means starting the trip home.
                         $go = Ladder::suggestion($rawObs, $tried, $known, false, $stance, $departUnreachable)
-                            ?? $this->fallbackDecision($observation, "colony work on this body is done — move on", $tried, $known, $researchPaying, $stance);
+                            ?? $this->fallbackDecision($observation, 'colony work on this body is done — move on', $tried, $known, $researchPaying, $stance);
                         if ($go !== null && ($go['verb'] ?? '') !== 'construct') {
                             $decision = ['verb' => (string) $go['verb'], 'args' => (array) ($go['args'] ?? []), 'reason' => 'colony share funded — ' . (string) ($go['why'] ?? 'move on')];
                             $verb = (string) $decision['verb'];
-                        } else {
+                        } elseif ($onSurface || $ownExtractors >= Ladder::MAX_BODY_EXTRACTORS) {
                             $decision = self::idle($rawObs, 'colony funded to your cap — nothing to build here');
                             $verb = (string) $decision['verb'];
                         }
