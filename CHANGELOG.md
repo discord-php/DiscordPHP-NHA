@@ -6,6 +6,19 @@ SemVer with the **major tracking the NHA world API version**.
 
 ## [Unreleased]
 
+## [3.4.5] - 2026-09-10
+
+### Fixed
+- **The "head home" hand-off only triggered on a `construct` pick.** Once the
+  Deimos colony share was funded and the transfer window shut for ~400 ticks,
+  the model picked `mine` / `dock` / `sell` and the guardrail — which only
+  fired on a body `construct` — let it churn. It now fires on **any** pick once
+  the colony share is funded (except an already-sane `ride` / `depart` /
+  `land`): from the body's orbit with a flyer + fuel + open window →
+  `depart {dest:'earth'}`; on the surface with a flyer → walk to the tall
+  elevator and `ride` up to hold in the depart band for the window; no flyer
+  yet → gear one; otherwise idle and wait.
+
 ## [3.4.4] - 2026-09-10
 
 ### Fixed
