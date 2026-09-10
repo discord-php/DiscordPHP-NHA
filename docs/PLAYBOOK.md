@@ -111,6 +111,15 @@ flight ladder to ride the elevator / depart for home. Without this the agent
 churns on a finished body forever, because the observation never carries
 `expansion.colony`.
 
+"On a body's surface" is `Ladder::onBodySurface()` — `expansion.place.where ==
+"body_surface"` / `location: "on_<body>"` / `at_body` set — **not**
+`!in_space && altitude == 0`, which is Earth-only (a moon reports `in_space`
+and a non-zero altitude on the ground). Once this agent's colony share is
+funded and it is back in the body's orbit with a flight-ready fuelled ship and
+the window open, the guardrail emits `depart {dest:'earth'}` — the only return
+leg in the brain; the `at_body_orbit` land-force and the outbound-`depart`
+sanity-check both exempt a `dest:'earth'`.
+
 ---
 
 ## The deterministic ladder — `Ladder::suggestion()`

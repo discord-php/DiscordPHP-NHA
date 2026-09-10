@@ -6,6 +6,26 @@ SemVer with the **major tracking the NHA world API version**.
 
 ## [Unreleased]
 
+## [3.4.4] - 2026-09-10
+
+### Fixed
+- **The brain thought it was in orbit while standing on Deimos.** On a MOON the
+  engine reports `in_space:true` and a non-zero `altitude` even on the ground,
+  so every `!in_space && altitude === 0` check read the agent as airborne: the
+  gear-up-a-flyer rung never fired, the colony guardrail's surface branch
+  never fired, and it churned. New `Ladder::onBodySurface()` keys off
+  `expansion.place.where === "body_surface"` / `location: "on_<body>"` /
+  `at_body` (never `at_body_orbit`); `Ladder::stanceMove` and the `AutoPlayer`
+  colony guardrail use it.
+- **Stranded on a body with no way back.** A standing-income extractor is now
+  only built once the agent already has a ship (`hasShipEarly` gate), so a
+  shipless agent on a body gears a flyer instead. And there was **no return
+  leg at all** — every `depart` path was Earth→body. The colony guardrail now,
+  once this agent's colony share is funded and it is in the body's orbit with
+  a flight-ready fuelled ship and the window open, emits `depart
+  {dest:'earth'}`; the `at_body_orbit` land-force and the outbound-`depart`
+  sanity-check both exempt it.
+
 ## [3.4.3] - 2026-09-10
 
 ### Fixed

@@ -1338,6 +1338,45 @@ class AutoPlayerTest extends NHAUnitTestCase
     }
 
     /**
+     * Colony share funded and the agent is in the body's ORBIT with a
+     * flight-ready ship and the window open → depart for Earth, not another
+     * doomed body `construct` (no ladder rung covers the return leg).
+     *
+     * @covers \NHA\Brain\AutoPlayer::step
+     */
+    public function testFromABodyOrbitWithTheShareFundedItDepartsForHome(): void
+    {
+        $state = new StateStore($this->statePath);
+
+        $nha = $this->nhaWith([
+            'tick' => 1300, 'downed_until' => 0, 'position' => [30, 110],
+            'in_space' => true, 'altitude' => 480,
+            'inventory' => ['credits' => 12000, 'cryo_fuel' => 90,
+                'stimpack' => 1, 'kinetic_gun' => 1, 'slug' => 5],
+            'vehicles' => [['name' => 'flyer', 'flies' => true, 'orbital_engine' => true]],
+            // In Deimos orbit (at_body null, at_body_orbit set), return window open.
+            'expansion' => [
+                'at_body' => null, 'at_body_orbit' => 'deimos',
+                'windows' => ['deimos' => ['open' => true]],
+            ],
+            'body' => 'deimos', 'cap_pct_per_agent' => 60, 'complete' => false,
+            'modules' => [[
+                'module' => 'mass_driver', 'complete' => false,
+                'need' => ['superalloy' => 160], 'remaining' => ['superalloy' => 40],
+                'contrib' => ['142285' => ['superalloy' => 96]],  // 96 = the 60% cap → no headroom
+            ]],
+            'extractors' => [],
+        ]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"construct","args":{"shape":"colony","body":"deimos","module":"habitat"}}'), $state);
+
+        $player->step(142285, 'tok');
+
+        $post = $this->posts[0][1];
+        $this->assertSame('depart', $post['verb']);
+        $this->assertSame('earth', $post['args']['dest']);
+    }
+
+    /**
      * The engine's named buildable `kind` for the body is adopted when the feed
      * has no materials shortfall to act on — the model's bad `shape`/`kind` is
      * replaced with exactly what the engine asked for.

@@ -480,6 +480,28 @@ class LadderTest extends NHAUnitTestCase
     }
 
     /**
+     * @covers \NHA\Brain\Ladder::onBodySurface
+     */
+    public function testOnBodySurfaceUsesPlaceWhereNotAltitudeForMoons(): void
+    {
+        // A moon: the engine reports in_space + a non-zero altitude on the ground.
+        $this->assertTrue(Ladder::onBodySurface([
+            'in_space' => true, 'altitude' => 480,
+            'expansion' => ['at_body' => 'deimos', 'place' => ['where' => 'body_surface']],
+        ]));
+        // `location: on_<body>` says the same.
+        $this->assertTrue(Ladder::onBodySurface(['expansion' => ['location' => 'on_mars']]));
+        // …and an older observation with just `at_body` still resolves.
+        $this->assertTrue(Ladder::onBodySurface(['expansion' => ['at_body' => 'phobos']]));
+
+        // In a body's ORBIT (at_body_orbit, at_body unset) is NOT the surface.
+        $this->assertFalse(Ladder::onBodySurface(['expansion' => ['at_body' => null, 'at_body_orbit' => 'deimos']]));
+        // Nor is mid-transit, nor Earth's ground.
+        $this->assertFalse(Ladder::onBodySurface(['expansion' => ['transit' => ['to' => 'mars'], 'at_body' => 'mars']]));
+        $this->assertFalse(Ladder::onBodySurface(['in_space' => false, 'altitude' => 0, 'expansion' => []]));
+    }
+
+    /**
      * @covers \NHA\Brain\Ladder::acquire
      */
     public function testAcquireIsNullWhenTheResourceCannotBeGotHere(): void

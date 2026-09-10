@@ -541,6 +541,33 @@ final class Ladder
     }
 
     /**
+     * Is the agent standing on a body's surface? On a MOON the engine reports
+     * `in_space:true` and a non-zero `altitude` even while grounded, so
+     * `!in_space && altitude === 0` is Earth-only — the reliable signal is
+     * `expansion.place.where === "body_surface"` (or `location: "on_<body>"`).
+     *
+     * @param array<string,mixed> $raw
+     */
+    public static function onBodySurface(array $raw): bool
+    {
+        if (self::inTransit($raw)) {
+            return false;
+        }
+        $ex = (array) ($raw['expansion'] ?? []);
+        if ((string) (((array) ($ex['place'] ?? []))['where'] ?? '') === 'body_surface'
+            || str_starts_with((string) ($ex['location'] ?? ''), 'on_')) {
+            return true;
+        }
+
+        // `at_body` (distinct from `at_body_orbit`) is only set after
+        // `land_body` — i.e. once on the ground — so an observation that
+        // carries just that still resolves as "on the surface".
+        $b = (string) ($ex['at_body'] ?? '');
+
+        return $b !== '' && $b !== 'earth';
+    }
+
+    /**
      * Whether the agent has a flying orbital ship that can still reach a
      * mission body. The bar is the three GEAR bodies — deimos, phobos, mars
      * (moons + Mars, TWR ≤ 0.7). Once every one of those is in `$unreachable`
@@ -1591,10 +1618,15 @@ final class Ladder
         if ($stance === Stance::Expansionist->value) {
             $expansion = (array) ($raw['expansion'] ?? []);
             $atBody = self::atBody($raw);
-            $onSurface = ($expansion['at_body'] ?? null) !== null;
+            // On a MOON the engine reports `in_space:true` + a non-zero
+            // `altitude` even while you stand on the ground — the real "on a
+            // body's surface" signal is `expansion.place.where`.
+            $onSurface = self::onBodySurface($raw);
             $alt = (int) ($raw['altitude'] ?? 0);
             $inSpace = (bool) ($raw['in_space'] ?? false);
-            $onGround = ! $inSpace && $alt === 0;
+            // "on the ground and free to build/gear" — Earth's surface, or a
+            // body's surface.
+            $onGround = $onSurface || (! $inSpace && $alt === 0);
 
             // Already departed — riding the interplanetary transfer. Nothing to
             // do but wait for arrival; every flight verb is rejected mid-crossing.
@@ -1611,9 +1643,11 @@ final class Ladder
                 return ['verb' => $verb, 'args' => [], 'why' => "expansionist — you have reached {$atBody}; land and build the base"];
             }
 
+            $hasShipEarly = self::hasDepartCapableShip($raw, $departUnreachable);
+
             // On a body → the mission itself: fund the colony, then the
             // terraform stages; an extractor in between for standing income.
-            if ($onSurface && $alt === 0) {
+            if ($onSurface) {
                 $colony = (array) ($expansion['colony'] ?? []);
                 $terraform = (array) ($expansion['terraform'] ?? []);
                 if ($colony !== [] && empty($colony['complete']) && $credits >= 200) {
@@ -1628,7 +1662,10 @@ final class Ladder
 
                     return ['verb' => 'construct', 'args' => $args, 'why' => "expansionist — fund the {$atBody} terraform stage {$stage}"];
                 }
-                if ($has('metal') >= 4) {
+                // A standing-income extractor is only worth a part slot once you
+                // ALREADY have a ship to fly home with. Stranded on a body with
+                // no flyer, gearing one comes first (fall through).
+                if ($has('metal') >= 4 && $hasShipEarly) {
                     return ['verb' => 'construct', 'args' => ['shape' => 'extractor', 'kind' => 'mine', 'body' => (string) $atBody], 'why' => "expansionist — an extractor on {$atBody} keeps paying after you fly home"];
                 }
             }

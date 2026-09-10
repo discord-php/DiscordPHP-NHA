@@ -1149,7 +1149,7 @@ final class AutoPlayer
                 // observation and the ladder fell back to "extractor for income"
                 // forever.
                 if ($colonyBoard !== [] && Ladder::atBody($rawObs) !== null) {
-                    $onSurface = (int) ($observation->get('altitude') ?? 0) === 0 && ! ($rawObs['in_space'] ?? false);
+                    $onSurface = Ladder::onBodySurface($rawObs);
                     $cInv = (array) $observation->getInventory();
                     $cInv['credits'] = (int) ($cInv['credits'] ?? $rawObs['credits'] ?? $observation->get('credits') ?? 0);
                     $ownExtractors = Ladder::ownedExtractors($colonyBoard, $agent_id);
@@ -1194,18 +1194,31 @@ final class AutoPlayer
                         || (! $onSurface && $verb === 'construct')
                     )) {
                         // Colony share funded and the pick is a doomed body
-                        // `construct`. Hand off to the expansionist flight
-                        // ladder — station-keep, ride the elevator, depart —
-                        // instead of re-issuing it. From this body's orbit that
-                        // means starting the trip home.
-                        $go = Ladder::suggestion($rawObs, $tried, $known, false, $stance, $departUnreachable)
-                            ?? $this->fallbackDecision($observation, 'colony work on this body is done — move on', $tried, $known, $researchPaying, $stance);
-                        if ($go !== null && ($go['verb'] ?? '') !== 'construct') {
-                            $decision = ['verb' => (string) $go['verb'], 'args' => (array) ($go['args'] ?? []), 'reason' => 'colony share funded — ' . (string) ($go['why'] ?? 'move on')];
-                            $verb = (string) $decision['verb'];
-                        } elseif ($onSurface || $ownExtractors >= Ladder::MAX_BODY_EXTRACTORS) {
-                            $decision = self::idle($rawObs, 'colony funded to your cap — nothing to build here');
-                            $verb = (string) $decision['verb'];
+                        // `construct`. Head home instead of re-issuing it.
+                        $fuel = (int) ($cInv['cryo_fuel'] ?? 0) + (int) ($cInv['hydrogen'] ?? 0) + (int) ($cInv['helium3'] ?? 0);
+                        $windows = (array) ($rawObs['expansion']['windows'] ?? []);
+                        $bodyWindowOpen = ! empty(((array) ($windows[(string) Ladder::atBody($rawObs)] ?? []))['open']);
+                        if (! $onSurface
+                            && Ladder::hasDepartCapableShip($rawObs, $departUnreachable)
+                            && $fuel >= 1 && $bodyWindowOpen) {
+                            // In the body's orbit, geared and fuelled, window
+                            // open → depart for Earth (no ladder rung covers the
+                            // return leg).
+                            $decision = ['verb' => 'depart', 'args' => ['dest' => 'earth'], 'reason' => 'colony share funded — depart ' . (string) Ladder::atBody($rawObs) . ' orbit for home'];
+                            $verb = 'depart';
+                        } else {
+                            // On the surface, or not flight-ready yet — hand to
+                            // the expansionist ladder (gear a flyer, stock fuel,
+                            // ride the tall elevator).
+                            $go = Ladder::suggestion($rawObs, $tried, $known, false, $stance, $departUnreachable)
+                                ?? $this->fallbackDecision($observation, 'colony work on this body is done — move on', $tried, $known, $researchPaying, $stance);
+                            if ($go !== null && ($go['verb'] ?? '') !== 'construct') {
+                                $decision = ['verb' => (string) $go['verb'], 'args' => (array) ($go['args'] ?? []), 'reason' => 'colony share funded — ' . (string) ($go['why'] ?? 'gear a flyer and head home')];
+                                $verb = (string) $decision['verb'];
+                            } elseif ($onSurface || $ownExtractors >= Ladder::MAX_BODY_EXTRACTORS) {
+                                $decision = self::idle($rawObs, 'colony funded to your cap — nothing to build here');
+                                $verb = (string) $decision['verb'];
+                            }
                         }
                     }
                 }
@@ -1266,14 +1279,14 @@ final class AutoPlayer
                     }
                 }
 
-                // Sanity-check any `depart` (model or ladder) before it goes
-                // out: it is only worth submitting when it is serviceable RIGHT
-                // NOW — the right destination, a window open, the 300-600
-                // altitude band, the arrival items on hand, not on a
-                // post-rejection cooldown, and not a body the ship has already
-                // proven it cannot reach (Venus TWR). Otherwise it is just
-                // rejected and the agent spams it every tick.
-                if ($verb === 'depart' && $stance === Stance::Expansionist->value) {
+                // Sanity-check an OUTBOUND `depart` (Earth orbit → a body)
+                // before it goes out: serviceable RIGHT NOW — right dest, window
+                // open, alt 300-600, arrival items on hand, off cooldown, not a
+                // proven-unreachable body. `depart {dest:'earth'}` is the
+                // RETURN leg from a body's orbit and is exempt (the colony
+                // guardrail only emits it geared, fuelled, window-open).
+                if ($verb === 'depart' && $stance === Stance::Expansionist->value
+                    && (string) ($decision['args']['dest'] ?? '') !== 'earth') {
                     $picked = (string) ($decision['args']['dest'] ?? '');
                     if (! $departNow || $picked !== $departServiceable) {
                         if ($departNow) {
@@ -1301,7 +1314,9 @@ final class AutoPlayer
                 // holding in Earth orbit. (Once `at_body` is set → on the
                 // surface → this stops.)
                 if (($body = Ladder::atBodyOrbit($rawObs)) !== null
-                    && ! in_array($verb, ['land_body', 'land_moon'], true)) {
+                    && ! in_array($verb, ['land_body', 'land_moon', 'depart'], true)) {
+                    // `depart` is exempt: from a body's orbit that is the
+                    // deliberate trip home once the colony share is funded.
                     $verb = in_array($body, ['moon', 'luna'], true) ? 'land_moon' : 'land_body';
                     $decision = ['verb' => $verb, 'args' => [], 'reason' => "reached {$body} — land and build the base"];
                 }
