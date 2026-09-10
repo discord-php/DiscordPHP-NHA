@@ -12,6 +12,21 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.38] - 2026-09-10
+
+### Fixed
+- **Venus kept a gearless hull looking flight-capable, so the agent held for a
+  window forever and never rebuilt.** `hasDepartCapableShip()` asked whether
+  *any* of the four bodies was still reachable. deimos / phobos / mars all land
+  in `agent_depart_unreachable` (each `depart`-rejected for a missing
+  `landing_gear` part), but venus needs an `acid_skin` the agent can't craft —
+  so `departTarget()` skips venus silently and it never enters the unreachable
+  set. That left the check permanently true: not stranded → no rebuild → parked
+  on `deposit` waiting for a window it can't take. The test is now against
+  `GameData::GEAR_BODIES` (deimos / phobos / mars) only; when all three are
+  rejected the hull is a dead end and the gear-up path builds a fresh,
+  gear-carrying flyer (`finalize` can't add a part to a built vehicle).
+
 ## [3.2.37] - 2026-09-09
 
 ### Fixed

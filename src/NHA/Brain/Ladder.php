@@ -492,13 +492,17 @@ final class Ladder
     }
 
     /**
-     * Whether the agent has a flying orbital ship that can still reach at least
-     * one expansion body. A hull that has been `depart`-rejected for every
-     * destination — no `landing_gear` for the moons/Mars, and too little
-     * thrust-to-weight for Venus — is a dead end: `finalize` bundles parts into
-     * ONE vehicle and cannot be amended, so the mission needs a fresh build.
+     * Whether the agent has a flying orbital ship that can still reach a
+     * mission body. The bar is the three GEAR bodies — deimos, phobos, mars
+     * (moons + Mars, TWR ≤ 0.7). Once every one of those is in `$unreachable`
+     * (each `depart`-rejected for a missing `landing_gear` part, which
+     * `finalize` cannot add to a built hull), the ship is a dead end and the
+     * mission needs a fresh, gear-carrying build. Venus is deliberately NOT
+     * counted: it needs TWR 0.9 *and* an `acid_skin` the agent can't craft, so
+     * `departTarget()` skips it silently and it never enters `$unreachable` —
+     * left in the test it would keep a stranded hull looking "capable" forever.
      * When this is false but {@see hasOrbitalShip()} is true, the gear-up path
-     * runs again for a new (this time gear-carrying) flyer.
+     * runs again for a new flyer.
      *
      * @param array<string,mixed> $raw
      * @param list<string>        $unreachable dests every `depart` was rejected for (state: `agent_depart_unreachable`)
@@ -509,7 +513,7 @@ final class Ladder
             return false;
         }
 
-        return array_diff(array_keys(self::DEPART_ORDER), $unreachable) !== [];
+        return array_diff(GameData::GEAR_BODIES, $unreachable) !== [];
     }
 
     /**

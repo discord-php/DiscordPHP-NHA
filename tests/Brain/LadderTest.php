@@ -473,8 +473,12 @@ class LadderTest extends NHAUnitTestCase
         $all = ['deimos', 'phobos', 'mars', 'venus'];
 
         $this->assertTrue(Ladder::hasDepartCapableShip($ship));
-        $this->assertTrue(Ladder::hasDepartCapableShip($ship, ['deimos', 'phobos']), 'mars/venus still open');
+        $this->assertTrue(Ladder::hasDepartCapableShip($ship, ['deimos', 'phobos']), 'mars still open');
         $this->assertFalse(Ladder::hasDepartCapableShip($ship, $all), 'nowhere left to go');
+        // The real stall: the three gear bodies are all rejected but venus was
+        // never listed (departTarget skips it — no acid_skin), so the old
+        // all-of-DEPART_ORDER test kept the dead hull looking "capable".
+        $this->assertFalse(Ladder::hasDepartCapableShip($ship, ['deimos', 'phobos', 'mars']), 'venus does not keep a gearless hull alive');
         $this->assertFalse(Ladder::hasDepartCapableShip(['vehicles' => []], []), 'no ship at all');
 
         // On the ground with the dead-end ship + parts stock → GEAR UP a new
