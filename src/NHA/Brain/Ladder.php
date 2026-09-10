@@ -821,12 +821,9 @@ final class Ladder
                 return $buy('silicon', 6, 'ship — buy silicon for chips');
             }
         }
-        // bearing (propeller thrust) — `combine metal+oil` currently mints
-        // superalloy, not a bearing (the world's physics-tag matcher drifted),
-        // which spun the gear-up forever. It is a depot good — just BUY it.
-        if ($has('bearing') < 3 && $credits >= 90) {
-            return $buy('bearing', 3, 'ship — buy bearings (the metal+oil craft mints superalloy here)');
-        }
+        // No bearing step: it can't be obtained (see SHIP_PART_UPGRADE) and the
+        // propellers are built bare.
+
         // ion_thruster — the orbital drive (goes on the jet → orbital_engine).
         // The depot stocks it; the craft is fusion fuel + motor + chip.
         if ($has('ion_thruster') === 0) {
@@ -901,10 +898,16 @@ final class Ladder
         'wing' => 3, 'tail' => 1, 'fuel_tank' => 2, 'landing_gear' => 1,
     ];
 
-    /** `part => the upgrade item to fit` (from `PART_UPGRADES` in the engine — lightest / strongest). */
+    /**
+     * `part => the upgrade item to fit` (from `PART_UPGRADES` in the engine —
+     * lightest / strongest). `propeller` has NO entry on purpose: its `bearing`
+     * upgrade can't be obtained in the live world (`combine metal+oil` mints
+     * superalloy, the depot doesn't trade it), and a bare-propeller flyer still
+     * flies and clears the deimos/phobos/mars depart gates ({@see GameData::assess()}).
+     */
     public const SHIP_PART_UPGRADE = [
         'frame' => 'composite', 'cockpit' => 'chip', 'jet' => 'ion_thruster',
-        'engine' => 'engine', 'propeller' => 'bearing', 'wing' => 'composite',
+        'engine' => 'engine', 'wing' => 'composite',
         'fuel_tank' => 'casing', 'wheel' => 'alloy', 'tail' => 'alloy',
     ];
 

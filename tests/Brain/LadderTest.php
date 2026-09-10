@@ -317,18 +317,20 @@ class LadderTest extends NHAUnitTestCase
      * @covers \NHA\Brain\Ladder::suggestion
      */
     /**
-     * The `bearing` upgrade is bought, not combined — `combine metal+oil` mints
-     * superalloy in this world and used to spin the gear-up forever.
+     * `bearing` can't be obtained in the live world, so nothing chases it:
+     * propellers have no upgrade and `shipCraftStep` never returns a bearing
+     * step even when the bundle wants propellers.
      *
      * @covers \NHA\Brain\Ladder::shipCraftStep
      */
-    public function testShipCraftStepBuysBearingsRatherThanCombiningThem(): void
+    public function testTheUnobtainableBearingUpgradeIsNotChased(): void
     {
-        // Frame / cockpit upgrades satisfied, bearing short, credits on hand.
-        $step = Ladder::shipCraftStep(['composite' => 6, 'chip' => 2, 'wire' => 6, 'bearing' => 0, 'metal' => 20, 'oil' => 10, 'credits' => 5000]);
+        $this->assertArrayNotHasKey('propeller', Ladder::SHIP_PART_UPGRADE);
 
-        $this->assertSame('buy', $step['verb']);
-        $this->assertSame('bearing', $step['args']['resource']);
+        // Everything else satisfied, no bearing → craft step is done (null),
+        // never a bearing combine or buy.
+        $step = Ladder::shipCraftStep(['composite' => 6, 'chip' => 2, 'wire' => 6, 'ion_thruster' => 1, 'bearing' => 0, 'metal' => 20, 'oil' => 10, 'credits' => 5000]);
+        $this->assertNull($step);
     }
 
     public function testExpansionistGearsTheShipBeforeRidingUp(): void

@@ -12,6 +12,18 @@ SemVer with the **major tracking the NHA world API version**.
   the loop guard, and a component diagram. Update it alongside any change to
   that logic.
 
+## [3.2.42] - 2026-09-10
+
+### Fixed
+- **`bearing` is unobtainable — stop chasing it.** The propeller upgrade
+  `bearing` can't be made (`combine metal+oil` mints superalloy) or bought
+  ("depot doesn't trade bearing"), so 3.2.40/3.2.41's buy path just spun on
+  rejections until the engine's own "loop detected" kicked in. `propeller` is
+  removed from `SHIP_PART_UPGRADE` and the bearing step from
+  `Ladder::shipCraftStep()`; propellers build bare. A bare-propeller flyer
+  still flies (thrust 2800 / mass 880) and clears the deimos/phobos/mars
+  `depart` gates — `GameData::assess()` confirms.
+
 ## [3.2.41] - 2026-09-10
 
 ### Fixed
