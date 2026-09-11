@@ -487,4 +487,25 @@ class StateStoreTest extends NHAUnitTestCase
         // Per-agent.
         $this->assertNull($reloaded->goingHome(8));
     }
+
+    /**
+     * @covers \NHA\State\LoopStrategyStateTrait
+     */
+    public function testColonyDoneBodiesAreRecordedDeduplicatedAndPerAgent(): void
+    {
+        $store = new StateStore($this->path);
+
+        $this->assertSame([], $store->colonyDoneBodies(7));
+        $store->recordColonyDone(7, 'deimos');
+        $store->recordColonyDone(7, 'deimos');
+        $store->recordColonyDone(7, 'phobos');
+        $this->assertSame(['deimos', 'phobos'], $store->colonyDoneBodies(7));
+        $this->assertSame([], $store->colonyDoneBodies(8), 'per-agent');
+
+        $store->clearColonyDone(7, 'deimos');
+        $this->assertSame(['phobos'], $store->colonyDoneBodies(7));
+
+        $reloaded = new StateStore($this->path);
+        $this->assertSame(['phobos'], $reloaded->colonyDoneBodies(7));
+    }
 }

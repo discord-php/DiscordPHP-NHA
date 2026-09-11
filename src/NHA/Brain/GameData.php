@@ -196,6 +196,14 @@ final class GameData
         'steel' => ['iron' => 1, 'carbon' => 1],
         'alloy' => ['metal' => 2],
         'ion_thruster' => ['helium3' => 1],
+        // The Venus arrival chain (`GET /rules`, verified 2026-09-11): every
+        // ingredient here is a raw the Earth depot trades, so it is fully
+        // buildable from a `buy` + three `combine`s with no mining needed.
+        // {@see \NHA\Brain\Ladder::acidSkinStep()} walks it turn by turn.
+        'plastic' => ['oil' => 1, 'carbon' => 1],
+        'rubber' => ['sulfur' => 1, 'plastic' => 1],
+        'acid' => ['sulfur' => 1, 'water' => 1],
+        'acid_skin' => ['acid' => 1, 'rubber' => 1],
     ];
 
     /**

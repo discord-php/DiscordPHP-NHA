@@ -959,7 +959,14 @@ final class AutoPlayer
                 $this->state->capabilityTargets($agent_id, 'depart'),
             )));
             $departCooldown = $this->state->departRetryCooldownActive($agent_id, $tick);
-            $departServiceable = Ladder::departTarget($rawObs, $departUnreachable); // null unless a window we can take is open
+            // Destination SELECTION additionally skips a body whose colony this
+            // agent already funded to its cap — so the next trip spreads to
+            // phobos / mars / venus instead of camping on the first body
+            // reached. Kept separate from `$departUnreachable` (a proven TWR /
+            // gear failure), which also feeds `hasDepartCapableShip()`'s
+            // dead-hull check and must not be inflated by "already done here".
+            $departSelectSkip = array_values(array_unique(array_merge($departUnreachable, $this->state->colonyDoneBodies($agent_id))));
+            $departServiceable = Ladder::departTarget($rawObs, $departSelectSkip); // null unless a window we can take is open
             $departNow = $departServiceable !== null && ! $departCooldown;
             // The current hull has been `depart`-rejected for every body — a
             // dead end. Don't hold or force-depart; let the ladder gear a fresh
@@ -1175,6 +1182,13 @@ final class AutoPlayer
 
                     if ($colonyDoneForMe && Ladder::atBody($rawObs) !== null) {
                         $this->state->setGoingHome($agent_id, (string) Ladder::atBody($rawObs));
+                        // Confirmed against a real fetched board (not just the
+                        // latch) — remember it so `departTarget()` sends the
+                        // NEXT trip to a body that still has work, instead of
+                        // camping on the one already funded.
+                        if ($hasRealBoard) {
+                            $this->state->recordColonyDone($agent_id, (string) Ladder::atBody($rawObs));
+                        }
                     }
                     // Drop the latch on a positive "home / on the way" signal.
                     $loc = (string) ($ex['location'] ?? '');

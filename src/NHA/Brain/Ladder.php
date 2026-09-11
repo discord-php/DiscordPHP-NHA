@@ -1014,6 +1014,60 @@ final class Ladder
     }
 
     /**
+     * Craft (or buy toward) an `acid_skin` — Venus's second arrival item,
+     * alongside `heat_shield`. The real chain, from `GET /rules`
+     * (`GameData::CRAFT_INPUTS`): `acid_skin = acid + rubber`,
+     * `rubber = sulfur + plastic`, `plastic = oil + carbon`,
+     * `acid = sulfur + water` — four raws, all on the Earth depot, three
+     * sequential combines. One step per call; climbs the chain bottom-up as
+     * each precursor becomes available, so it is safe to call every turn
+     * while gearing up or holding for a window.
+     *
+     * @param array<string,int|float> $inv
+     *
+     * @return array{verb:string,args:array<string,mixed>,why:string}|null `null` once `acid_skin` is held
+     */
+    public static function acidSkinStep(array $inv, int $credits): ?array
+    {
+        $has = static fn(string $k): int => (int) ($inv[$k] ?? 0);
+        if ($has('acid_skin') > 0) {
+            return null;
+        }
+        if ($has('acid') > 0 && $has('rubber') > 0) {
+            return ['verb' => 'combine', 'args' => ['ingredients' => ['acid' => 1, 'rubber' => 1]], 'why' => 'combine acid_skin (acid + rubber) for the Venus leg'];
+        }
+        if ($has('rubber') === 0) {
+            if ($has('sulfur') > 0 && $has('plastic') > 0) {
+                return ['verb' => 'combine', 'args' => ['ingredients' => ['sulfur' => 1, 'plastic' => 1]], 'why' => 'combine rubber (sulfur + plastic) toward acid_skin'];
+            }
+            if ($has('plastic') === 0) {
+                if ($has('oil') > 0 && $has('carbon') > 0) {
+                    return ['verb' => 'combine', 'args' => ['ingredients' => ['oil' => 1, 'carbon' => 1]], 'why' => 'combine plastic (oil + carbon) toward acid_skin'];
+                }
+                if ($credits >= 40) {
+                    $buy = $has('oil') === 0 ? 'oil' : 'carbon';
+
+                    return ['verb' => 'buy', 'args' => ['resource' => $buy, 'n' => 6], 'why' => "buy {$buy} to craft plastic toward acid_skin"];
+                }
+            } elseif ($credits >= 40) {
+                return ['verb' => 'buy', 'args' => ['resource' => 'sulfur', 'n' => 6], 'why' => 'buy sulfur to craft rubber toward acid_skin'];
+            }
+        }
+        if ($has('acid') === 0) {
+            if ($has('sulfur') > 0 && $has('water') > 0) {
+                return ['verb' => 'combine', 'args' => ['ingredients' => ['sulfur' => 1, 'water' => 1]], 'why' => 'combine acid (sulfur + water) toward acid_skin'];
+            }
+            if ($credits >= 40) {
+                $buy = $has('sulfur') === 0 ? 'sulfur' : 'water';
+
+                return ['verb' => 'buy', 'args' => ['resource' => $buy, 'n' => 6], 'why' => "buy {$buy} to craft acid toward acid_skin"];
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * The first still-incomplete module on a colony board (the decoded
      * `GET /colony/{body}` body), or `null` when the colony is done / the board
      * is empty / the only outstanding modules are waiting on other funders.
@@ -1743,6 +1797,11 @@ final class Ladder
                         return ['verb' => 'buy', 'args' => ['resource' => 'superalloy', 'n' => 1], 'why' => 'expansionist — stock a heat_shield for the Mars/Venus legs while holding'];
                     }
                 }
+                // Venus additionally needs an acid_skin — pack it too so a
+                // Venus window is actually takeable, not just Mars's.
+                if (($skin = self::acidSkinStep($inv, $credits)) !== null) {
+                    return ['verb' => $skin['verb'], 'args' => $skin['args'], 'why' => 'expansionist — ' . $skin['why'] . ' while holding for a window'];
+                }
                 // Mine an asteroid only when one is genuinely dockable — `dock`
                 // needs to be within 2 cells, and loop-break is suppressed while
                 // holding, so a `dock` that keeps missing would spin forever.
@@ -1819,6 +1878,11 @@ final class Ladder
                     if ($has('superalloy') === 0 && $credits >= 60) {
                         return ['verb' => 'buy', 'args' => ['resource' => 'superalloy', 'n' => 1], 'why' => 'expansionist — buy superalloy toward a heat_shield'];
                     }
+                }
+                // Pack an acid_skin too — Venus needs it on top of heat_shield,
+                // and it is cheap to build before launch (four Earth-depot raws).
+                if (($skin = self::acidSkinStep($inv, $credits)) !== null) {
+                    return ['verb' => $skin['verb'], 'args' => $skin['args'], 'why' => 'expansionist — ' . $skin['why']];
                 }
 
                 // 3. BUILD the flyer to SHIP_BUNDLE_TARGET, each part fitted

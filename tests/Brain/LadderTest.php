@@ -510,6 +510,70 @@ class LadderTest extends NHAUnitTestCase
         $this->assertNull(Ladder::acquire('nickel', 0, ['position' => [0, 0]], ['credits' => 9999]), 'already have enough');
     }
 
+    // ── acidSkinStep() — the Venus arrival-item chain ──────────────────
+
+    /**
+     * @covers \NHA\Brain\Ladder::acidSkinStep
+     */
+    public function testAcidSkinStepIsNullOnceHeld(): void
+    {
+        $this->assertNull(Ladder::acidSkinStep(['acid_skin' => 1], 9999));
+    }
+
+    /**
+     * @covers \NHA\Brain\Ladder::acidSkinStep
+     */
+    public function testAcidSkinStepClimbsTheChainBottomUpAsPrecursorsArrive(): void
+    {
+        // Nothing at all, but credits → buy oil first (plastic's first missing raw).
+        $step = Ladder::acidSkinStep([], 9999);
+        $this->assertSame('buy', $step['verb']);
+        $this->assertSame('oil', $step['args']['resource']);
+
+        // oil in hand, carbon still missing → buy carbon.
+        $step = Ladder::acidSkinStep(['oil' => 6], 9999);
+        $this->assertSame('buy', $step['verb']);
+        $this->assertSame('carbon', $step['args']['resource']);
+
+        // oil + carbon on hand → combine plastic.
+        $step = Ladder::acidSkinStep(['oil' => 6, 'carbon' => 6], 9999);
+        $this->assertSame('combine', $step['verb']);
+        $this->assertSame(['oil' => 1, 'carbon' => 1], $step['args']['ingredients']);
+
+        // plastic made, no sulfur yet → buy sulfur (for rubber).
+        $step = Ladder::acidSkinStep(['plastic' => 6], 9999);
+        $this->assertSame('buy', $step['verb']);
+        $this->assertSame('sulfur', $step['args']['resource']);
+
+        // sulfur + plastic → combine rubber.
+        $step = Ladder::acidSkinStep(['plastic' => 6, 'sulfur' => 6], 9999);
+        $this->assertSame('combine', $step['verb']);
+        $this->assertSame(['sulfur' => 1, 'plastic' => 1], $step['args']['ingredients']);
+
+        // rubber made, no water yet (for acid) → buy water.
+        $step = Ladder::acidSkinStep(['rubber' => 6, 'sulfur' => 6], 9999);
+        $this->assertSame('buy', $step['verb']);
+        $this->assertSame('water', $step['args']['resource']);
+
+        // sulfur + water → combine acid.
+        $step = Ladder::acidSkinStep(['rubber' => 6, 'sulfur' => 6, 'water' => 6], 9999);
+        $this->assertSame('combine', $step['verb']);
+        $this->assertSame(['sulfur' => 1, 'water' => 1], $step['args']['ingredients']);
+
+        // acid + rubber both held → the final combine.
+        $step = Ladder::acidSkinStep(['acid' => 1, 'rubber' => 1], 9999);
+        $this->assertSame('combine', $step['verb']);
+        $this->assertSame(['acid' => 1, 'rubber' => 1], $step['args']['ingredients']);
+    }
+
+    /**
+     * @covers \NHA\Brain\Ladder::acidSkinStep
+     */
+    public function testAcidSkinStepIsNullWhenBrokeAndMissingRaws(): void
+    {
+        $this->assertNull(Ladder::acidSkinStep([], 0));
+    }
+
     /**
      * @covers \NHA\Brain\Ladder::suggestion
      */
@@ -609,7 +673,7 @@ class LadderTest extends NHAUnitTestCase
             'elevators' => [['x' => 10, 'y' => 10]], 'nearby_deposits' => [],
         ];
         // Everything a flyer part could need on hand, so the craft chain is quiet.
-        $stocked = ['metal' => 120, 'crystal' => 20, 'composite' => 10, 'chip' => 4, 'bearing' => 4, 'wire' => 8, 'ion_thruster' => 1, 'cryo_fuel' => 3, 'heat_shield' => 1, 'credits' => 8000];
+        $stocked = ['metal' => 120, 'crystal' => 20, 'composite' => 10, 'chip' => 4, 'bearing' => 4, 'wire' => 8, 'ion_thruster' => 1, 'cryo_fuel' => 3, 'heat_shield' => 1, 'acid_skin' => 1, 'credits' => 8000];
 
         // A finished flyer bundle (cockpit + 3 engines + 2 propellers + 3 wings
         // + jet + fuel_tank) → finalize.
@@ -845,7 +909,7 @@ class LadderTest extends NHAUnitTestCase
         // STATION-KEEP: dropped below the 300 depart floor with a tall elevator
         // on the cell → bounce it (ride down, the on-ground rung rides back up)
         // rather than idle straight past the band while a window is shut.
-        $keep = $orbit(['credits' => 4000, 'cryo_fuel' => 120, 'heat_shield' => 1]);
+        $keep = $orbit(['credits' => 4000, 'cryo_fuel' => 120, 'heat_shield' => 1, 'acid_skin' => 1]);
         $keep['altitude'] = 250;
         $keep['position'] = [30, 110];
         $keep['elevators'] = [['id' => 1, 'x' => 30, 'y' => 110, 'height' => 680, 'dist' => 0]];
@@ -860,12 +924,12 @@ class LadderTest extends NHAUnitTestCase
         $this->assertSame('cryo_fuel', $buyFuel['args']['resource']);
 
         // Fuelled + shielded + no asteroid → a real idle (deposit), never land / mine.
-        $idle = Ladder::suggestion($orbit(['credits' => 4000, 'cryo_fuel' => 120, 'heat_shield' => 1]), [], [], false, 'expansionist');
+        $idle = Ladder::suggestion($orbit(['credits' => 4000, 'cryo_fuel' => 120, 'heat_shield' => 1, 'acid_skin' => 1]), [], [], false, 'expansionist');
         $this->assertContains($idle['verb'], ['deposit', 'move']);
 
         // An asteroid in view but OUT of dock range (dist > 2) → idle, not a
         // `dock` that would miss every turn (loop-break is suppressed here).
-        $far = $orbit(['credits' => 4000, 'cryo_fuel' => 120, 'heat_shield' => 1]);
+        $far = $orbit(['credits' => 4000, 'cryo_fuel' => 120, 'heat_shield' => 1, 'acid_skin' => 1]);
         $far['asteroids'] = [['id' => 1, 'x' => 40, 'y' => 40, 'dist' => 4]];
         $this->assertContains(Ladder::suggestion($far, [], [], false, 'expansionist')['verb'], ['deposit', 'move']);
 

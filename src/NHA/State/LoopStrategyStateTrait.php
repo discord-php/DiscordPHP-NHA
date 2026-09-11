@@ -242,6 +242,45 @@ trait LoopStrategyStateTrait
     }
 
     /**
+     * Bodies this agent has already funded its full colony share on (or whose
+     * colony is complete) — so `depart` stops re-offering the SAME body every
+     * cycle and the mission actually spreads across deimos / phobos / mars /
+     * venus instead of camping on the first one reached. Pure state; the
+     * skip-list semantics live in the caller ({@see \NHA\Brain\Ladder::departTarget()}).
+     *
+     * @since 3.4.9
+     */
+    public function recordColonyDone(int $agent_id, string $body): void
+    {
+        $key = (string) $agent_id;
+        $done = array_values(array_filter((array) ($this->data['agent_colony_done'][$key] ?? []), 'is_string'));
+        if (in_array($body, $done, true)) {
+            return;
+        }
+        $done[] = $body;
+        $this->data['agent_colony_done'][$key] = $done;
+        $this->save();
+    }
+
+    /** @return list<string> @since 3.4.9 */
+    public function colonyDoneBodies(int $agent_id): array
+    {
+        return array_values(array_filter((array) ($this->data['agent_colony_done'][(string) $agent_id] ?? []), 'is_string'));
+    }
+
+    /** Forgets a body is colony-done (e.g. a new module opened up there). @since 3.4.9 */
+    public function clearColonyDone(int $agent_id, string $body): void
+    {
+        $key = (string) $agent_id;
+        $done = array_values(array_filter((array) ($this->data['agent_colony_done'][$key] ?? []), static fn($b): bool => $b !== $body));
+        if ($done === (array) ($this->data['agent_colony_done'][$key] ?? [])) {
+            return;
+        }
+        $this->data['agent_colony_done'][$key] = $done;
+        $this->save();
+    }
+
+    /**
      * Records the agent's stance. `$tick` is only stamped when the stance
      * actually changes, so it marks the last *switch* for the dwell timer.
      *

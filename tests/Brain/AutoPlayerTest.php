@@ -919,7 +919,7 @@ class AutoPlayerTest extends NHAUnitTestCase
         return $this->nhaWith([
             'tick' => 500, 'downed_until' => 0, 'position' => [30, 110],
             'in_space' => true, 'altitude' => 560,
-            'inventory' => $extraInv + ['credits' => 4000, 'cryo_fuel' => 2, 'heat_shield' => 1,
+            'inventory' => $extraInv + ['credits' => 4000, 'cryo_fuel' => 2, 'heat_shield' => 1, 'acid_skin' => 1,
                 'stimpack' => 1, 'kinetic_gun' => 1, 'slug' => 5],
             'vehicles' => [['name' => 'skiff', 'flies' => true, 'orbital_engine' => true]],
             'expansion' => ['at_body' => null, 'windows' => ['deimos' => ['open' => false], 'mars' => ['open' => false]]],
@@ -1015,6 +1015,38 @@ class AutoPlayerTest extends NHAUnitTestCase
 
         $this->assertSame('depart', $this->posts[0][1]['verb']);
         $this->assertSame('deimos', $this->posts[0][1]['args']['dest']);
+    }
+
+    /**
+     * A body this agent has already funded its colony share on is skipped for
+     * destination SELECTION — even with its window open and cheaper — so the
+     * mission spreads across the whole system instead of camping on the first
+     * body reached.
+     *
+     * @covers \NHA\Brain\AutoPlayer::step
+     */
+    public function testADepartWindowForAColonyDoneBodyIsSkippedInFavourOfTheNextOne(): void
+    {
+        $state = new StateStore($this->statePath);
+        $state->recordColonyDone(142287, 'deimos');
+
+        $nha = $this->nhaWith([
+            'tick' => 500, 'downed_until' => 0, 'position' => [30, 110],
+            'in_space' => true, 'altitude' => 480,
+            'inventory' => ['credits' => 3000, 'cryo_fuel' => 95, 'heat_shield' => 1,
+                'stimpack' => 1, 'kinetic_gun' => 1, 'slug' => 5],
+            'vehicles' => [['name' => 'skiff', 'flies' => true, 'orbital_engine' => true]],
+            // deimos (already funded) AND mars both have an open window; the
+            // hard-coded cheapest-first order would normally pick deimos.
+            'expansion' => ['at_body' => null, 'windows' => ['deimos' => ['open' => true], 'mars' => ['open' => true]]],
+            'asteroids' => [],
+        ]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"mine","args":{"n":15,"resource":"crystal"}}'), $state);
+
+        $player->step(142287, 'tok');
+
+        $this->assertSame('depart', $this->posts[0][1]['verb']);
+        $this->assertSame('mars', $this->posts[0][1]['args']['dest'], 'deimos is skipped — its colony share is already funded');
     }
 
     /**

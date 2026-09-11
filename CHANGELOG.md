@@ -6,6 +6,36 @@ SemVer with the **major tracking the NHA world API version**.
 
 ## [Unreleased]
 
+## [3.4.9] - 2026-09-11
+
+### Added
+- **The mission can now actually reach every body — Deimos, Phobos, Mars,
+  *and* Venus — instead of only ever revisiting the first one it could reach.**
+  Two gaps closed:
+  - **`acid_skin` was never craftable.** Venus needs `heat_shield` *and*
+    `acid_skin` on arrival; only `heat_shield` was ever packed, so
+    `Ladder::departTarget()` silently skipped Venus forever regardless of its
+    window. New `Ladder::acidSkinStep()` walks the real chain (verified live
+    against `GET /rules`): `acid_skin = acid + rubber`, `rubber = sulfur +
+    plastic`, `plastic = oil + carbon`, `acid = sulfur + water` — four
+    Earth-depot raws, three sequential combines, one step per call. Wired in
+    alongside the existing `heat_shield` packing (Earth gear-up + holding for
+    a window), so a fully-geared ship now carries both Mars and Venus items.
+  - **A funded colony's body was never excluded from future `depart` picks.**
+    `DEPART_ORDER` is fixed cheapest-first (deimos, phobos, mars, venus) with
+    no notion of "already done here", so once Deimos was reachable the agent
+    would return to it forever rather than move on. New
+    `StateStore::recordColonyDone()` / `colonyDoneBodies()` / `clearColonyDone()`:
+    recorded the moment this agent's colony share on a body is funded, and
+    merged into `departTarget()`'s skip list for destination *selection* only
+    (kept separate from `$departUnreachable`, which also feeds
+    `hasDepartCapableShip()`'s dead-hull check and must stay a pure TWR/gear
+    fact) — so the next open window sends it to a body that still has work.
+
+`GameData::CRAFT_INPUTS` gained `plastic` / `rubber` / `acid` / `acid_skin`
+entries documenting the chain. Full suite green (278 tests, 869 assertions);
+php-cs-fixer clean.
+
 ## [3.4.8] - 2026-09-11
 
 ### Fixed

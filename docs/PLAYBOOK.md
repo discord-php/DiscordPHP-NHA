@@ -134,6 +134,27 @@ set the moment the share is funded and read every turn instead of
 re-deriving "heading home" from those fields; it clears only once `location`
 reports Earth or the agent is in transit to it.
 
+**Visiting the whole system, not just the first reachable body.**
+`Ladder::DEPART_ORDER` (`deimos, phobos, mars, venus`, cheapest Δv first) has
+no notion of "already done here" — `departTarget()` just returns the first
+one whose window is open and whose arrival items are held. Two things used to
+cap that at "wherever the agent reached first":
+
+  - **Venus's second item, `acid_skin`, was never craftable** (only
+    `heat_shield` was packed), so `departTarget()` silently skipped Venus
+    forever. `Ladder::acidSkinStep()` climbs the real chain from `GET /rules`
+    (`acid_skin = acid + rubber`, `rubber = sulfur + plastic`,
+    `plastic = oil + carbon`, `acid = sulfur + water` — four Earth-depot raws,
+    three combines) one step per call, wired in next to the `heat_shield`
+    packing (gear-up + holding for a window).
+  - **A funded colony's body stayed in `DEPART_ORDER`'s rotation forever.**
+    `StateStore::recordColonyDone()` marks a body once this agent's colony
+    share there is funded ({@see "Colony board"} above); `colonyDoneBodies()`
+    is merged into `departTarget()`'s skip list for destination *selection*
+    only — kept OUT of `$departUnreachable` (a proven TWR/gear fact that also
+    drives `hasDepartCapableShip()`'s dead-hull check) — so the next open
+    window sends the agent to a body that still needs it.
+
 ---
 
 ## The deterministic ladder — `Ladder::suggestion()`
