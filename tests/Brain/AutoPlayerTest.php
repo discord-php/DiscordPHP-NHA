@@ -1377,6 +1377,43 @@ class AutoPlayerTest extends NHAUnitTestCase
     }
 
     /**
+     * Share funded, on the moon's surface, low on return fuel → stock cryo_fuel.
+     * And a model `depart {dest:'deimos'}` (departing to where it already is —
+     * the fuel-burning loop) is never let through.
+     *
+     * @covers \NHA\Brain\AutoPlayer::step
+     */
+    public function testShareFundedOnTheSurfaceLowOnFuelStocksItAndNeverDepartsToTheCurrentBody(): void
+    {
+        $state = new StateStore($this->statePath);
+
+        $nha = $this->nhaWith([
+            'tick' => 1300, 'downed_until' => 0, 'position' => [30, 110],
+            'in_space' => true, 'altitude' => 440,
+            'inventory' => ['credits' => 11000, 'cryo_fuel' => 19,
+                'stimpack' => 1, 'kinetic_gun' => 1, 'slug' => 5],
+            'vehicles' => [['name' => 'flyer', 'flies' => true, 'orbital_engine' => true]],
+            'expansion' => [
+                'location' => 'on_deimos', 'place' => ['where' => 'body_surface', 'body' => 'deimos'],
+                'at_body' => 'deimos', 'return_dv' => 45,
+                'windows' => ['deimos' => ['open' => false, 'opens_in' => 300]],
+            ],
+            'elevators' => [['x' => 30, 'y' => 110, 'height' => 680]],
+            'body' => 'deimos', 'cap_pct_per_agent' => 60, 'complete' => true,
+            'modules' => [['module' => 'mass_driver', 'complete' => true, 'need' => [], 'remaining' => [], 'contrib' => []]],
+            'extractors' => [],
+        ]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"depart","args":{"dest":"deimos"}}'), $state);
+
+        $player->step(142285, 'tok');
+
+        $post = $this->posts[0][1];
+        $this->assertNotSame('depart', $post['verb'], 'never depart to the body you are already on');
+        $this->assertSame('buy', $post['verb']);
+        $this->assertSame('cryo_fuel', $post['args']['resource']);
+    }
+
+    /**
      * The engine's named buildable `kind` for the body is adopted when the feed
      * has no materials shortfall to act on — the model's bad `shape`/`kind` is
      * replaced with exactly what the engine asked for.

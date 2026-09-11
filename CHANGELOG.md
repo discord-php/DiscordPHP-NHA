@@ -6,6 +6,23 @@ SemVer with the **major tracking the NHA world API version**.
 
 ## [Unreleased]
 
+## [3.4.7] - 2026-09-11
+
+### Fixed
+- **Burned ~80 cryo_fuel over 4 hours `depart`-ing to the moon it was already
+  on.** When `expansion.at_body` / `at_body_orbit` momentarily glitched to
+  empty while the agent sat on Deimos, `Ladder::departTarget()` read it as
+  Earth orbit and — Deimos's window being open — offered **`deimos`** as a
+  serviceable target. The model / a loop-break then fired `depart {dest:
+  'deimos'}`, which burns fuel and goes nowhere, on repeat (fuel 101 → 19).
+  `departTarget()` now also bails on `onBodySurface()` / a non-Earth
+  `expansion.location`, and the colony guardrail's "share funded" branch is a
+  strict state machine — the ONLY `depart` it can emit is `{dest:'earth'}`
+  from a body's orbit with fuel and an open window; otherwise it stocks
+  cryo_fuel to `return_dv + 15`, rides the tall elevator near the window, or
+  idles. It no longer defers to `Ladder::suggestion()` (which returned
+  dock/mine churn) or lets a model `depart` through.
+
 ## [3.4.6] - 2026-09-10
 
 ### Fixed

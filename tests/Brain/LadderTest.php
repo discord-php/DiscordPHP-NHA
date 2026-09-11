@@ -937,6 +937,17 @@ class LadderTest extends NHAUnitTestCase
         $high['altitude'] = 601;
         $this->assertNull(Ladder::departTarget($high));
 
+        // Associated with a body (surface / orbit / `location`) is NOT an
+        // Earth-orbit depart context — even in the 300-600 band with an open
+        // window it must not offer that (or any) body. Prevents `depart` to the
+        // moon you are already at.
+        $atMoon = $orbit(['deimos' => ['open' => true]], ['cryo_fuel' => 80]);
+        $atMoon['expansion']['location'] = 'on_deimos';
+        $this->assertNull(Ladder::departTarget($atMoon));
+        $atMoonOrbit = $orbit(['deimos' => ['open' => true]], ['cryo_fuel' => 80]);
+        $atMoonOrbit['expansion']['at_body_orbit'] = 'deimos';
+        $this->assertNull(Ladder::departTarget($atMoonOrbit));
+
         // a destination in the unreachable list is skipped → next cheapest wins.
         $twoOpen = $orbit(['deimos' => ['open' => true], 'phobos' => ['open' => true]], ['cryo_fuel' => 80]);
         $this->assertSame('phobos', Ladder::departTarget($twoOpen, ['deimos']));

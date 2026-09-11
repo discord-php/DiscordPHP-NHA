@@ -669,7 +669,17 @@ final class Ladder
         if (self::inTransit($raw) || ! ($raw['in_space'] ?? false) || $alt < 300 || $alt > 600) {
             return null;
         }
-        if (self::atBody($raw) !== null || ! self::hasOrbitalShip($raw)) {
+        // Outbound `depart` is EARTH-orbit only. Bail whenever the agent is
+        // associated with a body at all — `at_body` / `at_body_orbit` set, on a
+        // body's surface, or `location` naming one — even if one of those
+        // fields momentarily glitches (which had `departTarget` offering the
+        // agent's OWN moon as a target, and the model burning ~40 fuel a shot
+        // `depart`-ing to where it already was).
+        $loc = (string) (((array) ($raw['expansion'] ?? []))['location'] ?? '');
+        if (self::atBody($raw) !== null
+            || self::onBodySurface($raw)
+            || ($loc !== '' && ! in_array($loc, ['earth', 'space', 'orbit', 'earth_orbit'], true))
+            || ! self::hasOrbitalShip($raw)) {
             return null;
         }
         $inv = (array) ($raw['inventory'] ?? []);
