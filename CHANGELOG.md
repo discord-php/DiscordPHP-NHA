@@ -6,6 +6,26 @@ SemVer with the **major tracking the NHA world API version**.
 
 ## [Unreleased]
 
+## [3.4.11] - 2026-09-11
+
+### Fixed
+- **A hull with nowhere useful left to go was reported "capable" forever.**
+  `Ladder::hasDepartCapableShip()` only checks deimos/phobos/mars
+  (`GameData::GEAR_BODIES`) against `$departUnreachable` — a body whose
+  colony this agent already funded (`StateStore::colonyDoneBodies()`, added
+  in [3.4.9]) never enters that set. Once Venus could actually be attempted
+  ([3.4.9]'s `acid_skin` chain) and got a genuine TWR rejection alongside
+  Mars, deimos and phobos being merely *done* (not unreachable) still made
+  the hull look "capable" — the ship held in Earth orbit forever with
+  nowhere left to profitably go, including through an open Venus window it
+  could never take. `AutoPlayer::step()`'s stranded-hull check now folds
+  `colonyDoneBodies()` into the skip list it passes `hasDepartCapableShip()`
+  (reusing `$departSelectSkip`, already used for destination *selection*),
+  so "every gear body is rejected-or-already-done" drives the same
+  gear-a-fresh-flyer rebuild a genuine dead end does. Found live on agent
+  142285 right after [3.4.10]'s ride-cooldown fix confirmed it was no longer
+  thrashing the elevator — this was the next layer down.
+
 ## [3.4.10] - 2026-09-11
 
 ### Fixed

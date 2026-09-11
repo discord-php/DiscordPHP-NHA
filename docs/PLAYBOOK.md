@@ -69,7 +69,7 @@ flowchart TD
     stay -- no --> exp
     useStay --> exp
     g2 -- no --> exp
-    exp{"&#40;expansionist flight guardrails&#41;<br/>dead-end hull &#40;deimos + phobos + mars all depart-rejected for a missing landing_gear part&#41; &#8594; gear a fresh flyer;<br/>on the ground w/ a depart-capable ship &#8594; force toward orbit;<br/>in orbit &amp; a window we can service is open &amp; no retry cooldown &#8594; force depart;<br/>a depart to any other dest &#40;model or ladder&#41; &#8594; force the deterministic hold;<br/>hold = station-keep: alt &lt; 300 &amp; ride cooldown elapsed &#8594; bounce the elevator back to the band &#40;no fuel, arms a 12-tick cooldown&#41;, else stock fuel/shield &#8594; dock &#8594; idle;<br/>body-surface construct the feed shows refused for materials &#8594; Ladder::bodyBuildStep &#40;buy the short depot raw / combine chips&#41;, or rewrite a bad `kind` arg;<br/>colony board has an incomplete module &#8594; Ladder::colonyFundStep &#40;hold a needed material &#8594; construct shape=colony, else Ladder::acquire it — mine a nearby deposit / dock an asteroid before buying&#41;; colony share funded &#8594; a construct extractor past the cap OR a construct shape=colony with a module not open on the board is dropped &#8594; hand off to the flight ladder &#40;ride / depart home&#41;"}
+    exp{"&#40;expansionist flight guardrails&#41;<br/>dead-end hull &#40;deimos + phobos + mars each depart-rejected OR already colony-done&#41; &#8594; gear a fresh flyer;<br/>on the ground w/ a depart-capable ship &#8594; force toward orbit;<br/>in orbit &amp; a window we can service is open &amp; no retry cooldown &#8594; force depart;<br/>a depart to any other dest &#40;model or ladder&#41; &#8594; force the deterministic hold;<br/>hold = station-keep: alt &lt; 300 &amp; ride cooldown elapsed &#8594; bounce the elevator back to the band &#40;no fuel, arms a 12-tick cooldown&#41;, else stock fuel/shield &#8594; dock &#8594; idle;<br/>body-surface construct the feed shows refused for materials &#8594; Ladder::bodyBuildStep &#40;buy the short depot raw / combine chips&#41;, or rewrite a bad `kind` arg;<br/>colony board has an incomplete module &#8594; Ladder::colonyFundStep &#40;hold a needed material &#8594; construct shape=colony, else Ladder::acquire it — mine a nearby deposit / dock an asteroid before buying&#41;; colony share funded &#8594; a construct extractor past the cap OR a construct shape=colony with a module not open on the board is dropped &#8594; hand off to the flight ladder &#40;ride / depart home&#41;"}
     exp --> rec
     rec[if final verb == combine:<br/>state.recordCombineSignature] --> submit[NHA::intentWithToken<br/>state.recordDecision &#40;with altitude&#41;]
     submit --> done([&#129302; &#91;stance&#93; / &#128737;&#65039; / &#9851;&#65039; / &#128260; status line])
@@ -171,6 +171,23 @@ depart band long enough for an opening window to find the ship there.
 mirroring the existing `depart` retry cooldown) now gate it:
 `AutoPlayer::step()` rewrites a `ride` arriving before its cooldown to a
 hold, and arms the cooldown on every `ride` that goes through.
+
+**"Capable" has to mean "still useful," not just "still reachable."**
+`Ladder::hasDepartCapableShip()` only ever checks deimos/phobos/mars
+(`GameData::GEAR_BODIES`) against `$departUnreachable` — a body this agent
+already finished (`colonyDoneBodies()`) never lands in that set, since it
+was never *rejected*. Before [3.4.9] that didn't matter: Venus could never
+even be attempted (no `acid_skin`), so `$departUnreachable` only ever held
+gear-body TWR failures. Once Venus became attemptable and picked up a
+genuine TWR rejection alongside Mars, a hull with deimos and phobos both
+*done* (not rejected, just no longer worth visiting) still read as
+"capable" off those two alone — the agent held in Earth orbit forever,
+including through an open Venus window it could never service. The
+stranded-hull check in `AutoPlayer::step()` now passes
+`hasDepartCapableShip()` the same skip list `departTarget()` uses for
+destination selection (`$departUnreachable ∪ colonyDoneBodies()`), so
+"every gear body is rejected-or-done" drives the fresh-flyer rebuild the
+same way a genuine dead end always has.
 
 ---
 

@@ -971,13 +971,22 @@ final class AutoPlayer
             $departNow = $departServiceable !== null && ! $departCooldown;
             // The current hull has been `depart`-rejected for every body — a
             // dead end. Don't hold or force-depart; let the ladder gear a fresh
-            // (gear-carrying) flyer.
+            // (gear-carrying) flyer. A body whose colony this agent already
+            // funded counts the same as "rejected" here, not just a genuine
+            // TWR/gear failure: `hasDepartCapableShip()` only ever checks
+            // deimos/phobos/mars (`GameData::GEAR_BODIES`), so once mars *and*
+            // venus are TWR-unreachable but deimos/phobos are merely done
+            // (still nominally flyable), it kept reporting "capable" forever —
+            // the agent held in orbit with nowhere useful left to go instead of
+            // gearing a ship that can actually clear Mars/Venus. Reuses
+            // `$departSelectSkip` ({@see departTarget()} above) so this and
+            // destination *selection* agree on what "nowhere left to go" means.
             // Already departed — riding the interplanetary transfer. Every
             // flight verb is rejected mid-crossing; the only move is to wait.
             $inTransit = Ladder::inTransit($rawObs);
             $shipStranded = ! $inTransit
                 && Ladder::hasOrbitalShip($rawObs)
-                && ! Ladder::hasDepartCapableShip($rawObs, $departUnreachable);
+                && ! Ladder::hasDepartCapableShip($rawObs, $departSelectSkip);
             $holdingForWindow = ! $shipStranded && ! $inTransit && (
                 Ladder::isHoldingForWindow($rawObs, $stance, $departUnreachable)
                 || ($departCooldown && ($rawObs['in_space'] ?? false) && Ladder::hasOrbitalShip($rawObs))
