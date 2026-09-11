@@ -882,13 +882,14 @@ final class AutoPlayer
             // `needs_item` entry.
             $this->reviewCapabilityFeed($agent_id, $pre['profile'] ?? null, (array) ($rawObs['inventory'] ?? []));
 
-            // At a body (surface OR its orbit) → pull the colony board so the
-            // decision can FUND the next incomplete module, stop raising
-            // redundant personal extractors, and — once this agent's share is
-            // funded — head home rather than churn. Best-effort: a failed fetch
-            // (or not being at a body) just yields an empty board.
-            $colonyBoardPromise = Ladder::atBody($rawObs) !== null
-                ? $this->nha->world->getColony((string) Ladder::atBody($rawObs))->then(
+            // At a body (surface OR its orbit) — or latched as heading home from
+            // one — pull that body's colony board so the decision can FUND the
+            // next module, stop raising redundant extractors, and once this
+            // agent's share is funded head home rather than churn. The stored
+            // body covers the ticks `expansion.at_body` glitches to empty.
+            $homeBody = Ladder::atBody($rawObs) ?? $this->state->goingHome($agent_id);
+            $colonyBoardPromise = $homeBody !== null
+                ? $this->nha->world->getColony((string) $homeBody)->then(
                     static fn($c): array => (array) (json_decode(json_encode($c), true) ?: []),
                     static fn(): array => [],
                 )
@@ -1148,29 +1149,44 @@ final class AutoPlayer
                 // 1/160 superalloy because `expansion.colony` is never in the
                 // observation and the ladder fell back to "extractor for income"
                 // forever.
-                if ($colonyBoard !== [] && Ladder::atBody($rawObs) !== null) {
+                $homeBody = Ladder::atBody($rawObs) ?? $this->state->goingHome($agent_id);
+                if ($colonyBoard !== [] && $homeBody !== null) {
+                    $ex = (array) ($rawObs['expansion'] ?? []);
+                    $alt = (int) ($observation->get('altitude') ?? 0);
+                    // On a MOON the ground altitude is the moon's own (~300-500,
+                    // drifting) and `onBodySurface()` stays true up the elevator
+                    // too — so the reliable "on the ground" signal is
+                    // `place.where === body_surface` AND not near the elevator
+                    // top; `alt >= 550` means ridden up to SKY_TOP, ready to go.
+                    $placeWhere = (string) (((array) ($ex['place'] ?? []))['where'] ?? '');
                     $onSurface = Ladder::onBodySurface($rawObs);
+                    $grounded = $alt < 550 && ($placeWhere === 'body_surface' || (! ($rawObs['in_space'] ?? false) && $alt === 0));
+                    $inDepartBand = $alt >= 550 || ($alt >= 300 && ! $grounded);
                     $cInv = (array) $observation->getInventory();
                     $cInv['credits'] = (int) ($cInv['credits'] ?? $rawObs['credits'] ?? $observation->get('credits') ?? 0);
                     $ownExtractors = Ladder::ownedExtractors($colonyBoard, $agent_id);
-                    $fund = Ladder::colonyFundStep($colonyBoard, $agent_id, $cInv, $rawObs);
+                    $fund = $grounded ? Ladder::colonyFundStep($colonyBoard, $agent_id, $cInv, $rawObs) : null;
                     $hasRealBoard = (array) ($colonyBoard['modules'] ?? []) !== [];
-                    // This agent's colony work on this body is finished: every
-                    // module done, or its per-agent share of the open one is
-                    // funded / unreachable ({@see Ladder::colonyFundStep()}
-                    // returns null).
-                    $colonyDoneForMe = $hasRealBoard && $fund === null;
-                    // Only ACT on a surface fund; in orbit the fund would be a
-                    // rejected `construct` — the point there is to head home.
-                    if (! $onSurface) {
-                        $fund = null;
+                    // Finished here: every module done, or this agent's share of
+                    // the open one is funded ({@see Ladder::colonyFundStep()}
+                    // returns null) — or the heading-home latch is already set.
+                    $colonyDoneForMe = $this->state->goingHome($agent_id) !== null
+                        || ($hasRealBoard && Ladder::colonyFundStep($colonyBoard, $agent_id, $cInv, $rawObs) === null);
+
+                    if ($colonyDoneForMe && Ladder::atBody($rawObs) !== null) {
+                        $this->state->setGoingHome($agent_id, (string) Ladder::atBody($rawObs));
+                    }
+                    // Drop the latch on a positive "home / on the way" signal.
+                    $loc = (string) ($ex['location'] ?? '');
+                    $transitTo = (string) (((array) ($ex['transit'] ?? []))['to'] ?? '');
+                    if (in_array($loc, ['earth', 'earth_orbit', 'orbit_earth'], true) || $transitTo === 'earth') {
+                        $this->state->clearGoingHome($agent_id);
+                        $colonyDoneForMe = false;
                     }
 
                     // A `construct` bound to this body the colony can't use — a
                     // personal extractor past the cap, or a hallucinated
-                    // `shape:colony` with a module not open on the board
-                    // (habitat / power_grid / communications / … — the live
-                    // failure once the real modules were funded).
+                    // `shape:colony` with a module not open on the board.
                     $openModules = array_map(
                         static fn($m): string => (string) (((array) $m)['module'] ?? ''),
                         array_filter((array) ($colonyBoard['modules'] ?? []), static fn($m): bool => empty(((array) $m)['complete'])),
@@ -1190,60 +1206,54 @@ final class AutoPlayer
                             $verb = (string) $decision['verb'];
                         }
                     } elseif ($colonyDoneForMe) {
-                        // This agent's colony share on this body is funded — the
-                        // ONLY job left here is the trip home, and there is no
-                        // ladder rung for it. Drive it as a tight state machine
-                        // and, crucially, never let the model / a loop-break
-                        // fire a `depart` at anything but Earth from orbit —
-                        // `depart {dest:'deimos'}` and a surface `depart` were
-                        // burning ~40 fuel a shot and never leaving.
-                        $ex = (array) ($rawObs['expansion'] ?? []);
-                        $win = (array) (($ex['windows'] ?? [])[(string) Ladder::atBody($rawObs)] ?? []);
+                        // Colony share funded — the ONLY job left is the trip
+                        // home, and there is no ladder rung for it. Tight state
+                        // machine; NEVER emit a `depart` at anything but Earth,
+                        // and only from the depart band (a `depart {dest:body}`
+                        // / surface `depart` was burning ~40 fuel a shot).
+                        $win = (array) (($ex['windows'] ?? [])[(string) $homeBody] ?? []);
                         $windowOpen = ! empty($win['open']);
                         $opensIn = (int) ($win['opens_in'] ?? 9999);
                         $fuel = (int) ($cInv['cryo_fuel'] ?? 0) + (int) ($cInv['hydrogen'] ?? 0) + (int) ($cInv['helium3'] ?? 0);
                         $fuelForHome = max(45, (int) ($ex['return_dv'] ?? 0)) + 15;
                         $credits = (int) ($cInv['credits'] ?? 0);
                         $shipReady = Ladder::hasDepartCapableShip($rawObs, $departUnreachable);
-                        $alt = (int) ($observation->get('altitude') ?? 0);
                         $lift = Ladder::orbitElevator($rawObs);
                         $px = (int) ((array) ($rawObs['position'] ?? [0, 0]))[0];
                         $py = (int) ((array) ($rawObs['position'] ?? [0, 0]))[1];
                         $atLift = $lift !== null && $px === $lift['x'] && $py === $lift['y'];
-                        $lead = 'colony share on ' . (string) Ladder::atBody($rawObs) . ' funded';
-
+                        $lead = "colony share on {$homeBody} funded";
                         $set = static function (string $v, array $a, string $why) use (&$decision, &$verb, $lead): void {
                             $decision = ['verb' => $v, 'args' => $a, 'reason' => "{$lead} — {$why}"];
                             $verb = $v;
                         };
-
-                        if (! $onSurface) {
-                            // In the body's orbit.
-                            if ($shipReady && $fuel >= 1 && $windowOpen) {
-                                $set('depart', ['dest' => 'earth'], 'window open — depart for home');
-                            } elseif ($alt > 0 && $alt < 300 && $lift !== null) {
-                                $set($atLift ? 'ride' : 'move', $atLift ? [] : ['x' => $lift['x'], 'y' => $lift['y']], 'bounce the elevator to hold in the depart band');
-                            } else {
-                                $decision = self::idle($rawObs, "{$lead} — holding orbit for the return window (opens in {$opensIn})");
-                                $verb = (string) $decision['verb'];
-                            }
-                        } elseif (! $shipReady) {
-                            // Stranded on the surface — gear a flyer. Take the
-                            // ladder's gear-up step; never a construct / dock.
-                            $go = Ladder::suggestion($rawObs, $tried, $known, false, $stance, $departUnreachable);
-                            if ($go !== null && in_array((string) ($go['verb'] ?? ''), ['build', 'combine', 'buy', 'finalize'], true)) {
-                                $set((string) $go['verb'], (array) ($go['args'] ?? []), (string) ($go['why'] ?? 'gear a flyer for the trip home'));
-                            } else {
-                                $decision = self::idle($rawObs, "{$lead} — need a flyer to leave; nothing to build this turn");
-                                $verb = (string) $decision['verb'];
-                            }
-                        } elseif ($fuel < $fuelForHome && $credits >= 60) {
-                            $set('buy', ['resource' => 'cryo_fuel', 'n' => min(30, $fuelForHome - $fuel + 5)], "stock cryo_fuel ({$fuel}/{$fuelForHome}) for the return Δv");
-                        } elseif (($windowOpen || $opensIn <= 60) && $lift !== null) {
-                            $set($atLift ? 'ride' : 'move', $atLift ? [] : ['x' => $lift['x'], 'y' => $lift['y']], $atLift ? 'ride to orbit for the return window' : 'walk to the tall elevator for the trip home');
-                        } else {
-                            $decision = self::idle($rawObs, "{$lead} — fuelled; waiting on the surface for the return window (opens in {$opensIn})");
+                        $hold = function (string $why) use (&$decision, &$verb, $rawObs, $lead): void {
+                            $decision = self::idle($rawObs, "{$lead} — {$why}");
                             $verb = (string) $decision['verb'];
+                        };
+
+                        if ($inDepartBand) {
+                            // Up the elevator, in the band. Go on an open window,
+                            // else HOLD — do NOT ride back down (that was the
+                            // sawtooth).
+                            $shipReady && $fuel >= 1 && $windowOpen
+                                ? $set('depart', ['dest' => 'earth'], "window open — depart for home")
+                                : $hold("in the depart band; holding for the return window (opens in {$opensIn})");
+                        } elseif ($grounded && ! $shipReady) {
+                            $go = Ladder::suggestion($rawObs, $tried, $known, false, $stance, $departUnreachable);
+                            in_array((string) ($go['verb'] ?? ''), ['build', 'combine', 'buy', 'finalize'], true)
+                                ? $set((string) $go['verb'], (array) ($go['args'] ?? []), (string) ($go['why'] ?? 'gear a flyer for the trip home'))
+                                : $hold('need a flyer to leave; nothing to build this turn');
+                        } elseif ($grounded && $fuel < $fuelForHome && $credits >= 60) {
+                            $set('buy', ['resource' => 'cryo_fuel', 'n' => min(30, $fuelForHome - $fuel + 5)], "stock cryo_fuel ({$fuel}/{$fuelForHome}) for the return Δv");
+                        } elseif ($grounded && ($windowOpen || $opensIn <= 30) && $lift !== null) {
+                            // Ride up ONLY when the window is close — riding
+                            // early just decays back out of the band.
+                            $atLift
+                                ? $set('ride', [], 'ride to orbit for the return window')
+                                : $set('move', ['x' => $lift['x'], 'y' => $lift['y']], 'walk to the tall elevator for the trip home');
+                        } else {
+                            $hold("fuelled ({$fuel}); waiting for the return window (opens in {$opensIn})");
                         }
                     }
                 }

@@ -204,6 +204,44 @@ trait LoopStrategyStateTrait
     }
 
     /**
+     * "This agent has funded its full colony share on `<body>` and is on the
+     * way home." A latch, because the observation's `expansion.at_body` /
+     * `location` glitch to empty for the odd tick — without it the return
+     * state machine goes dormant on those ticks and the agent drifts back into
+     * mine / ride churn. Cleared once it is actually home ({@see clearGoingHome()}).
+     *
+     * @since 3.4.8
+     */
+    public function setGoingHome(int $agent_id, string $body): void
+    {
+        $key = (string) $agent_id;
+        if (($this->data['agent_going_home'][$key] ?? null) === $body) {
+            return;
+        }
+        $this->data['agent_going_home'][$key] = $body;
+        $this->save();
+    }
+
+    /** The body an agent is heading home FROM, or `null`. @since 3.4.8 */
+    public function goingHome(int $agent_id): ?string
+    {
+        $b = $this->data['agent_going_home'][(string) $agent_id] ?? null;
+
+        return is_string($b) && $b !== '' ? $b : null;
+    }
+
+    /** Drops the heading-home latch (the agent is back at Earth / in transit to it). @since 3.4.8 */
+    public function clearGoingHome(int $agent_id): void
+    {
+        $key = (string) $agent_id;
+        if (! isset($this->data['agent_going_home'][$key])) {
+            return;
+        }
+        unset($this->data['agent_going_home'][$key]);
+        $this->save();
+    }
+
+    /**
      * Records the agent's stance. `$tick` is only stamped when the stance
      * actually changes, so it marks the last *switch* for the dwell timer.
      *

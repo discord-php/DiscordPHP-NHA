@@ -6,6 +6,26 @@ SemVer with the **major tracking the NHA world API version**.
 
 ## [Unreleased]
 
+## [3.4.8] - 2026-09-11
+
+### Fixed
+- **The 3.4.7 return state machine sawtoothed at the elevator top.** On a moon,
+  the ground altitude drifts (~300-500) rather than sitting at 0, and
+  `expansion.place.where` stays `"body_surface"` even after riding up to the
+  elevator top (alt ~600) — so the guardrail read "grounded, window open" at
+  the TOP too and rode straight back down, then back up, forever. It now
+  disambiguates "on the ground" vs "up in the depart band" by altitude
+  (`alt < 550`, not just `place.where`), and in the band it only ever `depart`s
+  or **holds** — it never rides back down.
+- **The return state machine went dormant whenever `expansion.at_body` /
+  `at_body_orbit` / `location` all glitched empty for a tick** (the same field
+  flakiness 3.4.7 fixed for `departTarget()`), letting the agent drift back
+  into model/ladder churn on exactly those ticks. New persistent
+  `StateStore::setGoingHome()` / `goingHome()` / `clearGoingHome()` latch: set
+  once the colony share is funded at a body, read every turn instead of
+  re-deriving "am I heading home" from the flaky per-tick fields, and cleared
+  only on a positive home signal (`location` is Earth, or in transit to it).
+
 ## [3.4.7] - 2026-09-11
 
 ### Fixed

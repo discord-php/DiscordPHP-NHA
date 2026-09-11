@@ -465,4 +465,26 @@ class StateStoreTest extends NHAUnitTestCase
         $this->assertTrue($store->loopBreakCooldownActive(7, 110), 'within 24 ticks of the break');
         $this->assertFalse($store->loopBreakCooldownActive(7, 130), 'past the cooldown');
     }
+
+    /**
+     * @covers \NHA\State\LoopStrategyStateTrait
+     */
+    public function testGoingHomeLatchPersistsAcrossAReload(): void
+    {
+        $store = new StateStore($this->path);
+
+        $this->assertNull($store->goingHome(7), 'not heading home yet');
+        $store->setGoingHome(7, 'deimos');
+        $this->assertSame('deimos', $store->goingHome(7));
+
+        // Survives a reload — the glitch-proofing point of the latch.
+        $reloaded = new StateStore($this->path);
+        $this->assertSame('deimos', $reloaded->goingHome(7));
+
+        $reloaded->clearGoingHome(7);
+        $this->assertNull($reloaded->goingHome(7));
+
+        // Per-agent.
+        $this->assertNull($reloaded->goingHome(8));
+    }
 }

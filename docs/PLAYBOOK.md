@@ -118,7 +118,21 @@ and a non-zero altitude on the ground). Once this agent's colony share is
 funded and it is back in the body's orbit with a flight-ready fuelled ship and
 the window open, the guardrail emits `depart {dest:'earth'}` — the only return
 leg in the brain; the `at_body_orbit` land-force and the outbound-`depart`
-sanity-check both exempt a `dest:'earth'`.
+sanity-check both exempt a `dest:'earth'`. `Ladder::departTarget()` (the
+OUTBOUND Earth→body picker) also refuses whenever the agent is associated with
+a body at all, so it can never offer "depart to the moon you're already on".
+
+The return trip is a small state machine keyed on **altitude**, not just
+`place.where` (which on a moon stays `"body_surface"` even up at the elevator
+top): `alt < 550` = grounded (gear a flyer / stock `cryo_fuel` to
+`return_dv+15` / ride up once the window is ≤30 ticks out); `alt ≥ 550` = in
+the depart band — `depart earth` on an open window, else **hold** (never ride
+back down — that was the sawtooth). Because `expansion.at_body` /
+`at_body_orbit` / `location` can all glitch empty for a tick, a persistent
+`StateStore` latch (`setGoingHome()` / `goingHome()` / `clearGoingHome()`) is
+set the moment the share is funded and read every turn instead of
+re-deriving "heading home" from those fields; it clears only once `location`
+reports Earth or the agent is in transit to it.
 
 ---
 

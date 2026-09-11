@@ -1414,6 +1414,78 @@ class AutoPlayerTest extends NHAUnitTestCase
     }
 
     /**
+     * The `agent_going_home` latch keeps the return state machine active on a
+     * tick where `expansion.at_body` / `at_body_orbit` / `location` all glitch
+     * to empty — without it the guardrail goes dormant and the agent drifts
+     * back into model/ladder churn on exactly those ticks.
+     *
+     * @covers \NHA\Brain\AutoPlayer::step
+     */
+    public function testTheGoingHomeLatchSurvivesAnExpansionFieldGlitch(): void
+    {
+        $state = new StateStore($this->statePath);
+        $state->setGoingHome(142285, 'deimos');
+
+        $nha = $this->nhaWith([
+            'tick' => 1300, 'downed_until' => 0, 'position' => [30, 110],
+            'in_space' => true, 'altitude' => 480,
+            'inventory' => ['credits' => 12000, 'cryo_fuel' => 90,
+                'stimpack' => 1, 'kinetic_gun' => 1, 'slug' => 5],
+            'vehicles' => [['name' => 'flyer', 'flies' => true, 'orbital_engine' => true]],
+            // The glitch: no at_body / at_body_orbit / location at all — only
+            // the window (keyed by the LATCHED body) is still readable.
+            'expansion' => ['windows' => ['deimos' => ['open' => true]]],
+            'body' => 'deimos', 'cap_pct_per_agent' => 60, 'complete' => true,
+            'modules' => [['module' => 'mass_driver', 'complete' => true, 'need' => [], 'remaining' => [], 'contrib' => []]],
+            'extractors' => [],
+        ]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"mine","args":{"n":15}}'), $state);
+
+        $player->step(142285, 'tok');
+
+        $post = $this->posts[0][1];
+        $this->assertSame('depart', $post['verb'], 'the latch keeps driving the return trip through the glitch');
+        $this->assertSame('earth', $post['args']['dest']);
+    }
+
+    /**
+     * Ridden up to the elevator top on a moon (alt ~600, still reporting
+     * `place.where: body_surface` since the moon's own fields don't change)
+     * with the window shut → HOLD in the band. Must not `ride` back down
+     * (the live sawtooth: ride up, window still shut, ride down, ride up, …).
+     *
+     * @covers \NHA\Brain\AutoPlayer::step
+     */
+    public function testAtTheElevatorTopWithTheWindowShutItHoldsRatherThanRidingBackDown(): void
+    {
+        $state = new StateStore($this->statePath);
+
+        $nha = $this->nhaWith([
+            'tick' => 1300, 'downed_until' => 0, 'position' => [30, 110],
+            'in_space' => true, 'altitude' => 600,
+            'inventory' => ['credits' => 9000, 'cryo_fuel' => 125,
+                'stimpack' => 1, 'kinetic_gun' => 1, 'slug' => 5],
+            'vehicles' => [['name' => 'flyer', 'flies' => true, 'orbital_engine' => true]],
+            'expansion' => [
+                'location' => 'on_deimos', 'place' => ['where' => 'body_surface', 'body' => 'deimos'],
+                'at_body' => 'deimos', 'return_dv' => 45,
+                'windows' => ['deimos' => ['open' => false, 'opens_in' => 300]],
+            ],
+            'elevators' => [['x' => 30, 'y' => 110, 'height' => 680]],
+            'body' => 'deimos', 'cap_pct_per_agent' => 60, 'complete' => true,
+            'modules' => [['module' => 'mass_driver', 'complete' => true, 'need' => [], 'remaining' => [], 'contrib' => []]],
+            'extractors' => [],
+        ]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"ride","args":{}}'), $state);
+
+        $player->step(142285, 'tok');
+
+        $post = $this->posts[0][1];
+        $this->assertNotSame('ride', $post['verb'], 'holding in the band, not bouncing back to the ground');
+        $this->assertNotSame('depart', $post['verb'], 'window is shut');
+    }
+
+    /**
      * The engine's named buildable `kind` for the body is adopted when the feed
      * has no materials shortfall to act on — the model's bad `shape`/`kind` is
      * replaced with exactly what the engine asked for.
