@@ -69,7 +69,7 @@ flowchart TD
     stay -- no --> exp
     useStay --> exp
     g2 -- no --> exp
-    exp{"&#40;expansionist flight guardrails&#41;<br/>dead-end hull &#40;deimos + phobos + mars all depart-rejected for a missing landing_gear part&#41; &#8594; gear a fresh flyer;<br/>on the ground w/ a depart-capable ship &#8594; force toward orbit;<br/>in orbit &amp; a window we can service is open &amp; no retry cooldown &#8594; force depart;<br/>a depart to any other dest &#40;model or ladder&#41; &#8594; force the deterministic hold;<br/>hold = station-keep: alt &lt; 300 &#8594; bounce the elevator back to the band &#40;no fuel&#41;, else stock fuel/shield &#8594; dock &#8594; idle;<br/>body-surface construct the feed shows refused for materials &#8594; Ladder::bodyBuildStep &#40;buy the short depot raw / combine chips&#41;, or rewrite a bad `kind` arg;<br/>colony board has an incomplete module &#8594; Ladder::colonyFundStep &#40;hold a needed material &#8594; construct shape=colony, else Ladder::acquire it — mine a nearby deposit / dock an asteroid before buying&#41;; colony share funded &#8594; a construct extractor past the cap OR a construct shape=colony with a module not open on the board is dropped &#8594; hand off to the flight ladder &#40;ride / depart home&#41;"}
+    exp{"&#40;expansionist flight guardrails&#41;<br/>dead-end hull &#40;deimos + phobos + mars all depart-rejected for a missing landing_gear part&#41; &#8594; gear a fresh flyer;<br/>on the ground w/ a depart-capable ship &#8594; force toward orbit;<br/>in orbit &amp; a window we can service is open &amp; no retry cooldown &#8594; force depart;<br/>a depart to any other dest &#40;model or ladder&#41; &#8594; force the deterministic hold;<br/>hold = station-keep: alt &lt; 300 &amp; ride cooldown elapsed &#8594; bounce the elevator back to the band &#40;no fuel, arms a 12-tick cooldown&#41;, else stock fuel/shield &#8594; dock &#8594; idle;<br/>body-surface construct the feed shows refused for materials &#8594; Ladder::bodyBuildStep &#40;buy the short depot raw / combine chips&#41;, or rewrite a bad `kind` arg;<br/>colony board has an incomplete module &#8594; Ladder::colonyFundStep &#40;hold a needed material &#8594; construct shape=colony, else Ladder::acquire it — mine a nearby deposit / dock an asteroid before buying&#41;; colony share funded &#8594; a construct extractor past the cap OR a construct shape=colony with a module not open on the board is dropped &#8594; hand off to the flight ladder &#40;ride / depart home&#41;"}
     exp --> rec
     rec[if final verb == combine:<br/>state.recordCombineSignature] --> submit[NHA::intentWithToken<br/>state.recordDecision &#40;with altitude&#41;]
     submit --> done([&#129302; &#91;stance&#93; / &#128737;&#65039; / &#9851;&#65039; / &#128260; status line])
@@ -154,6 +154,23 @@ cap that at "wherever the agent reached first":
     only — kept OUT of `$departUnreachable` (a proven TWR/gear fact that also
     drives `hasDepartCapableShip()`'s dead-hull check) — so the next open
     window sends the agent to a body that still needs it.
+
+**The station-keep bounce needed a cooldown.** `ride` on a completed
+elevator is a no-fuel toggle: from the ground it lifts to the elevator
+height (capped at 600); already in space with `alt > 0` it drops straight
+back to 0. The station-keep rung (`alt < 300` → `ride`) was designed as a
+rare reset — climb to ~600, decay ~2/tick, bounce back down only once
+every ~150 ticks — with a following on-ground rung riding straight back up.
+Live near Earth, orbital decay crossed the 300 floor within a single
+autoplay turn, so the pair fired on almost every turn instead: ride down,
+ride up, ride down, forever — 35+ consecutive `ride`s over 9 real minutes
+on agent 142285, with zero turns actually spent holding (topping
+`cryo_fuel`, packing `heat_shield`/`acid_skin`, mining) or sitting in the
+depart band long enough for an opening window to find the ship there.
+`StateStore::recordRide()` / `rideCooldownActive()` (a 12-tick cooldown,
+mirroring the existing `depart` retry cooldown) now gate it:
+`AutoPlayer::step()` rewrites a `ride` arriving before its cooldown to a
+hold, and arms the cooldown on every `ride` that goes through.
 
 ---
 

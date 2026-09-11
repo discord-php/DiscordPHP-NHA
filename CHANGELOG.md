@@ -6,6 +6,24 @@ SemVer with the **major tracking the NHA world API version**.
 
 ## [Unreleased]
 
+## [3.4.10] - 2026-09-11
+
+### Fixed
+- **The elevator station-keep bounce (v3.2.35) was firing on almost every
+  autoplay turn instead of the rare reset it was designed for.** Live near
+  Earth, orbital decay crossed the 300 depart floor within a single ~15s
+  autoplay turn, so `ride` down / `ride` up fired back to back for 9+
+  straight minutes (35 consecutive `ride`s, no other action) — the ship
+  never spent a turn actually holding (topping cryo_fuel, packing
+  `heat_shield`/`acid_skin`, mining) and was rarely sitting in the depart
+  band long enough for an opening transfer window to catch it there. New
+  `StateStore::recordRide()` / `rideCooldownActive()` (12-tick cooldown,
+  mirroring the existing `depart` retry cooldown): `AutoPlayer::step()`
+  rewrites a `ride` arriving before its cooldown to a hold, and arms the
+  cooldown on every `ride` that goes through. Found live on agent 142285
+  after [3.4.9] got it to Phobos and Deimos both — the colony-done fix is
+  working; this is the next layer down.
+
 ## [3.4.9] - 2026-09-11
 
 ### Added

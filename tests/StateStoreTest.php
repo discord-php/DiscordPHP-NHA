@@ -508,4 +508,23 @@ class StateStoreTest extends NHAUnitTestCase
         $reloaded = new StateStore($this->path);
         $this->assertSame(['phobos'], $reloaded->colonyDoneBodies(7));
     }
+
+    /**
+     * @covers \NHA\State\LoopStrategyStateTrait
+     */
+    public function testRideCooldownActiveAfterARecordedRideAndExpiresAfterTheWindow(): void
+    {
+        $store = new StateStore($this->path);
+
+        $this->assertFalse($store->rideCooldownActive(7, 100), 'nothing recorded yet');
+        $store->recordRide(7, 100);
+        $this->assertTrue($store->rideCooldownActive(7, 101), 'just bounced — still cooling down');
+        $this->assertTrue($store->rideCooldownActive(7, 111), 'one tick short of the window');
+        $this->assertFalse($store->rideCooldownActive(7, 112), 'cooldown window elapsed');
+        $this->assertFalse($store->rideCooldownActive(8, 101), 'per-agent');
+
+        // Survives a reload.
+        $reloaded = new StateStore($this->path);
+        $this->assertTrue($reloaded->rideCooldownActive(7, 101));
+    }
 }

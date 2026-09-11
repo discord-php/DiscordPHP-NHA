@@ -959,6 +959,7 @@ final class AutoPlayer
                 $this->state->capabilityTargets($agent_id, 'depart'),
             )));
             $departCooldown = $this->state->departRetryCooldownActive($agent_id, $tick);
+            $rideCooldown = $this->state->rideCooldownActive($agent_id, $tick);
             // Destination SELECTION additionally skips a body whose colony this
             // agent already funded to its cap — so the next trip spreads to
             // phobos / mars / venus instead of camping on the first body
@@ -1017,7 +1018,7 @@ final class AutoPlayer
 
             $altNow = (int) ($observation->get('altitude') ?? 0);
 
-            return $colonyBoardPromise->then(fn(array $colonyBoard) => $this->brain->decide($observation, $context ?: null, $stance)->then(function (?array $decision) use ($agent_id, $token, $tick, $altNow, $observation, $rawObs, $known, $tried, $dead, $researchPaying, $recent, $loop, $loopObjective, $stance, $holdingForWindow, $departNow, $departServiceable, $departCooldown, $departUnreachable, $shipStranded, $inTransit, $pre, $last, $colonyBoard) {
+            return $colonyBoardPromise->then(fn(array $colonyBoard) => $this->brain->decide($observation, $context ?: null, $stance)->then(function (?array $decision) use ($agent_id, $token, $tick, $altNow, $observation, $rawObs, $known, $tried, $dead, $researchPaying, $recent, $loop, $loopObjective, $stance, $holdingForWindow, $departNow, $departServiceable, $departCooldown, $rideCooldown, $departUnreachable, $shipStranded, $inTransit, $pre, $last, $colonyBoard) {
                 if ($decision === null && $loopObjective === null && ! $holdingForWindow) {
                     // Record the pass so a wait-streak is visible to detectLoop.
                     $this->state->recordDecision($agent_id, ['verb' => 'wait', 'args' => [], 'reason' => '', 'queued_intent' => null, 'tick' => $tick, 'alt' => $altNow]);
@@ -1651,6 +1652,24 @@ final class AutoPlayer
                 // asked to idle is rewritten to the real no-op.
                 if (($decision['verb'] ?? '') === 'wait') {
                     $decision = self::idle($rawObs, (string) ($decision['reason'] ?? 'idle turn'));
+                }
+
+                // `ride` toggles altitude 0<->~600 for no fuel, so the station-
+                // keep rung (Ladder v3.2.35) treats it as a free "reset" the
+                // moment altitude drifts under the 300 depart floor, trusting a
+                // following on-ground rung to climb straight back up — meant to
+                // be a rare bounce every ~150 ticks of -2/tick decay. Live near
+                // Earth that decay crossed the floor within a single autoplay
+                // turn, so ride-down/ride-up fired back to back every turn
+                // (~15s) with no turn ever spent actually holding — topping
+                // fuel/shield/acid_skin, or sitting in the depart band long
+                // enough for an opening window to find the ship there. Rewrite
+                // a `ride` that arrives before its cooldown to a hold instead;
+                // one that gets through arms the cooldown for the next one.
+                if (($decision['verb'] ?? '') === 'ride' && $rideCooldown) {
+                    $decision = self::idle($rawObs, 'just rode the elevator — holding a few turns before bouncing again');
+                } elseif (($decision['verb'] ?? '') === 'ride') {
+                    $this->state->recordRide($agent_id, $tick);
                 }
 
                 if (($decision['verb'] ?? '') === 'combine') {

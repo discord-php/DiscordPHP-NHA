@@ -203,6 +203,40 @@ trait LoopStrategyStateTrait
         $this->save();
     }
 
+    /** A `ride` is not auto-repeated for this many world ticks. */
+    private const RIDE_COOLDOWN_TICKS = 12;
+
+    /**
+     * Records a `ride` (the no-fuel elevator toggle). {@see \NHA\Brain\Ladder}'s
+     * station-keep rung (v3.2.35) rides down once altitude decays under the
+     * 300 depart floor, trusting a following on-ground rung to ride straight
+     * back up — a rare bounce every ~150 ticks by that design's decay
+     * estimate. Live near Earth, orbital decay turned out to cross that floor
+     * within a single autoplay turn, so the pair fired on almost every turn:
+     * ride down, ride up, ride down, forever, with zero turns actually spent
+     * holding (topping fuel/shield/acid_skin) or ever sitting in the depart
+     * band long enough for an opening window to find it there. This cooldown
+     * forces a few real hold turns between bounces.
+     *
+     * @since 3.4.10
+     */
+    public function recordRide(int $agent_id, int $tick): void
+    {
+        $this->data['agent_last_ride'][(string) $agent_id] = $tick;
+        $this->save();
+    }
+
+    /** True while the last recorded `ride` is still on its cooldown. */
+    public function rideCooldownActive(int $agent_id, int $tick): bool
+    {
+        $last = $this->data['agent_last_ride'][(string) $agent_id] ?? null;
+        if (! is_numeric($last) || $tick <= 0) {
+            return false;
+        }
+
+        return ($tick - (int) $last) < self::RIDE_COOLDOWN_TICKS;
+    }
+
     /**
      * "This agent has funded its full colony share on `<body>` and is on the
      * way home." A latch, because the observation's `expansion.at_body` /

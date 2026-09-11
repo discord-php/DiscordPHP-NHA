@@ -1518,6 +1518,73 @@ class AutoPlayerTest extends NHAUnitTestCase
     }
 
     /**
+     * Live near Earth, orbital decay crossed the 300 depart floor within a
+     * single autoplay turn, so the v3.2.35 station-keep bounce (ride down,
+     * ride back up) fired on almost every turn instead of the rare reset it
+     * was designed for — 35+ consecutive `ride`s over 9 minutes, never once
+     * holding to top fuel/shield/acid_skin or sitting in the depart band. A
+     * `ride` arriving before its cooldown must be rewritten to a hold.
+     *
+     * @covers \NHA\Brain\AutoPlayer::step
+     */
+    public function testARideWithinItsCooldownIsRewrittenToAHoldInsteadOfBouncingEveryTurn(): void
+    {
+        $state = new StateStore($this->statePath);
+        $state->recordRide(142285, 1295); // 5 ticks ago — still cooling down.
+
+        $nha = $this->nhaWith([
+            'tick' => 1300, 'downed_until' => 0, 'position' => [30, 110],
+            'in_space' => true, 'altitude' => 288,
+            'inventory' => ['credits' => 9000, 'cryo_fuel' => 125,
+                'stimpack' => 1, 'kinetic_gun' => 1, 'slug' => 5],
+            'vehicles' => [['name' => 'flyer', 'flies' => true, 'orbital_engine' => true]],
+            'expansion' => [
+                'location' => 'earth', 'place' => ['where' => 'earth_space'],
+                'windows' => ['deimos' => ['open' => false, 'opens_in' => 160]],
+            ],
+            'elevators' => [['x' => 30, 'y' => 110, 'height' => 680]],
+        ]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"ride","args":{}}'), $state);
+
+        $player->step(142285, 'tok');
+
+        $post = $this->posts[0][1];
+        $this->assertNotSame('ride', $post['verb'], 'still cooling down from the last bounce — hold instead');
+    }
+
+    /**
+     * Once the cooldown has elapsed the bounce is allowed through again — and
+     * issuing it re-arms the cooldown for the next one.
+     *
+     * @covers \NHA\Brain\AutoPlayer::step
+     */
+    public function testARideOnceItsCooldownHasElapsedIsAllowedAndReArmsIt(): void
+    {
+        $state = new StateStore($this->statePath);
+        $state->recordRide(142285, 1280); // 20 ticks ago — the 12-tick cooldown has elapsed.
+
+        $nha = $this->nhaWith([
+            'tick' => 1300, 'downed_until' => 0, 'position' => [30, 110],
+            'in_space' => true, 'altitude' => 288,
+            'inventory' => ['credits' => 9000, 'cryo_fuel' => 125,
+                'stimpack' => 1, 'kinetic_gun' => 1, 'slug' => 5],
+            'vehicles' => [['name' => 'flyer', 'flies' => true, 'orbital_engine' => true]],
+            'expansion' => [
+                'location' => 'earth', 'place' => ['where' => 'earth_space'],
+                'windows' => ['deimos' => ['open' => false, 'opens_in' => 160]],
+            ],
+            'elevators' => [['x' => 30, 'y' => 110, 'height' => 680]],
+        ]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"ride","args":{}}'), $state);
+
+        $player->step(142285, 'tok');
+
+        $post = $this->posts[0][1];
+        $this->assertSame('ride', $post['verb'], 'cooldown elapsed — the bounce is allowed');
+        $this->assertTrue($state->rideCooldownActive(142285, 1301), 'issuing the ride re-arms the cooldown');
+    }
+
+    /**
      * The engine's named buildable `kind` for the body is adopted when the feed
      * has no materials shortfall to act on — the model's bad `shape`/`kind` is
      * replaced with exactly what the engine asked for.
