@@ -202,6 +202,24 @@ the ladder still chose to hold anyway). `AutoPlayer::step()` now passes
 that ask "is this hull still useful" have to agree, or the fix only moves
 where the stale answer comes from.
 
+One more of the same shape: `stanceMove()`'s own
+`if (($dest = self::departTarget($raw)) !== null)` (the "window is open and
+you're fuelled" fast-path, right below `$hasShip`) called `departTarget()`
+with no second argument, defaulting to an empty skip list — the one call in
+the whole file that didn't pass its `$departUnreachable` through. Fixed to
+match every other call site.
+
+**Still open, not yet root-caused**: live, with Deimos's window genuinely
+open, the agent departed for Deimos once despite it being in
+`colonyDoneBodies()`. Every place a `depart` decision gets finalized
+(`AutoPlayer::step()`'s outbound sanity-check, both `$departNow`-forced
+blocks, the dead-end-hull override) demonstrably only targets
+`$departServiceable` — built from the merged skip list — so on paper
+`depart {dest:'deimos'}` shouldn't have been reachable. Revisiting a done
+body costs nothing (no repeated fuel burn), just a window spent on the
+wrong destination, so this hasn't blocked shipping — but it means the
+"visiting the whole system" story above isn't airtight yet.
+
 ---
 
 ## The deterministic ladder — `Ladder::suggestion()`

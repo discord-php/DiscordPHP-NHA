@@ -1794,6 +1794,50 @@ class AutoPlayerTest extends NHAUnitTestCase
     }
 
     /**
+     * A general invariant guard for the grounded, dead-end-hull shape: a body
+     * this run has permanently marked TWR-unreachable (`$departUnreachable`)
+     * must never come back as a `depart` pick just because its window opens,
+     * regardless of which internal path produces the decision. Also pins
+     * down one concrete bug on the way: `stanceMove()`'s inner
+     * `if (($dest = self::departTarget($raw)) !== null)` check called
+     * `departTarget()` with NO unreachable argument at all, silently
+     * defaulting to an empty skip list — fixed to pass its own
+     * `$departUnreachable` through, matching every other call in the file.
+     *
+     * @covers \NHA\Brain\AutoPlayer::step
+     */
+    public function testAStrandedHullOnTheGroundDoesNotRepeatADoomedDepartOnAnOpenWindow(): void
+    {
+        $state = new StateStore($this->statePath);
+        $state->recordDepartRejection(142287, 'mars', 400, true);
+        $state->recordDepartRejection(142287, 'venus', 400, true);
+        $state->recordColonyDone(142287, 'deimos');
+        $state->recordColonyDone(142287, 'phobos');
+
+        $nha = $this->nhaWith([
+            'tick' => 500, 'downed_until' => 0, 'position' => [10, 10],
+            'in_space' => false, 'altitude' => 0,
+            'inventory' => ['credits' => 8000, 'cryo_fuel' => 125, 'metal' => 40, 'composite' => 6, 'chip' => 2,
+                'stimpack' => 1, 'kinetic_gun' => 1, 'slug' => 5],
+            'vehicles' => [['name' => 'still-flies-to-deimos', 'flies' => true, 'orbital_engine' => true]],
+            'expansion' => ['windows' => [
+                'venus' => ['open' => true, 'opens_in' => 0],
+                'deimos' => ['open' => false, 'opens_in' => 580],
+                'phobos' => ['open' => false, 'opens_in' => 580],
+                'mars' => ['open' => false, 'opens_in' => 580],
+            ]],
+            'elevators' => [['x' => 10, 'y' => 10, 'height' => 680]],
+            'loose_parts' => [], 'nearby_deposits' => [],
+        ]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"sell","args":{"resource":"iron","n":10}}'), $state);
+
+        $player->step(142287, 'tok');
+
+        $verb = $this->posts[0][1]['verb'];
+        $this->assertNotSame('depart', $verb, 'venus is permanently unreachable for this hull — do not re-propose it just because its window is open');
+    }
+
+    /**
      * A loop-break research pass must never `combine` away survival gear.
      *
      * @covers \NHA\Brain\AutoPlayer::loopBreakDecision

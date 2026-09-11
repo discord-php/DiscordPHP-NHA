@@ -1761,6 +1761,11 @@ final class Ladder
             // depart (a moon first — a Forward Base discounts every later
             // route). The engine's Δv check is the real gate; if it rejects for
             // thin fuel the HOLD block below tops the tank up for next time.
+            // MUST pass `$departUnreachable` — bare `departTarget($raw)`
+            // silently defaults to an empty skip list, so a permanently
+            // TWR-rejected body with an open window (Venus) got suggested
+            // right back, over and over, even from inside the dead-end-hull
+            // rebuild path a few lines up.
             if (($dest = self::departTarget($raw)) !== null) {
                 return ['verb' => 'depart', 'args' => ['dest' => $dest], 'why' => "expansionist — {$dest} window is open and you are fuelled and shielded"];
             }

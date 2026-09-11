@@ -6,6 +6,32 @@ SemVer with the **major tracking the NHA world API version**.
 
 ## [Unreleased]
 
+## [3.4.13] - 2026-09-11
+
+### Fixed
+- **`Ladder::stanceMove()`'s inner depart check dropped the unreachable list.**
+  `if (($dest = self::departTarget($raw)) !== null)` called `departTarget()`
+  with no second argument at all, silently defaulting to an empty skip list
+  — every other call to `departTarget()` in the file passes its
+  `$departUnreachable`/`$departSelectSkip`; this was the one that didn't.
+  Fixed to pass it through.
+
+### Known issue — still under observation
+- Live on agent 142285: once, with Deimos's window legitimately open, the
+  agent departed for Deimos despite it being in `colonyDoneBodies()` — the
+  dedup [3.4.9] added should have kept it heading toward Mars/Venus instead.
+  Traced every place a `depart` decision can be finalized
+  (`AutoPlayer::step()`'s outbound sanity-check, the two `$departNow`-forced
+  blocks, the [3.4.12] dead-end-hull override) and each one demonstrably
+  only ever targets `$departServiceable`/`$departServiceable`-gated
+  destinations, which are built from the correctly-merged skip list — so on
+  paper this shouldn't be reachable. Not yet reproduced against a live open
+  Deimos/Phobos/Mars window with debug instrumentation (windows closed for
+  ~580 ticks at investigation time). Revisiting an already-funded body isn't
+  resource-destructive (no repeated fuel burn, unlike the bugs this session
+  fixed) — just a missed opportunity to spend an open window on Mars/Venus
+  instead — so shipping the rest of this release rather than blocking on it.
+
 ## [3.4.12] - 2026-09-11
 
 ### Fixed
