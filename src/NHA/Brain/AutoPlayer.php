@@ -1027,7 +1027,7 @@ final class AutoPlayer
 
             $altNow = (int) ($observation->get('altitude') ?? 0);
 
-            return $colonyBoardPromise->then(fn(array $colonyBoard) => $this->brain->decide($observation, $context ?: null, $stance)->then(function (?array $decision) use ($agent_id, $token, $tick, $altNow, $observation, $rawObs, $known, $tried, $dead, $researchPaying, $recent, $loop, $loopObjective, $stance, $holdingForWindow, $departNow, $departServiceable, $departCooldown, $rideCooldown, $departUnreachable, $shipStranded, $inTransit, $pre, $last, $colonyBoard) {
+            return $colonyBoardPromise->then(fn(array $colonyBoard) => $this->brain->decide($observation, $context ?: null, $stance)->then(function (?array $decision) use ($agent_id, $token, $tick, $altNow, $observation, $rawObs, $known, $tried, $dead, $researchPaying, $recent, $loop, $loopObjective, $stance, $holdingForWindow, $departNow, $departServiceable, $departCooldown, $rideCooldown, $departUnreachable, $departSelectSkip, $shipStranded, $inTransit, $pre, $last, $colonyBoard) {
                 if ($decision === null && $loopObjective === null && ! $holdingForWindow) {
                     // Record the pass so a wait-streak is visible to detectLoop.
                     $this->state->recordDecision($agent_id, ['verb' => 'wait', 'args' => [], 'reason' => '', 'queued_intent' => null, 'tick' => $tick, 'alt' => $altNow]);
@@ -1416,8 +1416,13 @@ final class AutoPlayer
                 // else from the model (including a `combine` — the agent has
                 // "learned" a `combine {metal,oil}` that mints superalloy, not a
                 // bearing) is replaced with the ladder's deterministic step.
+                // `$departSelectSkip`, not the bare `$departUnreachable` — the
+                // ladder's own internal `hasDepartCapableShip()` checks
+                // (`stanceMove()`) need to see deimos/phobos as off the table
+                // too, or it just holds for a window on them instead of
+                // recognising the same dead end `$shipStranded` already caught.
                 if ($shipStranded && ! in_array($verb, ['build', 'finalize'], true)) {
-                    $step = Ladder::suggestion($rawObs, $tried, $known, false, $stance, $departUnreachable);
+                    $step = Ladder::suggestion($rawObs, $tried, $known, false, $stance, $departSelectSkip);
                     if ($step !== null && (string) ($step['verb'] ?? '') !== 'depart') {
                         $decision = ['verb' => (string) $step['verb'], 'args' => (array) ($step['args'] ?? []), 'reason' => 'dead-end hull — ' . (string) ($step['why'] ?? 'gear a fresh flyer')];
                         $verb = (string) $decision['verb'];

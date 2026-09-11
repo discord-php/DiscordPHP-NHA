@@ -6,6 +6,27 @@ SemVer with the **major tracking the NHA world API version**.
 
 ## [Unreleased]
 
+## [3.4.12] - 2026-09-11
+
+### Fixed
+- **[3.4.11]'s stranded-hull override was a no-op in practice.** It rewrote
+  the decision but then handed off to `Ladder::suggestion()`, which runs its
+  OWN internal `hasDepartCapableShip()` checks against whatever unreachable
+  list it's given — and it was still being passed the bare
+  `$departUnreachable` (deimos/phobos were never *rejected*, so they weren't
+  in it), so the ladder itself still thought the hull was fine and held for
+  a window on it, undoing [3.4.11]'s fix one call deeper. Reproduced live on
+  agent 142285 immediately after redeploying 3.4.11: `> dead-end hull —
+  expansionist — flight-ready ship in orbit; holding for a transfer window
+  to open` — the override *had* fired (the "dead-end hull —" prefix proves
+  it), it just handed off to a ladder call that disagreed. Now passes
+  `$departSelectSkip` (the same `$departUnreachable ∪ colonyDoneBodies()`
+  list [3.4.11] added) into that `Ladder::suggestion()` call too. New
+  regression test reproduces the exact live shape (in Earth orbit, not on
+  the ground, mars/venus unreachable, deimos/phobos done, an open Venus
+  window it still can't take) and asserts against the model AND the ladder
+  both agreeing to hold — confirmed to fail without this fix, pass with it.
+
 ## [3.4.11] - 2026-09-11
 
 ### Fixed

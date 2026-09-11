@@ -189,6 +189,19 @@ destination selection (`$departUnreachable ∪ colonyDoneBodies()`), so
 "every gear body is rejected-or-done" drives the fresh-flyer rebuild the
 same way a genuine dead end always has.
 
+That first pass only fixed the flag that decides whether to intercept the
+model's decision — the intercept itself hands off to
+`Ladder::suggestion()`, which re-runs its OWN internal
+`hasDepartCapableShip()` checks (`stanceMove()`), and was still being
+handed the bare `$departUnreachable`. So it kept agreeing with the model
+that holding was fine, one call deeper — reproduced live as `> dead-end
+hull — expansionist — flight-ready ship in orbit; holding for a transfer
+window to open` (the "dead-end hull —" prefix proves the intercept fired;
+the ladder still chose to hold anyway). `AutoPlayer::step()` now passes
+`$departSelectSkip` into that `Ladder::suggestion()` call too — both places
+that ask "is this hull still useful" have to agree, or the fix only moves
+where the stale answer comes from.
+
 ---
 
 ## The deterministic ladder — `Ladder::suggestion()`
