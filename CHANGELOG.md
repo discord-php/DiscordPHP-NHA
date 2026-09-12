@@ -6,6 +6,25 @@ SemVer with the **major tracking the NHA world API version**.
 
 ## [Unreleased]
 
+## [3.5.4] - 2026-09-12
+
+### Fixed
+- **Dock range is 2, not 8** - corrected live: 3.5.3 widened it after seeing a
+  dock succeed at an observed dist of 6, but the engine rejects with *"nearest
+  asteroid is out of dock range (2)"*. The earlier success was the asteroid
+  DRIFTING into range, not a looser rule. `Ladder::DOCK_RANGE` now records the
+  engine's own number instead of a guess.
+- Because they drift (#2953 read 6, then 8, and was dockable in between),
+  "out of range" is a moving target rather than a permanent no - so a hold
+  with an asteroid within one `move` (`Ladder::MOVE_RANGE`, 6, from the
+  engine's "drove on carbon, range 6") now closes on it instead of idling.
+  `move` is applied in space, so the intercept is legal.
+
+### Lesson
+- One success is not a rule. A single dock at dist 6 looked like evidence the
+  range was wider; it was a moving object. Prefer the engine's rejection text
+  - it states the constraint outright - over an inference from one sample.
+
 ## [3.5.3] - 2026-09-12
 
 ### Fixed

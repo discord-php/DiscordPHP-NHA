@@ -1020,13 +1020,19 @@ class LadderTest extends NHAUnitTestCase
         $far['asteroids'] = [['id' => 1, 'x' => 40, 'y' => 40, 'dist' => 20]];
         $this->assertContains(Ladder::suggestion($far, [], [], false, 'expansionist')['verb'], ['deposit', 'move']);
 
-        // …within range → dock it. The live engine accepted a dock at dist 6
-        // (intent #3415083), so anything up to 8 counts as reachable; the old
-        // `<= 2` guess meant this rung never fired in orbit at all.
-        foreach ([2, 4, 6, 8] as $dist) {
-            $near = $far;
-            $near['asteroids'] = [['id' => 1, 'x' => 40, 'y' => 40, 'dist' => $dist]];
-            $this->assertSame('dock', Ladder::suggestion($near, [], [], false, 'expansionist')['verb'], "dist {$dist} should be dockable");
+        // …within dock range (the engine's own text says 2) → dock it.
+        $near = $far;
+        $near['asteroids'] = [['id' => 1, 'x' => 40, 'y' => 40, 'dist' => 2, 'resource' => 'iridium']];
+        $this->assertSame('dock', Ladder::suggestion($near, [], [], false, 'expansionist')['verb']);
+
+        // Out of dock range but within one move → close on it rather than idle.
+        // Asteroids drift, so "out of range" is a moving target.
+        foreach ([3, 4, 6] as $dist) {
+            $step = $far;
+            $step['asteroids'] = [['id' => 1, 'x' => 40, 'y' => 40, 'dist' => $dist, 'resource' => 'iridium']];
+            $move = Ladder::suggestion($step, [], [], false, 'expansionist');
+            $this->assertSame('move', $move['verb'], "dist {$dist} should be approached");
+            $this->assertSame(40, $move['args']['x']);
         }
     }
 

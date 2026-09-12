@@ -85,6 +85,12 @@ final class Ladder
      * — `brine` and the off-world body resources are the common offenders, and
      * the biggest hoard is often exactly one of them, wedging the sell rung.
      */
+    /** Cells within which `dock` is accepted — from the engine's own rejection text ("out of dock range (2)"). */
+    public const DOCK_RANGE = 2;
+
+    /** Cells a single `move` covers, including in space ("drove on carbon, range 6"). */
+    public const MOVE_RANGE = 6;
+
     public const DEPOT_TRADEABLE = [
         'ice', 'oil', 'ore', 'coal', 'herb', 'iron', 'salt', 'slug', 'wood', 'algae',
         'metal', 'water', 'carbon', 'copper', 'fungus', 'lichen', 'nickel', 'sulfur',
@@ -1956,12 +1962,25 @@ final class Ladder
                 if ($raw['docked'] ?? false) {
                     return ['verb' => 'mine', 'args' => ['n' => 15], 'why' => 'expansionist — mine the docked asteroid while holding for a window'];
                 }
-                $near = 99;
+                $near = null;
                 foreach ((array) ($raw['asteroids'] ?? []) as $a) {
-                    $near = min($near, (int) (((array) $a)['dist'] ?? 99));
+                    $a = (array) $a;
+                    if (null === $near || (int) ($a['dist'] ?? 99) < (int) ($near['dist'] ?? 99)) {
+                        $near = $a;
+                    }
                 }
-                if ($near <= 8 && $alt >= 300 && $alt < 600) {
+                $nearDist = null === $near ? 99 : (int) ($near['dist'] ?? 99);
+                if ($nearDist <= self::DOCK_RANGE && $alt >= 300 && $alt < 600) {
                     return ['verb' => 'dock', 'args' => [], 'why' => 'expansionist — dock the adjacent asteroid and mine while holding for a window'];
+                }
+                // Just out of reach → close the gap. Asteroids DRIFT a cell or
+                // two per tick, so "out of range" is a moving target, not a
+                // permanent no: #2953 sat at dist 6, then 8, and was dockable
+                // in between. `move` is applied in space (the engine reports
+                // "range 6"), so one step toward it is both legal and the only
+                // idle-turn alternative to a `deposit` no-op.
+                if ($nearDist <= self::MOVE_RANGE && $alt >= 300 && $alt < 600) {
+                    return ['verb' => 'move', 'args' => ['x' => (int) ($near['x'] ?? $x), 'y' => (int) ($near['y'] ?? $y)], 'why' => "expansionist — close on the {$near['resource']} asteroid ({$nearDist} away) to dock and mine while holding"];
                 }
 
                 return self::noop($raw, 'expansionist — flight-ready ship in orbit; holding for a transfer window to open');
