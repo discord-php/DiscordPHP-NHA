@@ -1169,4 +1169,24 @@ class LadderTest extends NHAUnitTestCase
         $inSpace['position'] = [40, 120];
         $this->assertContains(Ladder::suggestion($inSpace, [], [], false, 'expansionist')['verb'], ['move', 'wait']);
     }
+
+    public function testAffordableBuyRefusesWhenOneUnitIsOutOfReach(): void
+    {
+        // metal is 10/unit: 9 credits cannot buy even one.
+        self::assertNull(Ladder::affordableBuy('metal', 20, 9));
+        $step = Ladder::affordableBuy('metal', 20, 110);
+        self::assertNotNull($step);
+        self::assertSame(11, $step['n']);
+    }
+
+    public function testRaiseCashStepSellsTheBiggestTradeableHoard(): void
+    {
+        $step = Ladder::raiseCashStep(['credits' => 4, 'brine' => 9000, 'iron' => 300, 'crystal' => 40]);
+        self::assertNotNull($step);
+        self::assertSame('sell', $step['verb']);
+        self::assertSame('iron', $step['args']['resource']);   // brine is untradeable
+        self::assertSame(20, $step['args']['n']);
+
+        self::assertNull(Ladder::raiseCashStep(['credits' => 4, 'brine' => 9000]));
+    }
 }

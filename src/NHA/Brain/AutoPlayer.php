@@ -1495,9 +1495,22 @@ final class AutoPlayer
                             }
                             // Enough metal to build it → build it bare; otherwise
                             // buy metal (never combine — that is what is spinning).
+                            // The buy MUST be sized to the purse: a flat `n:20`
+                            // costs 200 credits at metal's 10/unit, so at 110
+                            // credits the engine refused it and the identical
+                            // order re-fired every turn forever (the 3.5.1 metal
+                            // spin — same shape as the 3.5.0 cryo_fuel one).
+                            // When even one unit is out of reach, selling a glut
+                            // is the only move that changes the inputs.
+                            $inv = (array) $observation->getInventory();
+                            $buy = Ladder::affordableBuy('metal', 20, (int) ($inv['credits'] ?? 0));
                             $decision = $metal >= 5
                                 ? ['verb' => 'build', 'args' => ['part' => $p], 'reason' => "craft spin on the flyer upgrades — build a bare {$p} to move the bundle on"]
-                                : ['verb' => 'buy', 'args' => ['resource' => 'metal', 'n' => 20], 'reason' => "craft spin — stock metal to build a bare {$p}"];
+                                : ($buy !== null
+                                    ? ['verb' => 'buy', 'args' => $buy['args'], 'reason' => "craft spin — stock {$buy['n']} metal to build a bare {$p}"]
+                                    : (($cash = Ladder::raiseCashStep($inv)) !== null
+                                        ? ['verb' => 'sell', 'args' => $cash['args'], 'reason' => "craft spin — {$cash['why']} (a bare {$p})"]
+                                        : ['verb' => 'build', 'args' => ['part' => $p], 'reason' => "craft spin — broke and out of stock; try a bare {$p} anyway"]));
                             $verb = (string) $decision['verb'];
                             break;
                         }

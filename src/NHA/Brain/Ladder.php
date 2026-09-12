@@ -629,6 +629,36 @@ final class Ladder
     }
 
     /**
+     * Sell the biggest depot-tradeable hoard to raise cash.
+     *
+     * The companion to {@see affordableBuy()}: when a rung wants to buy and
+     * cannot afford a single unit, repeating the buy is a no-op the engine
+     * refuses forever (see the 3.5.0 cryo_fuel bankruptcy and the 3.5.1 metal
+     * spin). Converting a glut into credits is the only thing that changes the
+     * inputs to that decision, so it is the correct fall-through.
+     *
+     * @return array{verb: string, args: array<string,mixed>}|null
+     *
+     * @since 3.5.1
+     */
+    public static function raiseCashStep(array $inv, int $n = 20): ?array
+    {
+        $raws = [];
+        foreach ($inv as $k => $qty) {
+            if ('credits' !== $k && is_numeric($qty) && $qty > 0 && in_array((string) $k, self::DEPOT_TRADEABLE, true)) {
+                $raws[(string) $k] = (int) $qty;
+            }
+        }
+        arsort($raws);
+        $res = array_key_first($raws);
+        if (null === $res) {
+            return null;
+        }
+        $sell = min($n, max(1, $raws[$res] - 10));
+
+        return ['verb' => 'sell', 'args' => ['resource' => $res, 'n' => $sell], 'why' => "no credits to buy with — sell {$sell} {$res} to fund the next step"];
+    }
+    /**
      * The agent is parked in Earth orbit with a `depart`-capable ship and no
      * window it can actually service is open — the "wait for the launch window"
      * state. There is exactly one productive move here (top up fuel / shield,

@@ -6,6 +6,28 @@ SemVer with the **major tracking the NHA world API version**.
 
 ## [Unreleased]
 
+## [3.5.1] - 2026-09-12
+
+### Fixed
+- **The metal spin.** The craft-spin breaker in `AutoPlayer::step()` — the
+  rung that stops a drifted upgrade recipe from wedging the flyer rebuild —
+  ordered a flat `buy {metal, n:20}`. Metal is 10/unit, so that order costs
+  200 credits; with 110 in the purse the engine refused it, nothing in the
+  observation changed, and the identical buy re-fired every turn forever.
+  Exactly the shape of the 3.5.0 `cryo_fuel` bankruptcy, in the one buy that
+  had not been routed through `Ladder::affordableBuy()`. It now is.
+- When even a single unit is out of reach, the rung no longer repeats a buy
+  it cannot make: new `Ladder::raiseCashStep()` sells the biggest
+  depot-tradeable hoard instead, which is the only move that changes the
+  inputs to the decision. Untradeable gluts (`brine`) are skipped, so the
+  rung cannot wedge on them.
+
+### Lesson
+- Every hardcoded `buy` `n` is a latent spin. A quantity the purse cannot
+  cover is not a smaller purchase — it is a refused intent with no state
+  change, which is indistinguishable from a no-op loop. Price the order, and
+  always give a buy rung a not-broke fall-through.
+
 ## [3.5.0] - 2026-09-12
 
 ### Added
