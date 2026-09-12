@@ -173,10 +173,21 @@ trait VerbsTrait
         return $this->intent($agent_id, 'construct', ['shape' => $shape] + $args);
     }
 
-    /** Bankrolls a Station `module` with `credits` (space era; a pure credit sink). @link https://nha.recluse.lol/docs#/world/station_ep_station_get */
-    public function invest(int $agent_id, string $module, int $credits, ?string $resource = null): PromiseInterface
+    /**
+     * Bankrolls a `module` with `credits`. Without `$body` that is a Station
+     * module (space era); WITH `$body` it funds that body's COLONY module from
+     * anywhere — no need to be standing on the body. Only the fixed-price
+     * industrial lines can be bought this way; every exotic line
+     * (`c_regolith`, `cloud_acid`, …) still has to be mined on the surface.
+     *
+     * @link https://nha.recluse.lol/docs#/world/station_ep_station_get
+     *
+     * @since 3.5.0 the `$body` (colony) form
+     */
+    public function invest(int $agent_id, string $module, int $credits, ?string $resource = null, ?string $body = null): PromiseInterface
     {
         return $this->intent($agent_id, 'invest', array_filter([
+            'body' => $body,
             'module' => $module,
             'credits' => $credits,
             'resource' => $resource,

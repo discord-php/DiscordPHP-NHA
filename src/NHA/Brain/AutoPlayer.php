@@ -473,7 +473,7 @@ final class AutoPlayer
      *
      * @return array{verb: string, args: array<string, mixed>, reason: string}|null
      */
-    private function fallbackDecision(AgentObservation $observation, string $reasonLead, array $tried, array $known, bool $researchPaying, string $stance = 'homestead'): ?array
+    private function fallbackDecision(AgentObservation $observation, string $reasonLead, array $tried, array $known, bool $researchPaying, string $stance = 'homestead', array $departUnreachable = []): ?array
     {
         $raw = json_decode(json_encode($observation->jsonSerialize()), true);
         $raw = is_array($raw) ? $raw : [];
@@ -483,7 +483,17 @@ final class AutoPlayer
             $exhausted[$sig] = true;
         }
 
-        $suggestion = Ladder::suggestion($raw, $exhausted, $exhausted, $researchPaying, $stance);
+        // The skip list MUST come through. Omitting it (as this did until
+        // 3.5.0) hands `Ladder::suggestion()` an empty `$departUnreachable`,
+        // so `departTarget()` re-offers a body that is permanently
+        // TWR-rejected or whose colony share is already funded — and because
+        // every caller below re-assigns `$decision` AFTER the outbound-depart
+        // sanity-check and the dead-end-hull override have already run,
+        // nothing revalidates it. Live cost: 21 departs in three hours, 19 of
+        // them to Venus (rejected for thrust-to-weight every time) and 2 back
+        // to an already-funded Deimos — the "how did that even get proposed"
+        // mystery from the 3.4.11-13 chase.
+        $suggestion = Ladder::suggestion($raw, $exhausted, $exhausted, $researchPaying, $stance, $departUnreachable);
         if ($suggestion === null) {
             return null;
         }
@@ -888,8 +898,18 @@ final class AutoPlayer
             // agent's share is funded head home rather than churn. The stored
             // body covers the ticks `expansion.at_body` glitches to empty.
             $homeBody = Ladder::atBody($rawObs) ?? $this->state->goingHome($agent_id);
-            $colonyBoardPromise = $homeBody !== null
-                ? $this->nha->world->getColony((string) $homeBody)->then(
+            // Home with nothing underfoot: keep one eye on a body we already
+            // funded. Its colony can still be short, and BOTH moves that close
+            // that gap now work from anywhere — the co-op call for help, and
+            // `invest {body,module,credits}`. Rotate by tick so several funded
+            // bodies each get looked at rather than only the first.
+            $doneBodies = $this->state->colonyDoneBodies($agent_id);
+            $remoteBody = $homeBody === null && $doneBodies !== []
+                ? (string) $doneBodies[$tick % count($doneBodies)]
+                : null;
+            $boardBody = $homeBody ?? $remoteBody;
+            $colonyBoardPromise = $boardBody !== null
+                ? $this->nha->world->getColony((string) $boardBody)->then(
                     static fn($c): array => (array) (json_decode(json_encode($c), true) ?: []),
                     static fn(): array => [],
                 )
@@ -1027,7 +1047,7 @@ final class AutoPlayer
 
             $altNow = (int) ($observation->get('altitude') ?? 0);
 
-            return $colonyBoardPromise->then(fn(array $colonyBoard) => $this->brain->decide($observation, $context ?: null, $stance)->then(function (?array $decision) use ($agent_id, $token, $tick, $altNow, $observation, $rawObs, $known, $tried, $dead, $researchPaying, $recent, $loop, $loopObjective, $stance, $holdingForWindow, $departNow, $departServiceable, $departCooldown, $rideCooldown, $departUnreachable, $departSelectSkip, $shipStranded, $inTransit, $pre, $last, $colonyBoard) {
+            return $colonyBoardPromise->then(fn(array $colonyBoard) => $this->brain->decide($observation, $context ?: null, $stance)->then(function (?array $decision) use ($agent_id, $token, $tick, $altNow, $observation, $rawObs, $known, $tried, $dead, $researchPaying, $recent, $loop, $loopObjective, $stance, $holdingForWindow, $departNow, $departServiceable, $departCooldown, $rideCooldown, $departUnreachable, $departSelectSkip, $shipStranded, $inTransit, $pre, $last, $colonyBoard, $remoteBody) {
                 if ($decision === null && $loopObjective === null && ! $holdingForWindow) {
                     // Record the pass so a wait-streak is visible to detectLoop.
                     $this->state->recordDecision($agent_id, ['verb' => 'wait', 'args' => [], 'reason' => '', 'queued_intent' => null, 'tick' => $tick, 'alt' => $altNow]);
@@ -1104,7 +1124,7 @@ final class AutoPlayer
                             $dipsReserve !== null => "combine `{$sig}` would dip below the {$dipsReserve} reserve",
                             default => "research set `{$sig}` spent",
                         };
-                        $decision = $this->fallbackDecision($observation, $lead, $tried, $known, $researchPaying, $stance);
+                        $decision = $this->fallbackDecision($observation, $lead, $tried, $known, $researchPaying, $stance, $departSelectSkip);
                         if ($decision === null) {
                             // Record the skip so a skip-streak is visible to detectLoop.
                             $this->state->recordDecision($agent_id, ['verb' => 'wait', 'args' => [], 'reason' => 'nothing to do', 'queued_intent' => null, 'tick' => $tick, 'alt' => $altNow]);
@@ -1136,7 +1156,7 @@ final class AutoPlayer
                     // hull rejected for every body doesn't count.
                     $ready = $fuelled && Ladder::hasDepartCapableShip($rawObs, $departUnreachable);
                     if (! $ready) {
-                        $gear = $this->fallbackDecision($observation, 'stay on the mission — gear the ship, do not ' . ($vanityTower ? 'raise another spire' : 'ride to an empty orbit'), $tried, $known, $researchPaying, $stance);
+                        $gear = $this->fallbackDecision($observation, 'stay on the mission — gear the ship, do not ' . ($vanityTower ? 'raise another spire' : 'ride to an empty orbit'), $tried, $known, $researchPaying, $stance, $departSelectSkip);
                         if ($gear !== null && ($gear['verb'] ?? '') !== $verb) {
                             $decision = $gear;
                             $verb = (string) ($decision['verb'] ?? '');
@@ -1167,6 +1187,25 @@ final class AutoPlayer
                 // observation and the ladder fell back to "extractor for income"
                 // forever.
                 $homeBody = Ladder::atBody($rawObs) ?? $this->state->goingHome($agent_id);
+
+                // REMOTE CO-OP CALL. Standing on Earth, holding a board for a
+                // body we already funded to our cap: if it is still short, the
+                // only thing that closes it is another funder. The rest of this
+                // world is played by other LLM agents, and they read world
+                // chat — so ask THEM, with the body, the module, the exact
+                // shortfall and the two verbs that close it. Deliberately its
+                // own block: the at-body guardrail below assumes the agent is
+                // physically on the body, and must not be handed a board for
+                // one it is nowhere near.
+                if ($remoteBody !== null && $homeBody === null && $colonyBoard !== []
+                    && ! $this->state->colonyCallCooldownActive($agent_id, $remoteBody, $tick)
+                    && ($callout = Ladder::colonyCallForHelp($colonyBoard, $agent_id)) !== null
+                ) {
+                    $this->state->recordColonyCall($agent_id, $remoteBody, $tick);
+                    $decision = ['verb' => 'say', 'args' => $callout['args'], 'reason' => $callout['why']];
+                    $verb = 'say';
+                }
+
                 if ($colonyBoard !== [] && $homeBody !== null) {
                     $ex = (array) ($rawObs['expansion'] ?? []);
                     $alt = (int) ($observation->get('altitude') ?? 0);
@@ -1222,6 +1261,12 @@ final class AutoPlayer
                             && ! in_array((string) ($decision['args']['module'] ?? ''), $openModules, true))
                     );
 
+                    // NB the co-op call for help is deliberately NOT made from
+                    // here. At a body the agent is mid-mission — funding, or
+                    // already on the trip home — and a `say` competes with the
+                    // return state machine (and gets rewritten by the
+                    // land-on-arrival force). It is made from Earth instead,
+                    // off the remembered board, where the agent is idle anyway.
                     if ($fund !== null) {
                         $same = ($decision['verb'] ?? '') === $fund['verb']
                             && json_encode($decision['args'] ?? []) === json_encode($fund['args']);
@@ -1390,7 +1435,7 @@ final class AutoPlayer
                     $verb = (string) $decision['verb'];
                 }
 
-                if ($holdingForWindow && $verb !== 'depart') {
+                if ($holdingForWindow && ! in_array($verb, ['depart', 'say'], true)) {
                     // `$holdingForWindow` is only set when the deterministic
                     // check says NOT to depart (no serviceable window, or a
                     // post-rejection cooldown), so a `depart` coming back from
@@ -1421,7 +1466,7 @@ final class AutoPlayer
                 // (`stanceMove()`) need to see deimos/phobos as off the table
                 // too, or it just holds for a window on them instead of
                 // recognising the same dead end `$shipStranded` already caught.
-                if ($shipStranded && ! in_array($verb, ['build', 'finalize'], true)) {
+                if ($shipStranded && ! in_array($verb, ['build', 'finalize', 'say'], true)) {
                     $step = Ladder::suggestion($rawObs, $tried, $known, false, $stance, $departSelectSkip);
                     if ($step !== null && (string) ($step['verb'] ?? '') !== 'depart') {
                         $decision = ['verb' => (string) $step['verb'], 'args' => (array) ($step['args'] ?? []), 'reason' => 'dead-end hull — ' . (string) ($step['why'] ?? 'gear a fresh flyer')];
@@ -1476,12 +1521,16 @@ final class AutoPlayer
                 // NOT on a destination body's surface — there the job is the
                 // colony, and this would revert the base-project acquisition
                 // guardrail back to the doomed `construct`.
+                // `$departSelectSkip`, not the bare list: with every body either
+                // unreachable or already funded there is nowhere worth climbing
+                // to, and forcing the agent at the elevator anyway is what kept
+                // it flying round trips it could not profit from.
                 if ($stance === Stance::Expansionist->value
-                    && $verb !== 'depart'
+                    && ! in_array($verb, ['depart', 'say'], true)
                     && ! ($rawObs['in_space'] ?? false)
                     && (int) ($observation->get('altitude') ?? 0) === 0
                     && Ladder::atBody($rawObs) === null
-                    && Ladder::hasDepartCapableShip($rawObs, $departUnreachable)
+                    && Ladder::hasDepartCapableShip($rawObs, $departSelectSkip)
                 ) {
                     $up = Ladder::suggestion($rawObs, $tried, $known, false, $stance, $departUnreachable);
                     if ($up !== null && ! in_array((string) ($up['verb'] ?? ''), ['land', $verb], true)) {
@@ -1497,7 +1546,7 @@ final class AutoPlayer
                     && $stance === Stance::Expansionist->value
                     && Ladder::hasDepartCapableShip($rawObs, $departUnreachable)
                 ) {
-                    $alt = $this->fallbackDecision($observation, 'you already have a flying ship — do not build a second', $tried, $known, $researchPaying, $stance);
+                    $alt = $this->fallbackDecision($observation, 'you already have a flying ship — do not build a second', $tried, $known, $researchPaying, $stance, $departSelectSkip);
                     if ($alt !== null && ($alt['verb'] ?? '') !== 'build') {
                         $decision = $alt;
                         $verb = (string) ($decision['verb'] ?? '');
@@ -1568,7 +1617,7 @@ final class AutoPlayer
                     $inertOnly = ! Ladder::hasAnyVehicle($rawObs) && Ladder::hasDeadHull($rawObs);
                     $alreadyHasMiner = Ladder::hasAnyVehicle($rawObs) && $recentDeploys >= 1;
                     if ($inertOnly || $alreadyHasMiner || $recentDeploys >= 2) {
-                        $gear = $this->fallbackDecision($observation, 'nothing left to deploy — build / earn instead', $tried, $known, $researchPaying, $stance);
+                        $gear = $this->fallbackDecision($observation, 'nothing left to deploy — build / earn instead', $tried, $known, $researchPaying, $stance, $departSelectSkip);
                         if ($gear !== null && ($gear['verb'] ?? '') !== 'deploy') {
                             $decision = $gear;
                             $verb = (string) ($decision['verb'] ?? '');
@@ -1654,7 +1703,7 @@ final class AutoPlayer
                         // transit verb (`land`) when the current spot is truly
                         // exhausted. Take its pick unless it just agrees with the
                         // brain (same verb) or has nothing at all.
-                        $stay = $this->fallbackDecision($observation, 'just changed location — work this spot before riding the elevator again', $tried, $known, $researchPaying, $stance);
+                        $stay = $this->fallbackDecision($observation, 'just changed location — work this spot before riding the elevator again', $tried, $known, $researchPaying, $stance, $departSelectSkip);
                         if ($stay !== null && (string) ($stay['verb'] ?? '') !== $verb) {
                             $decision = $stay;
                         }

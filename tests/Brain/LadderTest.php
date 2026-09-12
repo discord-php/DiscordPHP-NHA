@@ -417,6 +417,63 @@ class LadderTest extends NHAUnitTestCase
     }
 
     /**
+     * The co-op ask only goes out when the board is blocked ON SOMEONE ELSE:
+     * an outstanding line this agent has no cap headroom left on. While we can
+     * still fund it ourselves, funding beats asking.
+     *
+     * @covers \NHA\Brain\Ladder::colonyCallForHelp
+     */
+    public function testColonyCallForHelpOnlyFiresOnceOurOwnShareIsSpent(): void
+    {
+        // Headroom left (contributed 1 of a 96 cap) → fund it, don't ask.
+        $this->assertNull(Ladder::colonyCallForHelp(self::deimosBoard(), 142285));
+
+        // Complete board → nothing to ask for.
+        $done = self::deimosBoard();
+        $done['complete'] = true;
+        $this->assertNull(Ladder::colonyCallForHelp($done, 142285));
+
+        // Capped on both outstanding lines → only another funder can close it.
+        $capped = self::deimosBoard();
+        $capped['modules'][1]['contrib']['142285'] = ['superalloy' => 96, 'nickel' => 72];
+        $capped['modules'][1]['remaining'] = ['superalloy' => 64, 'nickel' => 48];
+        $call = Ladder::colonyCallForHelp($capped, 142285);
+
+        $this->assertNotNull($call);
+        $this->assertSame('say', $call['verb']);
+        $text = (string) $call['args']['text'];
+        $this->assertLessThanOrEqual(280, mb_strlen($text), 'the engine caps `say` at 280 chars');
+        // It has to be actionable by another AGENT, so it names the body, the
+        // module, the exact shortfall and both verbs that close it.
+        $this->assertStringContainsString('mass_driver', $text);
+        $this->assertStringContainsString('64 superalloy', $text);
+        $this->assertStringContainsString('48 nickel', $text);
+        $this->assertStringContainsString('construct{shape:colony,body:deimos', $text);
+        $this->assertStringContainsString('invest{body:deimos', $text);
+    }
+
+    /**
+     * A line we are NOT capped on is our own job — it must not be begged for
+     * even when a sibling line on the same module is capped.
+     *
+     * @covers \NHA\Brain\Ladder::colonyCallForHelp
+     */
+    public function testColonyCallForHelpAsksOnlyForTheLinesItCannotFundItself(): void
+    {
+        $board = self::deimosBoard();
+        // Capped on superalloy, untouched on nickel.
+        $board['modules'][1]['contrib']['142285'] = ['superalloy' => 96];
+        $board['modules'][1]['remaining'] = ['superalloy' => 64, 'nickel' => 120];
+
+        $call = Ladder::colonyCallForHelp($board, 142285);
+
+        $this->assertNotNull($call);
+        $text = (string) $call['args']['text'];
+        $this->assertStringContainsString('64 superalloy', $text);
+        $this->assertStringNotContainsString('nickel', $text, 'we still have nickel headroom — fund it, do not ask');
+    }
+
+    /**
      * @covers \NHA\Brain\Ladder::ownedExtractors
      */
     public function testOwnedExtractorsCountsOnlyThisAgents(): void
@@ -426,6 +483,36 @@ class LadderTest extends NHAUnitTestCase
         $this->assertSame(12, Ladder::ownedExtractors($board, 142285));
         $this->assertSame(1, Ladder::ownedExtractors($board, 999));
         $this->assertSame(0, Ladder::ownedExtractors([], 142285));
+    }
+
+    /**
+     * The live bankruptcy this replaces: `buy {cryo_fuel, n:30}` behind a flat
+     * `$credits >= 60` guard. cryo_fuel is 16/unit, so that order costs 480 —
+     * with 158 credits the agent cleared the guard, the engine refused, and the
+     * identical buy re-fired 419 times in three hours (after the ~15 that DID
+     * land drained ~7,000 credits).
+     *
+     * @covers \NHA\Brain\Ladder::affordableBuy
+     */
+    public function testAffordableBuyIsSizedToCreditsAtTheRealDepotPrice(): void
+    {
+        // 158 credits at 16/unit → 9 units, not a 480-credit order that fails.
+        $step = Ladder::affordableBuy('cryo_fuel', 30, 158);
+        $this->assertNotNull($step);
+        $this->assertSame('buy', $step['verb']);
+        $this->assertSame('cryo_fuel', $step['args']['resource']);
+        $this->assertSame(9, $step['args']['n']);
+
+        // Never more than asked for, however rich.
+        $this->assertSame(30, Ladder::affordableBuy('cryo_fuel', 30, 999999)['args']['n']);
+
+        // Cannot afford a single unit → null, so the caller falls through to
+        // earning instead of spinning on a rejected order.
+        $this->assertNull(Ladder::affordableBuy('cryo_fuel', 30, 15));
+        $this->assertNull(Ladder::affordableBuy('cryo_fuel', 30, 0));
+
+        // Unknown price → null rather than a guess.
+        $this->assertNull(Ladder::affordableBuy('c_regolith', 10, 9999));
     }
 
     // ── acquire() — get a resource by where it actually is ────────────

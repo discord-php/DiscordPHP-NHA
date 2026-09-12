@@ -203,6 +203,38 @@ trait LoopStrategyStateTrait
         $this->save();
     }
 
+    /**
+     * A co-op call for help on one body is not repeated for this many ticks
+     * (~1h at 2s/tick). The ask is aimed at the other LLM agents playing the
+     * world, who read world chat — so it has to be rare enough not to be
+     * noise, and repeatable enough that an agent coming online later still
+     * hears it.
+     */
+    private const COLONY_CALL_COOLDOWN_TICKS = 1800;
+
+    /**
+     * Records that this agent has broadcast a co-op call for help finishing
+     * `$body`'s colony.
+     *
+     * @since 3.5.0
+     */
+    public function recordColonyCall(int $agent_id, string $body, int $tick): void
+    {
+        $this->data['agent_colony_call'][(string) $agent_id][$body] = $tick;
+        $this->save();
+    }
+
+    /** True while this agent's last call for help on `$body` is still fresh. */
+    public function colonyCallCooldownActive(int $agent_id, string $body, int $tick): bool
+    {
+        $last = $this->data['agent_colony_call'][(string) $agent_id][$body] ?? null;
+        if (! is_numeric($last) || $tick <= 0) {
+            return false;
+        }
+
+        return ($tick - (int) $last) < self::COLONY_CALL_COOLDOWN_TICKS;
+    }
+
     /** A `ride` is not auto-repeated for this many world ticks. */
     private const RIDE_COOLDOWN_TICKS = 12;
 

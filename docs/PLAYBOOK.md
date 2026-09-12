@@ -209,16 +209,41 @@ with no second argument, defaulting to an empty skip list — the one call in
 the whole file that didn't pass its `$departUnreachable` through. Fixed to
 match every other call site.
 
-**Still open, not yet root-caused**: live, with Deimos's window genuinely
-open, the agent departed for Deimos once despite it being in
-`colonyDoneBodies()`. Every place a `depart` decision gets finalized
-(`AutoPlayer::step()`'s outbound sanity-check, both `$departNow`-forced
-blocks, the dead-end-hull override) demonstrably only targets
-`$departServiceable` — built from the merged skip list — so on paper
-`depart {dest:'deimos'}` shouldn't have been reachable. Revisiting a done
-body costs nothing (no repeated fuel burn), just a window spent on the
-wrong destination, so this hasn't blocked shipping — but it means the
-"visiting the whole system" story above isn't airtight yet.
+**And the path all of that missed — `fallbackDecision()` (fixed in 3.5.0).**
+Tracing the places a `depart` gets *finalized* never explained the Deimos
+trip, because the culprit does not appear in any of them: `fallbackDecision()`
+called `Ladder::suggestion()` **without the 6th argument**, so the ladder ran
+with an empty `$departUnreachable` and re-proposed whatever window was open —
+a permanently TWR-rejected body, or one already funded. It is invisible to a
+search for `$departUnreachable` precisely because the parameter is *absent*.
+And all five of its callers re-assign `$decision` AFTER the outbound-depart
+sanity-check and the dead-end-hull override have already run, so nothing
+revalidates the result. Live cost in one three-hour window: 21 departs, 19 to
+a Venus that rejects every one, 2 back to a funded Deimos. **Rule of thumb
+this leaves behind: a skip list that is a defaulted parameter will eventually
+be dropped by somebody. Grep for the call, not for the variable.**
+
+**Ask the other agents.** The rest of this world is played by other LLM
+agents, and they read world chat. When our per-agent cap on a colony is spent
+but the colony is still short, the only thing that closes it is another
+funder — so `Ladder::colonyCallForHelp()` says so, naming the body, the
+module, the exact outstanding lines, and both verbs that close them
+(`construct {shape:colony,…}` on the surface, `invest {body,module,credits}`
+from anywhere), plus why it is worth their turn: a finished moon cuts Mars and
+Venus Δv by 5 world-wide (`_route_discount` — "who holds the moons controls
+the routes") and unlocks the warp-gate blueprint. It fires only for lines we
+are genuinely capped on, only from Earth (at a body the agent is mid-mission
+and a `say` fights the return state machine and the land-on-arrival force),
+and at most once per body per ~1800 ticks.
+
+**Buys are sized to the price, not to a guess.** Every buy rung used to gate
+on a flat `$credits >= 60` and then order a fixed `n`. `cryo_fuel` is 16/unit,
+so the standing `buy {cryo_fuel, n:30}` cost 480 — with 158 credits the agent
+cleared the guard, the engine refused, and the identical order re-fired 419
+times in three hours, after the ~15 that landed drained ~7,000 credits.
+`Ladder::affordableBuy()` sizes `n` from `GameData::DEPOT_UNIT_COST` and
+returns null when even one unit is out of reach, so the ladder falls through
+to earning instead of spinning on a refusal.
 
 ---
 

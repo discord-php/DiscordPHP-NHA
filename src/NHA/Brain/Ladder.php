@@ -593,6 +593,42 @@ final class Ladder
     }
 
     /**
+     * A `buy` sized to what the agent can ACTUALLY pay, at the real depot price
+     * ({@see GameData::DEPOT_UNIT_COST}) — never a fixed `n` behind a flat
+     * credit guard.
+     *
+     * The flat `$credits >= 60` guards this replaces assumed every line was
+     * cheap. `cryo_fuel` is 16/unit, so the standing `buy {cryo_fuel, n:30}`
+     * cost 480: with 158 credits the agent cleared the guard, the engine
+     * refused the order, nothing changed, and the identical buy re-fired every
+     * turn — 419 times in three hours, after the ~15 that did land drained
+     * ~7,000 credits. Sizing `n` to `credits / unit_cost` both converges and
+     * fails closed (null → the caller falls through to earning instead of
+     * spinning).
+     *
+     * Returns null when the agent cannot afford even one unit, or when the
+     * resource has no known price (unknown lines stay on the caller's own
+     * judgement rather than guessing).
+     *
+     * @return array{verb: string, args: array<string,mixed>, n: int}|null
+     *
+     * @since 3.5.0
+     */
+    public static function affordableBuy(string $res, int $want, int $credits): ?array
+    {
+        $unit = GameData::DEPOT_UNIT_COST[$res] ?? 0;
+        if ($unit <= 0 || $want < 1) {
+            return null;
+        }
+        $n = min($want, intdiv(max(0, $credits), $unit));
+        if ($n < 1) {
+            return null;
+        }
+
+        return ['verb' => 'buy', 'args' => ['resource' => $res, 'n' => $n], 'n' => $n];
+    }
+
+    /**
      * The agent is parked in Earth orbit with a `depart`-capable ship and no
      * window it can actually service is open — the "wait for the launch window"
      * state. There is exactly one productive move here (top up fuel / shield,
@@ -1137,6 +1173,75 @@ final class Ladder
      *
      * @return array{verb:string,args:array<string,mixed>,why:string}|null
      */
+    /**
+     * A world-chat call for help on a colony this agent can no longer move on
+     * its own — the co-op ask, aimed at the other LLM agents playing the world.
+     *
+     * Fires only when the board is genuinely blocked ON OTHERS: the colony is
+     * incomplete, a module still has an outstanding line, and this agent's own
+     * per-agent cap on every one of those lines is spent. While we still have
+     * headroom, funding it ourselves beats asking someone else to.
+     *
+     * The text names the body, the module and the exact shortfall, and quotes
+     * both verbs that close it — `construct {shape:colony}` for a hauler on the
+     * surface, `invest {body,module,credits}` for anyone with spare credits
+     * anywhere — because the reader is another agent that has to act on it, not
+     * a human skimming a feed. The payoff is stated (the world-wide Δv discount
+     * and the warp-gate blueprint) so it is worth their turn. Capped at the
+     * engine's 280-character `say` limit.
+     *
+     * @param array<string,mixed> $board `GET /colony/{body}`
+     *
+     * @return array{verb: string, args: array<string,mixed>, why: string}|null
+     *
+     * @since 3.5.0
+     */
+    public static function colonyCallForHelp(array $board, int $agent_id): ?array
+    {
+        $module = self::colonyNextModule($board);
+        if ($module === null) {
+            return null;
+        }
+        $body = (string) ($board['body'] ?? '');
+        $key = (string) ($module['module'] ?? '');
+        if ($body === '' || $key === '') {
+            return null;
+        }
+        // Outstanding lines we are personally capped out on — the ones only
+        // another funder can close.
+        $headroom = self::colonyAgentHeadroom($module, $agent_id, (int) ($board['cap_pct_per_agent'] ?? 100));
+        $blocked = [];
+        foreach ((array) ($module['remaining'] ?? []) as $res => $short) {
+            if ((int) $short > 0 && (int) ($headroom[$res] ?? 0) <= 0) {
+                $blocked[(string) $res] = (int) $short;
+            }
+        }
+        if ($blocked === []) {
+            return null;      // still our own job to finish
+        }
+
+        $bill = [];
+        foreach ($blocked as $res => $short) {
+            $bill[] = "{$short} {$res}";
+        }
+        $text = sprintf(
+            '%s colony: %s needs %s and I am capped at my share. construct{shape:colony,body:%s,module:%s} or invest{body:%s,module:%s,credits:N}. Finishing it cuts Mars+Venus Δv by 5 world-wide and unlocks the warp-gate blueprint.',
+            ucfirst($body),
+            $key,
+            implode(' + ', $bill),
+            $body,
+            $key,
+            $body,
+            $key,
+        );
+
+        return [
+            'verb' => 'say',
+            'args' => ['text' => mb_substr($text, 0, 280)],
+            'why' => "co-op call — {$body}/{$key} is blocked on another funder",
+        ];
+    }
+
     public static function colonyFundStep(array $board, int $agent_id, array $inv, array $raw = []): ?array
     {
         $module = self::colonyNextModule($board);
@@ -1791,8 +1896,8 @@ final class Ladder
                         ? ['verb' => 'ride', 'args' => [], 'why' => "expansionist — alt {$alt} below the 300 depart floor; ride the elevator to reset into the band"]
                         : ['verb' => 'move', 'args' => ['x' => $lift['x'], 'y' => $lift['y']], 'why' => "expansionist — alt {$alt} below the depart floor; get to the tall elevator base to reset altitude"];
                 }
-                if (! $fuelReady && $credits >= 60) {
-                    return ['verb' => 'buy', 'args' => ['resource' => 'cryo_fuel', 'n' => 30], 'why' => "expansionist — stock cryo_fuel ({$fuelUnits}/" . self::DEPART_FUEL_MIN . ') so the ship clears the transfer Δv'];
+                if (! $fuelReady && ($top = self::affordableBuy('cryo_fuel', self::DEPART_FUEL_MIN - $fuelUnits, $credits)) !== null) {
+                    return ['verb' => $top['verb'], 'args' => $top['args'], 'why' => "expansionist — stock {$top['n']} cryo_fuel ({$fuelUnits}/" . self::DEPART_FUEL_MIN . ') so the ship clears the transfer Δv'];
                 }
                 if ($has('heat_shield') === 0) {
                     if ($has('superalloy') > 0 && $has('composite') > 0) {
@@ -1834,8 +1939,8 @@ final class Ladder
             // parks there. Fall through to the generic ladder (sell a glut) if
             // it cannot afford or craft fuel this turn.
             if ($onGround && $hasShip && ! $fuelReady) {
-                if ($credits >= 60) {
-                    return ['verb' => 'buy', 'args' => ['resource' => 'cryo_fuel', 'n' => 30], 'why' => "expansionist — stock cryo_fuel ({$fuelUnits}/" . self::DEPART_FUEL_MIN . ') before riding up'];
+                if (($top = self::affordableBuy('cryo_fuel', self::DEPART_FUEL_MIN - $fuelUnits, $credits)) !== null) {
+                    return ['verb' => $top['verb'], 'args' => $top['args'], 'why' => "expansionist — stock {$top['n']} cryo_fuel ({$fuelUnits}/" . self::DEPART_FUEL_MIN . ') before riding up'];
                 }
                 if ($has('ice') > 0 && ($has('coal') > 0 || $has('oil') > 0)) {
                     return ['verb' => 'combine', 'args' => ['ingredients' => ['ice' => 1, ($has('coal') > 0 ? 'coal' : 'oil') => 1]], 'why' => 'expansionist — combine cryo_fuel before riding up'];

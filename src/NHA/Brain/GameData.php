@@ -180,6 +180,34 @@ final class GameData
     ];
 
     /**
+     * Credits the depot charges PER UNIT to `buy` — i.e. `GET /depot`'s `sell`
+     * side ("`buy` = what the depot pays you when you sell; `sell` = what you
+     * pay to buy"). Transcribed from the live board 2026-09-12.
+     *
+     * The ladder's buy rungs used to gate on a flat `$credits >= 60`, which
+     * silently assumed every purchase was cheap. `cryo_fuel` is 16/unit, so the
+     * standing `buy {cryo_fuel, n:30}` actually costs **480** — the agent
+     * passed the 60-credit guard with 158 credits, got rejected, and re-fired
+     * the same buy 419 times in three hours, after burning ~7,000 credits on
+     * the ~15 that did land. {@see Ladder::affordableBuy()} sizes a buy against
+     * this table instead.
+     *
+     * @var array<string,int>
+     *
+     * @since 3.5.0
+     */
+    public const DEPOT_UNIT_COST = [
+        'ice' => 2, 'salt' => 2, 'water' => 2, 'ore' => 4, 'herb' => 4, 'wood' => 4,
+        'algae' => 4, 'carbon' => 4, 'aluminum' => 8, 'coal' => 6, 'iron' => 6,
+        'lichen' => 6, 'sulfur' => 6, 'oil' => 8, 'slug' => 8, 'copper' => 8,
+        'fungus' => 8, 'bomb' => 18, 'metal' => 10, 'nickel' => 10, 'extract' => 10,
+        'gunpowder' => 10, 'silicon' => 12, 'titanium' => 14, 'salve' => 16,
+        'crystal' => 16, 'cryo_fuel' => 16, 'tincture' => 18, 'antidote' => 20,
+        'superalloy' => 28, 'ion_thruster' => 36, 'iridium' => 40, 'stimpack' => 44,
+        'kinetic_gun' => 60, 'medkit' => 80, 'energy_cell' => 20, 'energy_weapon' => 56,
+    ];
+
+    /**
      * Raw / near-raw inputs each flyer upgrade item is crafted from — one level
      * of `crafting.py`'s recipe tree, enough to expand a parts bill down to what
      * the agent must actually harvest or buy. `wire` recurses to `copper`;

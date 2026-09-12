@@ -6,6 +6,58 @@ SemVer with the **major tracking the NHA world API version**.
 
 ## [Unreleased]
 
+## [3.5.0] - 2026-09-12
+
+### Added
+- **The agent now asks the other agents for help.** This world is played by
+  other LLM agents, and they read world chat — so when a colony we have
+  funded to our per-agent cap is still short, `Ladder::colonyCallForHelp()`
+  broadcasts a `say` naming the body, the module, the exact outstanding
+  lines and BOTH verbs that close them (`construct {shape:colony,…}` for a
+  hauler on the surface, `invest {body,module,credits}` for anyone with
+  spare credits anywhere), plus the payoff — finishing a moon cuts Mars and
+  Venus Δv by 5 world-wide and unlocks the warp-gate blueprint. It fires
+  only for lines we are genuinely capped on (while we still have headroom,
+  funding beats asking), only from Earth (at a body the agent is mid-mission
+  and a `say` fights the return state machine), and at most once per body
+  per `COLONY_CALL_COOLDOWN_TICKS` (1800, ~1h) so it reads as a standing
+  request rather than chatter.
+- **`invest` can now fund a COLONY module from anywhere** — `VerbsTrait::invest()`
+  takes an optional `$body`, per the engine's new `invest{body,module,credits}`.
+  No need to be standing on the body; only the fixed-price industrial lines
+  can be bought this way, every exotic line still has to be mined on the
+  surface. (This is why the Forward Bases suddenly moved.)
+- `GameData::DEPOT_UNIT_COST` — the real per-unit buy price for all 37
+  tradeable lines, transcribed from the live `GET /depot`.
+
+### Fixed
+- **`fallbackDecision()` silently dropped the depart skip-list — the missing
+  path behind the 3.4.11–3.4.13 chase.** It called `Ladder::suggestion()`
+  without the 6th argument, so the ladder ran with an EMPTY
+  `$departUnreachable` and happily re-proposed a permanently TWR-rejected
+  body or one whose colony share is already funded. Because all five callers
+  re-assign the decision AFTER the outbound-depart sanity-check and the
+  dead-end-hull override have run, nothing revalidated it — which is exactly
+  why tracing those paths never explained it. Live cost in one three-hour
+  window: **21 departs, 19 of them to a Venus that rejects every one** for
+  the thrust-to-weight shortfall that put it in `$departUnreachable` to begin
+  with, and 2 back to an already-funded Deimos. All five call sites now pass
+  `$departSelectSkip`.
+- **The buy rungs bankrupted the agent.** They gated on a flat
+  `$credits >= 60` and then ordered a fixed `n:30`. `cryo_fuel` is 16/unit,
+  so that order costs **480**: with 158 credits the agent cleared the guard,
+  the engine refused the order, nothing changed, and the identical buy
+  re-fired **419 times in three hours** — after the ~15 that did land drained
+  the treasury from ~7,000 credits to 158. New `Ladder::affordableBuy()`
+  sizes `n` to `credits / unit_cost` and returns null when even one unit is
+  out of reach, so the ladder falls through to earning instead of spinning.
+- The "on Earth's ground with a ship → force toward orbit" guardrail also
+  used the bare `$departUnreachable`; with every body unreachable-or-done
+  there is nowhere worth climbing to, and forcing the agent at the elevator
+  anyway is what kept it flying round trips it could not profit from. Now on
+  `$departSelectSkip`, and it (like the holding and dead-end-hull overrides)
+  leaves a `say` alone.
+
 ## [3.4.13] - 2026-09-11
 
 ### Fixed

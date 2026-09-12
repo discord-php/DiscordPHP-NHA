@@ -1838,6 +1838,92 @@ class AutoPlayerTest extends NHAUnitTestCase
     }
 
     /**
+     * The "just changed location" dwell guard re-runs the ladder through
+     * `fallbackDecision()`, which until 3.5.0 called `Ladder::suggestion()`
+     * WITHOUT the depart skip-list — so it re-proposed a body that is
+     * permanently TWR-rejected or already colony-funded, and because it
+     * re-assigns the decision AFTER the outbound-depart sanity-check and the
+     * dead-end-hull override have run, nothing revalidated it. Live cost: 21
+     * departs in three hours, 19 to a Venus that rejects every one.
+     *
+     * @covers \NHA\Brain\AutoPlayer::fallbackDecision
+     */
+    public function testTheDwellGuardCannotResurrectADepartToAnUnreachableBody(): void
+    {
+        $state = new StateStore($this->statePath);
+        $state->recordDepartRejection(142287, 'venus', 400, true);
+        $state->recordDepartRejection(142287, 'mars', 400, true);
+        $state->recordColonyDone(142287, 'deimos');
+        $state->recordColonyDone(142287, 'phobos');
+        // A transit verb inside TRANSIT_DWELL_TICKS arms the dwell guard.
+        $state->recordDecision(142287, ['verb' => 'ride', 'args' => [], 'reason' => '', 'queued_intent' => 1, 'tick' => 498, 'alt' => 600]);
+
+        $nha = $this->nhaWith([
+            'tick' => 500, 'downed_until' => 0, 'position' => [30, 110],
+            'in_space' => true, 'altitude' => 400,
+            'inventory' => ['credits' => 9000, 'cryo_fuel' => 200, 'heat_shield' => 1, 'acid_skin' => 1,
+                'stimpack' => 1, 'kinetic_gun' => 1, 'slug' => 5],
+            'vehicles' => [['name' => 'flyer', 'flies' => true, 'orbital_engine' => true]],
+            'expansion' => ['windows' => [
+                'venus' => ['open' => true, 'opens_in' => 0],
+                'deimos' => ['open' => true, 'opens_in' => 0],
+            ]],
+            'elevators' => [['x' => 30, 'y' => 110, 'height' => 680]],
+        ]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"ride","args":{}}'), $state);
+
+        $player->step(142287, 'tok');
+
+        $this->assertNotSame('depart', $this->posts[0][1]['verb'], 'venus is TWR-rejected and deimos is already funded — neither is a destination');
+    }
+
+    /**
+     * Our cap on a colony is spent but the colony still is not finished: the
+     * remaining stretch can only come from another funder, and the rest of this
+     * world is played by other LLM agents that read world chat. So ask there —
+     * from Earth, off the remembered board, where the agent is idle anyway.
+     *
+     * @covers \NHA\Brain\AutoPlayer::step
+     */
+    public function testFromEarthItAsksTheOtherAgentsToFinishAColonyItIsCappedOn(): void
+    {
+        $state = new StateStore($this->statePath);
+        $state->recordColonyDone(142287, 'deimos');
+
+        // The mock answers every GET with this payload, so it is both the
+        // observation (Earth ground, at no body) and the deimos colony board.
+        $nha = $this->nhaWith([
+            'tick' => 500, 'downed_until' => 0, 'position' => [10, 10],
+            'in_space' => false, 'altitude' => 0,
+            'inventory' => ['credits' => 150, 'stimpack' => 1, 'kinetic_gun' => 1, 'slug' => 5],
+            'vehicles' => [['name' => 'flyer', 'flies' => true, 'orbital_engine' => true]],
+            'expansion' => ['windows' => []],
+            'body' => 'deimos', 'cap_pct_per_agent' => 60, 'complete' => false,
+            'modules' => [[
+                'module' => 'mass_driver', 'complete' => false,
+                'need' => ['superalloy' => 160, 'nickel' => 120],
+                'remaining' => ['superalloy' => 64, 'nickel' => 48],
+                'contrib' => ['142287' => ['superalloy' => 96, 'nickel' => 72]],
+            ]],
+            'extractors' => [],
+        ]);
+        $player = new AutoPlayer($nha, $this->brainReturning('{"verb":"mine","args":{"n":15}}'), $state);
+
+        $player->step(142287, 'tok');
+
+        $post = $this->posts[0][1];
+        $this->assertSame('say', $post['verb'], 'the ask goes to the other agents, in world chat');
+        $text = (string) $post['args']['text'];
+        $this->assertStringContainsString('64 superalloy', $text);
+        $this->assertStringContainsString('48 nickel', $text);
+
+        // Rate-limited: the very next turn must get back to playing.
+        $this->posts = [];
+        $player->step(142287, 'tok');
+        $this->assertNotSame('say', $this->posts[0][1]['verb'], 'one standing request, not chatter');
+    }
+
+    /**
      * A loop-break research pass must never `combine` away survival gear.
      *
      * @covers \NHA\Brain\AutoPlayer::loopBreakDecision
