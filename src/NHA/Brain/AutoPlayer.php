@@ -293,6 +293,38 @@ final class AutoPlayer
     private const TRANSIT_DWELL_TICKS = 8;
 
     /**
+     * Whether the agent is currently docked to an asteroid.
+     *
+     * The observation does NOT carry a `docked` flag — `GET /observe` has no
+     * such key, which is why `Ladder`'s `$raw['docked']` mining rungs never
+     * fire and an orbital hold degrades into a `deposit` no-op. The only
+     * report of the state is the `dock` intent's own result text, so read it
+     * back off the world profile's recent-intent list: an applied `dock` with
+     * nothing that moves the agent after it means we are still attached.
+     *
+     * @param list<mixed> $worldRecent `$pre['profile']->recent`, oldest first.
+     *
+     * @since 3.5.2
+     */
+    public static function dockedToAsteroid(array $worldRecent): bool
+    {
+        foreach (array_reverse($worldRecent) as $e) {
+            $d = (array) (((array) $e)['data'] ?? []);
+            $verb = (string) ($d['verb'] ?? '');
+            // Anything that relocates the agent breaks the dock.
+            if (in_array($verb, ['move', 'ride', 'depart', 'land', 'land_body', 'land_moon', 'launch', 'undock'], true)) {
+                return false;
+            }
+            if ('dock' === $verb && 'applied' === (string) ($d['status'] ?? '')
+                && 1 === preg_match('/docked to asteroid/i', (string) ($d['result'] ?? ''))
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+    /**
      * Looks at the recent decision history for an infinite loop:
      *  - a `land` / `launch` run that is NOT changing altitude (stuck, e.g. on
      *    a structure `land` cannot get past),
@@ -1445,7 +1477,16 @@ final class AutoPlayer
                     if ($hold !== null && ! in_array((string) ($hold['verb'] ?? ''), ['land', 'depart'], true)) {
                         $decision = ['verb' => (string) $hold['verb'], 'args' => (array) ($hold['args'] ?? []), 'reason' => (string) ($hold['why'] ?? '')];
                         $verb = (string) $decision['verb'];
-                    } elseif (! in_array($verb, ['dock', 'buy', 'deposit', 'wait'], true)) {
+                    } elseif (self::dockedToAsteroid((array) (is_object($pre['profile'] ?? null) ? ($pre['profile']->recent ?? []) : []))) {
+                        // Docked asteroids are the one productive thing to do
+                        // while waiting out a ~90-tick window, and the ladder's
+                        // own `mine` rung cannot see it (the observation has no
+                        // `docked` key). Without this the hold burns every turn
+                        // on a `deposit` the engine answers with "self-scoped
+                        // no-op — your balance is unchanged".
+                        $decision = ['verb' => 'mine', 'args' => ['n' => 15], 'reason' => 'holding for a transfer window — mine the docked asteroid instead of idling'];
+                        $verb = 'mine';
+                    } elseif (! in_array($verb, ['dock', 'mine', 'buy', 'sell', 'wait'], true)) {
                         $decision = self::idle($rawObs, 'flight-ready ship in orbit — holding for a transfer window');
                         $verb = (string) $decision['verb'];
                     }

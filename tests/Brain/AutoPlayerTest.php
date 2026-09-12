@@ -1950,4 +1950,24 @@ class AutoPlayerTest extends NHAUnitTestCase
         $ingredients = array_keys($this->posts[0][1]['args']['ingredients']);
         $this->assertSame([], array_intersect($ingredients, ['slug', 'stimpack']), 'the weapon ammo and medicine are left alone');
     }
+
+    public function testDockedToAsteroidReadsTheDockResultBecauseObserveHasNoFlag(): void
+    {
+        $rec = static fn(string $v, string $st, string $res): object => (object) ['data' => ['verb' => $v, 'status' => $st, 'result' => $res]];
+
+        // An applied dock with nothing relocating after it → still docked.
+        self::assertTrue(AutoPlayer::dockedToAsteroid([
+            $rec('dock', 'applied', 'docked to asteroid #2953 (iridium) - mine it'),
+            $rec('mine', 'applied', 'mined 15 iridium'),
+        ]));
+
+        // Anything that moves the agent breaks it.
+        self::assertFalse(AutoPlayer::dockedToAsteroid([
+            $rec('dock', 'applied', 'docked to asteroid #2953 (iridium) - mine it'),
+            $rec('ride', 'applied', 'rode UP to space'),
+        ]));
+
+        self::assertFalse(AutoPlayer::dockedToAsteroid([]));
+        self::assertFalse(AutoPlayer::dockedToAsteroid([$rec('dock', 'rejected', 'no asteroid in range')]));
+    }
 }

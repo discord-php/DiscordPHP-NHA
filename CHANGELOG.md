@@ -6,6 +6,31 @@ SemVer with the **major tracking the NHA world API version**.
 
 ## [Unreleased]
 
+## [3.5.2] - 2026-09-12
+
+### Fixed
+- **The orbital hold burned every turn on a no-op.** With the rebuilt flyer
+  finally waiting in orbit for a transfer window, the hold branch fell
+  through to `AutoPlayer::idle()`, which the engine answers with *"stashed 1
+  acid (self-scoped no-op - your balance is unchanged)"* - ~90 ticks of
+  nothing while credits sat at 8.
+- The root cause is that **`GET /observe` carries no `docked` key at all**,
+  so both of `Ladder`'s `$raw['docked']` mining rungs are unreachable dead
+  code and a docked asteroid was invisible to the brain. The only report of
+  the state is the `dock` intent's own result text, so new
+  `AutoPlayer::dockedToAsteroid()` reads it back off the world profile's
+  recent-intent list: an applied `dock` with nothing relocating the agent
+  after it means we are still attached. The hold now mines that asteroid.
+- The hold's pass-through verb list admitted `deposit`/`wait` and excluded
+  `mine`/`sell`, which is backwards - it protected the no-op and overrode
+  the productive moves. Swapped.
+
+### Lesson
+- A rung keyed on an observation field that does not exist never fires and
+  never errors; it just quietly degrades to the fallback. When a
+  deterministic branch seems not to run, check the key is actually in the
+  payload before reading the logic.
+
 ## [3.5.1] - 2026-09-12
 
 ### Fixed
