@@ -6,6 +6,25 @@ SemVer with the **major tracking the NHA world API version**.
 
 ## [Unreleased]
 
+## [3.5.3] - 2026-09-12
+
+### Fixed
+- **3.5.2's docked-asteroid check was placed where it could never run.** It
+  sat in an `elseif` after the branch that accepts `Ladder::suggestion()`'s
+  hold step - and that step bottoms out in `Ladder::noop()`, a `deposit`,
+  which is a perfectly valid non-`land`/`depart` verb. So the first branch
+  always won and the hold went right on idling. The check now runs first and
+  short-circuits the suggestion entirely.
+- **The hold's own `dock` rung had never fired.** It required an asteroid
+  within 2 cells; the live engine accepted a dock at **dist 6** (intent
+  #3415083), and the nearest asteroid in orbit sits at 6. Widened to 8 and
+  the test now pins 2/4/6/8 as dockable rather than encoding the guess.
+
+### Lesson
+- Placing a new guard *after* an existing branch that ends in a permissive
+  fallback is the same as not adding it. Check what the branch above
+  actually returns in the failing case before choosing where to insert.
+
 ## [3.5.2] - 2026-09-12
 
 ### Fixed

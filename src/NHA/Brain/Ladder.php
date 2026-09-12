@@ -1942,9 +1942,17 @@ final class Ladder
                 if (($skin = self::acidSkinStep($inv, $credits)) !== null) {
                     return ['verb' => $skin['verb'], 'args' => $skin['args'], 'why' => 'expansionist — ' . $skin['why'] . ' while holding for a window'];
                 }
-                // Mine an asteroid only when one is genuinely dockable — `dock`
-                // needs to be within 2 cells, and loop-break is suppressed while
-                // holding, so a `dock` that keeps missing would spin forever.
+                // Mine an asteroid only when one is genuinely dockable, since
+                // loop-break is suppressed while holding and a `dock` that
+                // keeps missing would spin forever. The live engine accepted a
+                // dock at dist 6 (intent #3415083), so the old `<= 2` guess was
+                // far too tight and this rung never fired in orbit.
+                //
+                // NOTE: `$raw['docked']` below is dead — `GET /observe` has no
+                // such key. {@see AutoPlayer::dockedToAsteroid()} reads the
+                // state off the `dock` intent's result text instead, and runs
+                // BEFORE this whole suggestion is consulted. Kept in case the
+                // world ever starts reporting it.
                 if ($raw['docked'] ?? false) {
                     return ['verb' => 'mine', 'args' => ['n' => 15], 'why' => 'expansionist — mine the docked asteroid while holding for a window'];
                 }
@@ -1952,7 +1960,7 @@ final class Ladder
                 foreach ((array) ($raw['asteroids'] ?? []) as $a) {
                     $near = min($near, (int) (((array) $a)['dist'] ?? 99));
                 }
-                if ($near <= 2 && $alt >= 300 && $alt < 600) {
+                if ($near <= 8 && $alt >= 300 && $alt < 600) {
                     return ['verb' => 'dock', 'args' => [], 'why' => 'expansionist — dock the adjacent asteroid and mine while holding for a window'];
                 }
 

@@ -1014,16 +1014,20 @@ class LadderTest extends NHAUnitTestCase
         $idle = Ladder::suggestion($orbit(['credits' => 4000, 'cryo_fuel' => 120, 'heat_shield' => 1, 'acid_skin' => 1]), [], [], false, 'expansionist');
         $this->assertContains($idle['verb'], ['deposit', 'move']);
 
-        // An asteroid in view but OUT of dock range (dist > 2) → idle, not a
-        // `dock` that would miss every turn (loop-break is suppressed here).
+        // An asteroid in view but OUT of dock range → idle, not a `dock` that
+        // would miss every turn (loop-break is suppressed here).
         $far = $orbit(['credits' => 4000, 'cryo_fuel' => 120, 'heat_shield' => 1, 'acid_skin' => 1]);
-        $far['asteroids'] = [['id' => 1, 'x' => 40, 'y' => 40, 'dist' => 4]];
+        $far['asteroids'] = [['id' => 1, 'x' => 40, 'y' => 40, 'dist' => 20]];
         $this->assertContains(Ladder::suggestion($far, [], [], false, 'expansionist')['verb'], ['deposit', 'move']);
 
-        // …within range → dock it.
-        $near = $far;
-        $near['asteroids'] = [['id' => 1, 'x' => 40, 'y' => 40, 'dist' => 2]];
-        $this->assertSame('dock', Ladder::suggestion($near, [], [], false, 'expansionist')['verb']);
+        // …within range → dock it. The live engine accepted a dock at dist 6
+        // (intent #3415083), so anything up to 8 counts as reachable; the old
+        // `<= 2` guess meant this rung never fired in orbit at all.
+        foreach ([2, 4, 6, 8] as $dist) {
+            $near = $far;
+            $near['asteroids'] = [['id' => 1, 'x' => 40, 'y' => 40, 'dist' => $dist]];
+            $this->assertSame('dock', Ladder::suggestion($near, [], [], false, 'expansionist')['verb'], "dist {$dist} should be dockable");
+        }
     }
 
     /**

@@ -1473,11 +1473,18 @@ final class AutoPlayer
                     // post-rejection cooldown), so a `depart` coming back from
                     // `Ladder::suggestion()` here is stale — drop it with `land`
                     // and fall through to the idle hold.
-                    $hold = Ladder::suggestion($rawObs, $tried, $known, false, $stance, $departUnreachable);
+                    // The docked check has to come BEFORE the ladder's own hold
+                    // suggestion, not after it: that suggestion bottoms out in
+                    // `Ladder::noop()` (a `deposit`), which is a perfectly valid
+                    // non-land/depart verb, so it is accepted here and an
+                    // `elseif` below never gets a turn. 3.5.2 put the check in
+                    // that elseif and the hold went right on idling.
+                    $docked = self::dockedToAsteroid((array) (is_object($pre['profile'] ?? null) ? ($pre['profile']->recent ?? []) : []));
+                    $hold = $docked ? null : Ladder::suggestion($rawObs, $tried, $known, false, $stance, $departUnreachable);
                     if ($hold !== null && ! in_array((string) ($hold['verb'] ?? ''), ['land', 'depart'], true)) {
                         $decision = ['verb' => (string) $hold['verb'], 'args' => (array) ($hold['args'] ?? []), 'reason' => (string) ($hold['why'] ?? '')];
                         $verb = (string) $decision['verb'];
-                    } elseif (self::dockedToAsteroid((array) (is_object($pre['profile'] ?? null) ? ($pre['profile']->recent ?? []) : []))) {
+                    } elseif ($docked) {
                         // Docked asteroids are the one productive thing to do
                         // while waiting out a ~90-tick window, and the ladder's
                         // own `mine` rung cannot see it (the observation has no
