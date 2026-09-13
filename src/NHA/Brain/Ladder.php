@@ -635,6 +635,59 @@ final class Ladder
     }
 
     /**
+     * How much fuel a transfer actually needs, solved from the engine's own
+     * Δv rejection.
+     *
+     * {@see DEPART_FUEL_MIN} (90) is sized for the MOONS (Δv 50-55). Once both
+     * moons are on the skip list the only destinations left are Mars (100) and
+     * Venus (130), and 90 units is nowhere near either — so the brain called
+     * itself "flight-ready", held for a window, departed, and collected
+     * *"Δv too low: your ship makes 62 but Venus needs 130"* 47 times in one
+     * evening while sitting on 6,320 unspent credits.
+     *
+     * The engine's capacity curve is `dv = 900·L / (mass + 5·L)`. A rejection
+     * hands us a solved point on it (`dv` at the current load `L`), so the
+     * ship's mass falls out — `mass = 900·L/dv - 5·L` — and the load that
+     * clears `need` follows:
+     *
+     *     L' = need·mass / (900 - 5·need)
+     *
+     * Deriving mass from the rejection rather than the vehicle list is
+     * deliberate: `GET /observe`'s vehicles carry no `mass` field, and this
+     * also sidesteps guessing WHICH of 75 hulls the engine picked to fly.
+     *
+     * Returns `null` when the text is not a Δv rejection, and when the
+     * destination is unreachable at ANY load (`need >= 180` drives the
+     * denominator to zero — no amount of fuel clears it, so the honest answer
+     * is a lighter ship, not a bigger tank).
+     *
+     * @param string $result the rejection text
+     * @param int    $onHand fuel units carried when it was rejected
+     *
+     * @since 3.5.5
+     */
+    public static function fuelTargetFromRejection(string $result, int $onHand): ?int
+    {
+        if (1 !== preg_match('/your ship makes\s+(\d+)\s+but\s+\S+\s+needs\s+(\d+)/i', $result, $m)) {
+            return null;
+        }
+        $dv = (int) $m[1];
+        $need = (int) $m[2];
+        $denom = 900 - 5 * $need;
+        if ($dv < 1 || $onHand < 1 || $denom < 1) {
+            return null;
+        }
+        $mass = 900 * $onHand / $dv - 5 * $onHand;
+        if ($mass < 1) {
+            return null;
+        }
+
+        // +5% so a rounding edge or a few units burned in the meantime does
+        // not leave it one unit short and holding all over again.
+        return (int) ceil($need * $mass / $denom * 1.05);
+    }
+
+    /**
      * Sell the biggest depot-tradeable hoard to raise cash.
      *
      * The companion to {@see affordableBuy()}: when a rung wants to buy and
@@ -1887,7 +1940,12 @@ final class Ladder
             $fuelled = $fuelUnits > 0;
             // "flight-ready" means the ship can actually make a transfer, not
             // just hold an altitude — reaching orbit on fumes only parks it.
-            $fuelReady = $fuelUnits >= self::DEPART_FUEL_MIN;
+            // `_fuel_goal` is injected by {@see AutoPlayer} from the last Δv
+            // rejection ({@see fuelTargetFromRejection()}) — the real bar for
+            // the destinations still on the table, which DEPART_FUEL_MIN
+            // (a moon-sized 90) badly under-states.
+            $fuelGoal = max(self::DEPART_FUEL_MIN, (int) ($raw['_fuel_goal'] ?? 0));
+            $fuelReady = $fuelUnits >= $fuelGoal;
             $flightReady = $hasShip && $fuelReady;
 
             // In space with no ship → dead end. Altitude decays, every verb up
@@ -1932,8 +1990,8 @@ final class Ladder
                         ? ['verb' => 'ride', 'args' => [], 'why' => "expansionist — alt {$alt} below the 300 depart floor; ride the elevator to reset into the band"]
                         : ['verb' => 'move', 'args' => ['x' => $lift['x'], 'y' => $lift['y']], 'why' => "expansionist — alt {$alt} below the depart floor; get to the tall elevator base to reset altitude"];
                 }
-                if (! $fuelReady && ($top = self::affordableBuy('cryo_fuel', self::DEPART_FUEL_MIN - $fuelUnits, $credits)) !== null) {
-                    return ['verb' => $top['verb'], 'args' => $top['args'], 'why' => "expansionist — stock {$top['n']} cryo_fuel ({$fuelUnits}/" . self::DEPART_FUEL_MIN . ') so the ship clears the transfer Δv'];
+                if (! $fuelReady && ($top = self::affordableBuy('cryo_fuel', $fuelGoal - $fuelUnits, $credits)) !== null) {
+                    return ['verb' => $top['verb'], 'args' => $top['args'], 'why' => "expansionist — stock {$top['n']} cryo_fuel ({$fuelUnits}/{$fuelGoal}) so the ship clears the transfer Δv"];
                 }
                 if ($has('heat_shield') === 0) {
                     if ($has('superalloy') > 0 && $has('composite') > 0) {

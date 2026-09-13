@@ -1199,4 +1199,49 @@ class LadderTest extends NHAUnitTestCase
 
         self::assertNull(Ladder::raiseCashStep(['credits' => 4, 'brine' => 9000]));
     }
+
+    public function testFuelTargetIsSolvedFromTheEnginesOwnDeltaVRejection(): void
+    {
+        $venus = 'Δv too low: your ship makes 62 but Venus needs 130. Load more/better fuel (cryo_fuel/helium3) or lighten the ship.';
+
+        // dv = 900L/(mass+5L). Rejected at L=95 making 62 → mass ≈ 904, so
+        // Venus (130) wants ~470 units and Mars (100) ~226, +5% margin.
+        self::assertSame(494, Ladder::fuelTargetFromRejection($venus, 95));
+        self::assertSame(238, Ladder::fuelTargetFromRejection(str_replace(['Venus', '130'], ['Mars', '100'], $venus), 95));
+
+        // The whole point: the moon-sized DEPART_FUEL_MIN is nowhere near it.
+        self::assertGreaterThan(Ladder::DEPART_FUEL_MIN * 2, Ladder::fuelTargetFromRejection($venus, 95));
+
+        // Not a Δv rejection, or no load to solve from → no opinion.
+        self::assertNull(Ladder::fuelTargetFromRejection('depart from EARTH ORBIT (altitude 300-600)', 95));
+        self::assertNull(Ladder::fuelTargetFromRejection($venus, 0));
+
+        // Δv 180+ zeroes the denominator — unreachable at ANY load, so say so
+        // rather than sending it shopping for infinite fuel.
+        self::assertNull(Ladder::fuelTargetFromRejection(str_replace('130', '180', $venus), 95));
+    }
+
+    public function testTheHoldStocksFuelToTheLearnedGoalNotTheMoonSizedMinimum(): void
+    {
+        $orbit = [
+            'in_space' => true, 'altitude' => 450, 'position' => [30, 110],
+            'expansion' => ['location' => 'earth', 'place' => ['where' => 'earth_space'], 'at_body' => null,
+                'windows' => ['mars' => ['open' => false, 'opens_in' => 100]]],
+            'vehicles' => [['name' => 'flyer', 'flies' => true, 'orbital_engine' => true, 'fuel_cap' => 640]],
+            'inventory' => ['credits' => 9000, 'cryo_fuel' => 120, 'heat_shield' => 1, 'acid_skin' => 1, 'stimpack' => 2, 'kinetic_gun' => 1, 'slug' => 20],
+            'asteroids' => [],
+        ];
+
+        // 120 units clears the moon-sized minimum, so without a goal the hold
+        // considers itself fuelled and idles.
+        $idle = Ladder::suggestion($orbit, [], [], false, 'expansionist');
+        self::assertNotSame('buy', $idle['verb'], 'sanity: without a goal the hold thinks 120 units is enough');
+
+        // With the solved goal injected it keeps buying toward the real bar.
+        $orbit['_fuel_goal'] = 238;
+        $buy = Ladder::suggestion($orbit, [], [], false, 'expansionist');
+        self::assertSame('buy', $buy['verb']);
+        self::assertSame('cryo_fuel', $buy['args']['resource']);
+        self::assertStringContainsString('120/238', $buy['why']);
+    }
 }

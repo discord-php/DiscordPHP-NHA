@@ -6,6 +6,38 @@ SemVer with the **major tracking the NHA world API version**.
 
 ## [Unreleased]
 
+## [3.5.5] - 2026-09-13
+
+### Fixed
+- **The agent was holding in orbit for a departure it could never make.**
+  `Ladder::DEPART_FUEL_MIN` (90 units) is sized for the MOONS (Δv 50-55) -
+  but both moons are on the skip list once our colony share is spent, so the
+  only live destinations are Mars (Δv 100) and Venus (Δv 130). At 90 units
+  the brain called itself "flight-ready", held for a window, departed, and
+  collected *"Δv too low: your ship makes 62 but Venus needs 130"* - **47
+  times in one evening, sitting on 6,320 unspent credits.**
+- New `Ladder::fuelTargetFromRejection()` solves the real bar from the
+  engine's own curve. A Δv rejection is a solved point on
+  `dv = 900·L / (mass + 5·L)`, so the ship's mass falls out
+  (`mass = 900·L/dv - 5·L`) and the load that clears the destination follows
+  (`L' = need·mass / (900 - 5·need)`, +5% margin): **~238 units for Mars,
+  ~494 for Venus** on this hull, against the 90 it was stopping at. The goal
+  is captured once, at the rejection (the derivation needs the fuel load from
+  that moment), stored per agent, and spent against by the hold's buy rung.
+- Deriving mass from the rejection rather than the vehicle list is
+  deliberate: `GET /observe`'s vehicles carry no `mass` field, and it also
+  sidesteps guessing which of the agent's **75** hulls the engine picked.
+- A destination needing Δv 180+ zeroes the denominator - unreachable at any
+  load - and returns `null` rather than sending the agent shopping for
+  infinite fuel. That case wants a lighter ship, not a bigger tank.
+
+### Lesson
+- A threshold constant tuned for one era silently becomes a trap in the next.
+  `DEPART_FUEL_MIN` was right when the moons were the target and wrong the
+  moment they were finished; nothing failed loudly, the agent just waited.
+  Prefer a bar DERIVED from what the engine says it wants over a number that
+  was correct once.
+
 ## [3.5.4] - 2026-09-12
 
 ### Fixed

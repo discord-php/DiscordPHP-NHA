@@ -401,4 +401,28 @@ trait LoopStrategyStateTrait
 
         return $roseNow || ($roseAt > 0 && ($now - $roseAt) < self::RESEARCH_PAYING_WINDOW);
     }
+
+    /**
+     * Remembers how much fuel the ship actually needs for a transfer, solved
+     * from the engine's Δv rejection by
+     * {@see \NHA\Brain\Ladder::fuelTargetFromRejection()}.
+     *
+     * Stored rather than recomputed every turn because the derivation needs
+     * the fuel load AT THE MOMENT OF THE REJECTION: buying more fuel changes
+     * `L` and would skew the mass that falls out of the curve. Capture once,
+     * then spend against it.
+     *
+     * @since 3.5.5
+     */
+    public function recordFuelGoal(int $agent_id, int $units): void
+    {
+        $this->data['agent_fuel_goal'][(string) $agent_id] = $units;
+        $this->save();
+    }
+
+    /** The stored Δv-derived fuel goal, or 0 when none has been learned yet. */
+    public function fuelGoal(int $agent_id): int
+    {
+        return (int) ($this->data['agent_fuel_goal'][(string) $agent_id] ?? 0);
+    }
 }

@@ -924,6 +924,31 @@ final class AutoPlayer
             // `needs_item` entry.
             $this->reviewCapabilityFeed($agent_id, $pre['profile'] ?? null, (array) ($rawObs['inventory'] ?? []));
 
+            // Learn the REAL fuel bar from the engine's own Δv rejection.
+            // `Ladder::DEPART_FUEL_MIN` (90) is sized for the moons; with both
+            // moons skipped the live destinations are Mars (100) and Venus
+            // (130), which want ~226 and ~470 units on this hull. Until 3.5.5
+            // the brain declared itself flight-ready at 90, held for a window,
+            // departed, and was refused — 47 times in one evening on 6,320
+            // unspent credits. Capture the solved goal ONCE, at the rejection
+            // (the derivation needs the fuel load from that moment), then let
+            // the ladder spend against it.
+            $fuelOnHand = (int) (($inv0 = (array) ($rawObs['inventory'] ?? []))['cryo_fuel'] ?? 0)
+                + (int) ($inv0['hydrogen'] ?? 0) + (int) ($inv0['helium3'] ?? 0);
+            foreach (array_reverse((array) (is_object($pre['profile'] ?? null) ? ($pre['profile']->recent ?? []) : [])) as $e) {
+                $d = (array) (((array) $e)['data'] ?? []);
+                if ('depart' !== ($d['verb'] ?? '') || 'rejected' !== ($d['status'] ?? '')) {
+                    continue;
+                }
+                if (($goal = Ladder::fuelTargetFromRejection((string) ($d['result'] ?? ''), $fuelOnHand)) !== null) {
+                    $this->state->recordFuelGoal($agent_id, $goal);
+                }
+                break;
+            }
+            if (($goal = $this->state->fuelGoal($agent_id)) > 0) {
+                $rawObs['_fuel_goal'] = $goal;
+            }
+
             // At a body (surface OR its orbit) — or latched as heading home from
             // one — pull that body's colony board so the decision can FUND the
             // next module, stop raising redundant extractors, and once this
